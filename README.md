@@ -114,8 +114,12 @@ composeApp/src/
   direct + niveau micro pour l'onde, permission `RECORD_AUDIO` demandée au tap.
   Le texte final est passé à `WineRecognizer.fromText` (Gemini) qui remplit les
   champs ; l'écran Voix affiche l'onde réelle, la transcription et le résultat.
-- **Reste à brancher** : sync cloud effective des données Room vers le compte ;
-  capture caméra réelle (bytes → `WineRecognizer.fromImage`).
+- **Photo d'étiquette (câblée).** `ai/PhotoCapture.kt` (expect) +
+  `PhotoCapture.android.kt` : appareil photo **système** (`TakePicture` +
+  `FileProvider`, pleine résolution, **sans CameraX** — inutile pour un cliché
+  ponctuel), permission CAMERA au tap. En mode Photo, le bouton capture →
+  `WineRecognizer.fromImage` (Gemini) remplit les champs + prix.
+- **Reste à brancher** : sync cloud effective des données Room vers le compte.
 - **Bouteilles** : dessinées vectoriellement (`ui/WineBottle`) — capsule, corps,
   étiquette — donc nettes à toute taille, sans asset bitmap. Remplaçables par de
   vraies photos plus tard.

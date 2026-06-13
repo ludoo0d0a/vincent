@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import com.vincent.ai.PriceEstimate
 import com.vincent.ai.priceEstimator
 import com.vincent.ai.rememberDictation
+import com.vincent.ai.rememberPhotoCapture
 import com.vincent.ai.wineRecognizer
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -65,14 +66,27 @@ fun AddScreen(onClose: () -> Unit) {
     var aiBottle by remember { mutableStateOf<Bottle?>(null) }
     var aiPrice by remember { mutableStateOf<PriceEstimate?>(null) }
     var busy by remember { mutableStateOf(false) }
-    // The scan/photo path feeds the recognised label to Gemini, then estimates a price.
-    val identify: () -> Unit = {
+    // Photo mode: snap the label with the system camera (full-res) → Gemini fromImage.
+    val startCapture = rememberPhotoCapture { bytes ->
         busy = true
         scope.launch {
-            val b = recognizer.fromText("Château Margaux 2015")
-            aiBottle = b
-            aiPrice = b?.let { estimator.estimate(it) }
+            aiBottle = recognizer.fromImage(bytes)
+            aiPrice = aiBottle?.let { estimator.estimate(it) }
             busy = false
+        }
+    }
+    // Scan = recognised label text; Photo = real photo. Both land in aiBottle/aiPrice.
+    val identify: () -> Unit = {
+        if (mode == AddMode.PHOTO) {
+            startCapture()
+        } else {
+            busy = true
+            scope.launch {
+                val b = recognizer.fromText("Château Margaux 2015")
+                aiBottle = b
+                aiPrice = b?.let { estimator.estimate(it) }
+                busy = false
+            }
         }
     }
     // Voice dictation: real SpeechRecognizer → transcript → Gemini parsing on final result.
