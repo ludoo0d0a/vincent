@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
@@ -27,7 +28,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.vincent.ai.PriceEstimate
+import com.vincent.ai.priceEstimator
+import com.vincent.ai.wineRecognizer
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +57,22 @@ private enum class AddMode(val label: String) { SCAN("Scan"), PHOTO("Photo"), VO
 @Composable
 fun AddScreen(onClose: () -> Unit) {
     var mode by remember { mutableStateOf(AddMode.SCAN) }
+    val recognizer = wineRecognizer()
+    val estimator = priceEstimator()
+    val scope = rememberCoroutineScope()
+    var aiBottle by remember { mutableStateOf<Bottle?>(null) }
+    var aiPrice by remember { mutableStateOf<PriceEstimate?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    // The scan/photo path feeds the recognised label to Gemini, then estimates a price.
+    val identify: () -> Unit = {
+        busy = true
+        scope.launch {
+            val b = recognizer.fromText("Château Margaux 2015")
+            aiBottle = b
+            aiPrice = b?.let { estimator.estimate(it) }
+            busy = false
+        }
+    }
     Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 8.dp),
@@ -85,13 +107,24 @@ fun AddScreen(onClose: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
             when (mode) {
-                AddMode.SCAN, AddMode.PHOTO -> ScanPane(photo = mode == AddMode.PHOTO)
+                AddMode.SCAN, AddMode.PHOTO -> ScanPane(
+                    photo = mode == AddMode.PHOTO,
+                    color = aiBottle?.color ?: WineColor.RED,
+                    title = aiBottle?.let { "${it.domain} ${it.vintage}" } ?: "Château Margaux 2015",
+                    subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" } ?: "Margaux · Bordeaux · Rouge",
+                    priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
+                    busy = busy,
+                    onIdentify = identify,
+                )
                 AddMode.VOICE -> VoicePane()
             }
         }
 
         Button(
-            onClick = { Cellar.addBottle(buildAdded(mode)); onClose() },
+            onClick = {
+                val b = aiBottle?.copy(price = aiPrice?.amountEur ?: 0) ?: buildAdded(mode)
+                Cellar.addBottle(b); onClose()
+            },
             modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
@@ -131,7 +164,15 @@ private fun buildAdded(mode: AddMode): Bottle {
 }
 
 @Composable
-private fun ScanPane(photo: Boolean) {
+private fun ScanPane(
+    photo: Boolean,
+    color: WineColor,
+    title: String,
+    subtitle: String,
+    priceLabel: String?,
+    busy: Boolean,
+    onIdentify: () -> Unit,
+) {
     Column(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(18.dp))
@@ -156,21 +197,24 @@ private fun ScanPane(photo: Boolean) {
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(14.dp).clip(RoundedCornerShape(16.dp)).background(VincentColors.Surface).padding(13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                WineBottle(WineColor.RED, Modifier.size(width = 28.dp, height = 50.dp))
+                WineBottle(color, Modifier.size(width = 28.dp, height = 50.dp))
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Green, modifier = Modifier.size(11.dp))
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(11.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("ÉTIQUETTE RECONNUE", fontSize = 9.sp, fontWeight = FontWeight.W800, color = VincentColors.Green)
+                        Text(if (busy) "ANALYSE…" else "IDENTIFIER AVEC L'IA", fontSize = 9.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
                     }
-                    Text("Château Margaux 2015", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg, modifier = Modifier.padding(top = 2.dp))
-                    Text("Margaux · Bordeaux · Rouge", fontSize = 11.sp, color = VincentColors.Muted)
+                    Text(title, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg, modifier = Modifier.padding(top = 2.dp))
+                    Text(subtitle, fontSize = 11.sp, color = VincentColors.Muted)
+                    if (priceLabel != null) {
+                        Text(priceLabel, fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Green, modifier = Modifier.padding(top = 2.dp))
+                    }
                 }
                 Box(
-                    Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Accent),
+                    Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Accent).clickable(onClick = onIdentify),
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.Add, contentDescription = "Ajouter", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                ) { Icon(Icons.Filled.AutoAwesome, contentDescription = "Identifier", tint = Color.White, modifier = Modifier.size(20.dp)) }
             }
         }
     }

@@ -101,9 +101,16 @@ composeApp/src/
   et mappe couleur, millésime, prix, région, note… L'accès fichier passe par le
   Storage Access Framework (`data/FileTransfer*.kt`, `expect/actual`). Écran
   **Importer / Exporter** accessible depuis le Compte.
-- **Reste à brancher** : sync cloud effective des données Room vers le compte,
-  reconnaissance d'étiquette (ML Kit) et dictée (Speech-to-Text) côté
-  `androidMain`.
+- **Reconnaissance & prix (IA, câblé).** `ai/WineAi.kt` expose
+  `WineRecognizer` (titre/photo → `Bottle`) et `PriceEstimator` (→ prix estimé).
+  L'`actual` Android `ai/WineAi.android.kt` appelle **Gemini Flash** (HTTP +
+  `org.json`, sortie JSON structurée). Branché sur l'écran d'ajout (scan/photo) :
+  bouton « identifier avec l'IA » → remplit les champs + un prix estimé, puis
+  l'ajout reprend ces valeurs. ⚠️ Renseigner `GEMINI_API_KEY` dans
+  `WineAi.android.kt` (clé gratuite sur aistudio.google.com) — sinon no-op propre.
+  Le prix est toujours présenté comme **estimation** (source affichée).
+- **Reste à brancher** : sync cloud effective des données Room vers le compte ;
+  capture caméra réelle + dictée (Speech-to-Text) pour alimenter le recognizer.
 - **Bouteilles** : dessinées vectoriellement (`ui/WineBottle`) — capsule, corps,
   étiquette — donc nettes à toute taille, sans asset bitmap. Remplaçables par de
   vraies photos plus tard.
