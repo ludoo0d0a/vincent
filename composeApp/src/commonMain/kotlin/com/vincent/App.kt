@@ -32,6 +32,7 @@ import com.vincent.screens.BottleDetailScreen
 import com.vincent.screens.BottlesScreen
 import com.vincent.screens.CellarScreen
 import com.vincent.screens.DashboardScreen
+import com.vincent.screens.ImportExportScreen
 import com.vincent.screens.LoginScreen
 import com.vincent.screens.RecentScreen
 import com.vincent.screens.SearchScreen
@@ -45,7 +46,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
     SEARCH("Recherche", Icons.Filled.Search),
 }
 
-private enum class Overlay { ADD, ACCOUNT, RECENT }
+private enum class Overlay { ADD, ACCOUNT, RECENT, TRANSFER }
 
 @Composable
 fun App() = VincentTheme {
@@ -69,8 +70,13 @@ fun App() = VincentTheme {
             overlay == Overlay.ACCOUNT -> AccountScreen(
                 onBack = { overlay = null },
                 onOpenRecent = { overlay = Overlay.RECENT },
+                onOpenTransfer = { overlay = Overlay.TRANSFER },
                 onOpenBottle = { detail = it; overlay = null },
                 onSignOut = { Auth.signOut(); guest = false; overlay = null },
+            )
+
+            overlay == Overlay.TRANSFER -> ImportExportScreen(
+                onBack = { overlay = Overlay.ACCOUNT },
             )
 
             overlay == Overlay.RECENT -> RecentScreen(

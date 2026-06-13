@@ -95,6 +95,12 @@ composeApp/src/
   ⚠️ **À renseigner** : la constante `WEB_CLIENT_ID` dans
   `GoogleSignIn.android.kt` — l'ID client **OAuth Web** (Google Cloud Console /
   Firebase). Sans lui, le flux échoue à l'exécution (le code compile).
+- **Import / Export CSV (câblé).** `data/CsvFormat.kt` sérialise la cave (format
+  Vincent, round-trip) et parse un CSV entrant avec **mapping de colonnes
+  tolérant** : détecte Vincent / Vivino / PLOC / tableur via les en-têtes (FR/EN)
+  et mappe couleur, millésime, prix, région, note… L'accès fichier passe par le
+  Storage Access Framework (`data/FileTransfer*.kt`, `expect/actual`). Écran
+  **Importer / Exporter** accessible depuis le Compte.
 - **Reste à brancher** : sync cloud effective des données Room vers le compte,
   reconnaissance d'étiquette (ML Kit) et dictée (Speech-to-Text) côté
   `androidMain`.

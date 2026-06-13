@@ -98,6 +98,19 @@ object Cellar {
         }
     }
 
+    /** Serialise the whole cellar to Vincent CSV (round-trip importable). */
+    fun exportCsv(): String = CsvFormat.toCsv(bottles)
+
+    /** Merge imported bottles by id (add or replace), persisting each. */
+    fun importBottles(incoming: List<Bottle>): Int {
+        incoming.forEach { b ->
+            val i = bottles.indexOfFirst { it.id == b.id }
+            if (i >= 0) bottles[i] = b else bottles.add(0, b)
+            persist(b)
+        }
+        return incoming.size
+    }
+
     private fun persist(b: Bottle) {
         val r = repo ?: return
         scope.launch { r.upsert(b) }
