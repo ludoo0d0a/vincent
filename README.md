@@ -55,11 +55,14 @@ FAB d'ajout, plus les surfaces atteintes par navigation :
 
 ```
 composeApp/src/
-├── androidMain/            # MainActivity + manifeste (entrée Android)
+├── androidMain/com/vincent/
+│   ├── MainActivity.kt     # entrée Android : build Room + Cellar.bootstrap
+│   └── db/                 # BottleEntity, BottleDao, VincentDatabase, RoomCellarRepository
 └── commonMain/com/vincent/
     ├── App.kt              # navigation racine (Scaffold + bottom bar + overlays)
     ├── theme/Theme.kt      # palette lie-de-vin + Material3 + typo
     ├── model/              # Models.kt (WineColor, Bottle, RackCell…) + SampleData.kt
+    ├── data/               # Cellar (store réactif) + CellarRepository (seam persistance)
     ├── ui/                 # WineBottle (Canvas), ColorTag, Stars, ScreenHeader, VCard
     └── screens/            # les 9 écrans
 ```
@@ -72,10 +75,18 @@ composeApp/src/
   modifient réellement les données, et le tableau de bord / les favoris / les
   dernières bouteilles se recalculent. L'API est volontairement étroite
   (`addBottle` / `adjustQuantity` / `toggleFavorite` + lectures dérivées) pour
-  qu'une implémentation **persistante (Room ou SQLDelight)** remplace les listes
-  en mémoire sans toucher à l'UI.
-- **Reste à brancher** : persistance disque, sync cloud, reconnaissance
-  d'étiquette (ML Kit) et dictée (Speech-to-Text) côté `androidMain`.
+  qu'une implémentation persistante remplace les listes en mémoire sans toucher
+  à l'UI.
+- **Persistance : Room (câblé).** `CellarRepository` (commonMain) est implémenté
+  par `RoomCellarRepository` (androidMain) sur une base Room
+  (`db/VincentDatabase`, entité `BottleEntity`, DAO suspend). `MainActivity`
+  construit la base et appelle `Cellar.bootstrap(repo)` : au 1er lancement le
+  seed est persisté, ensuite les bouteilles enregistrées remplacent le seed, et
+  chaque ajout / service / favori est écrit en *write-through*. Room tourne sur
+  la cible Android via KSP (`kspAndroid`) ; les enums sont stockés par nom, donc
+  pas de `TypeConverter`.
+- **Reste à brancher** : sync cloud (compte Google), reconnaissance d'étiquette
+  (ML Kit) et dictée (Speech-to-Text) côté `androidMain`.
 - **Bouteilles** : dessinées vectoriellement (`ui/WineBottle`) — capsule, corps,
   étiquette — donc nettes à toute taille, sans asset bitmap. Remplaçables par de
   vraies photos plus tard.

@@ -1,0 +1,236 @@
+package com.vincent.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.vincent.data.Cellar
+import com.vincent.model.AddSource
+import com.vincent.model.Bottle
+import com.vincent.model.WineCategory
+import com.vincent.model.WineColor
+import com.vincent.theme.MonoNumber
+import com.vincent.theme.VincentColors
+import com.vincent.ui.ColorTag
+import com.vincent.ui.WineBottle
+
+private enum class AddMode(val label: String) { SCAN("Scan"), PHOTO("Photo"), VOICE("Voix") }
+
+@Composable
+fun AddScreen(onClose: () -> Unit) {
+    var mode by remember { mutableStateOf(AddMode.SCAN) }
+    Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Filled.Close, contentDescription = "Fermer", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            Text("Ajouter une bouteille", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+            Spacer(Modifier.width(38.dp))
+        }
+
+        // mode selector
+        Row(
+            Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(11.dp))
+                .background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp)).padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            AddMode.entries.forEach { m ->
+                val on = m == mode
+                Box(
+                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (on) VincentColors.Surface else Color.Transparent)
+                        .clickable { mode = m }.padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text(m.label, fontSize = 12.sp, fontWeight = FontWeight.W700, color = if (on) VincentColors.Accent else VincentColors.Muted) }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
+            when (mode) {
+                AddMode.SCAN, AddMode.PHOTO -> ScanPane(photo = mode == AddMode.PHOTO)
+                AddMode.VOICE -> VoicePane()
+            }
+        }
+
+        Button(
+            onClick = { Cellar.addBottle(buildAdded(mode)); onClose() },
+            modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+        ) { Text("Confirmer l'ajout", fontWeight = FontWeight.W700) }
+    }
+}
+
+/** Builds the bottle implied by the active capture mode (mocked recognition result). */
+private fun buildAdded(mode: AddMode): Bottle {
+    val source = when (mode) {
+        AddMode.VOICE -> AddSource.VOICE
+        AddMode.PHOTO -> AddSource.PHOTO
+        AddMode.SCAN -> AddSource.SCAN
+    }
+    return Bottle(
+        id = "new-${Cellar.references()}",
+        domain = "Château Margaux",
+        appellation = "Margaux",
+        color = WineColor.RED,
+        category = WineCategory.BORDEAUX,
+        vintage = "2015",
+        price = 620,
+        quantity = 2,
+        rating = 4.8,
+        cellarSpot = "B4",
+        provenance = "Margaux, FR",
+        merchant = "—",
+        purchaseDate = "Aujourd'hui",
+        occasion = "Cave de garde",
+        pairings = listOf("Côte de bœuf", "Truffe", "Gibier à plume"),
+        drinkFrom = 2025,
+        drinkTo = 2045,
+        drinkNow = 0.3f,
+        source = source,
+        addedLabel = "à l'instant",
+    )
+}
+
+@Composable
+private fun ScanPane(photo: Boolean) {
+    Column(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(18.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF15151B)))),
+            contentAlignment = Alignment.Center,
+        ) {
+            // viewfinder frame
+            Box(Modifier.size(width = 180.dp, height = 260.dp), contentAlignment = Alignment.Center) {
+                WineBottle(WineColor.RED, Modifier.size(width = 74.dp, height = 170.dp))
+                listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd).forEach { a ->
+                    Box(Modifier.align(a).size(30.dp).border(3.dp, Color.White, RoundedCornerShape(8.dp)))
+                }
+                Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(Color(0xFF7BE6A8)))
+            }
+            Text(
+                if (photo) "Prenez la bouteille en photo" else "Cadrez l'étiquette — reconnaissance auto",
+                color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.W600,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp),
+            )
+            // detected card
+            Row(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(14.dp).clip(RoundedCornerShape(16.dp)).background(VincentColors.Surface).padding(13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WineBottle(WineColor.RED, Modifier.size(width = 28.dp, height = 50.dp))
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Green, modifier = Modifier.size(11.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("ÉTIQUETTE RECONNUE", fontSize = 9.sp, fontWeight = FontWeight.W800, color = VincentColors.Green)
+                    }
+                    Text("Château Margaux 2015", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg, modifier = Modifier.padding(top = 2.dp))
+                    Text("Margaux · Bordeaux · Rouge", fontSize = 11.sp, color = VincentColors.Muted)
+                }
+                Box(
+                    Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Accent),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.Add, contentDescription = "Ajouter", tint = Color.White, modifier = Modifier.size(20.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoicePane() {
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("● Écoute…", color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
+        Spacer(Modifier.height(8.dp))
+        Text("Dictez votre bouteille", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+        Text("« domaine, millésime, couleur, quantité, casier »", fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp))
+
+        // waveform
+        Row(
+            Modifier.height(80.dp).padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            listOf(18, 40, 66, 30, 78, 48, 80, 34, 60, 22, 50, 74, 28, 44, 16).forEach { h ->
+                Box(Modifier.width(5.dp).height(h.dp).clip(RoundedCornerShape(3.dp)).background(VincentColors.Accent.copy(alpha = 0.85f)))
+            }
+        }
+
+        Box(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(16.dp)).padding(15.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("« Château Margaux 2015, rouge, deux bouteilles, casier B4 »", fontSize = 15.sp, color = VincentColors.Fg, lineHeight = 22.sp)
+        }
+
+        Spacer(Modifier.height(13.dp))
+        ParsedField("Domaine", "Château Margaux")
+        ParsedField("Millésime", "2015", mono = true)
+        ParsedFieldTag("Couleur")
+        ParsedField("Quantité · Casier", "×2 · B4", mono = true)
+    }
+}
+
+@Composable
+private fun ParsedField(label: String, value: String, mono: Boolean = false) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp)).padding(horizontal = 13.dp, vertical = 11.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+        if (mono) Text(value, style = MonoNumber, color = VincentColors.Fg)
+        else Text(value, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+    }
+}
+
+@Composable
+private fun ParsedFieldTag(label: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp)).padding(horizontal = 13.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+        ColorTag(WineColor.RED)
+    }
+}
