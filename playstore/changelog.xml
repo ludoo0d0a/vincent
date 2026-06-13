@@ -1,0 +1,18 @@
+<fr-FR>
+Première version de Vincent 🍷
+• Ajout express : scan, photo ou voix, avec reconnaissance et prix estimé par IA
+• Plan des casiers coloré par type de vin, filtres par millésime/prix
+• Fiche vin : accords mets-vin, fenêtre de garde, notes
+• Recherche par goût, cépage, provenance, caviste…
+• Import/export CSV (PLOC, Vivino)
+• Connexion Google et favoris
+</fr-FR>
+<en-US>
+Vincent 1.0 🍷
+• Quick add: scan, photo or voice, with AI recognition and price estimate
+• Rack plan coloured by wine type, filter by vintage/price
+• Rich bottle sheet: food pairings, drink window, notes
+• Search by taste, grape, region, merchant…
+• CSV import/export (PLOC, Vivino)
+• Google sign-in and favourites
+</en-US>

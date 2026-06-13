@@ -15,3 +15,5 @@ scripts/.keystore-credentials
 
 # Generated Play release notes (from playstore/whatsnew.xml)
 playstore/whatsnew/
+/secrets/*.json
+/composeApp/release/
