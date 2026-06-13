@@ -1,5 +1,3 @@
-rootProject.name = "Vincent"
-
 pluginManagement {
     repositories {
         google {
@@ -12,6 +10,11 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+}
+
+plugins {
+    // Lets Gradle auto-provision the requested JVM toolchain (build + daemon).
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
 }
 
 dependencyResolutionManagement {
@@ -27,4 +30,5 @@ dependencyResolutionManagement {
     }
 }
 
+rootProject.name = "Vincent"
 include(":composeApp")
