@@ -12,3 +12,6 @@ captures/
 *.keystore
 *.jks
 scripts/.keystore-credentials
+
+# Generated Play release notes (from playstore/whatsnew.xml)
+playstore/whatsnew/

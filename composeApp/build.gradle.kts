@@ -15,6 +15,12 @@ val localProps = Properties().apply {
 }
 fun secret(key: String): String = localProps.getProperty(key) ?: System.getenv(key) ?: ""
 
+// Version is managed in playstore/version.properties (CI env overrides it).
+val versionProps = Properties().apply {
+    val f = rootProject.file("playstore/version.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 kotlin {
     jvmToolchain(17)
 
@@ -51,8 +57,8 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         // CI overrides these via env so Play always gets an increasing versionCode.
-        versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = (System.getenv("VERSION_NAME") ?: "1.0").removePrefix("v")
+        versionCode = (System.getenv("VERSION_CODE") ?: versionProps.getProperty("versionCode") ?: "1").toInt()
+        versionName = (System.getenv("VERSION_NAME")?.takeIf { it.isNotBlank() } ?: versionProps.getProperty("versionName") ?: "1.0").removePrefix("v")
         buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
         buildConfigField("String", "WEB_CLIENT_ID", "\"${secret("WEB_CLIENT_ID")}\"")
     }

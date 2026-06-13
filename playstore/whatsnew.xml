@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Play Store release notes ("What's new"), per release and locale.
+  Each <locale> text must be <= 500 characters (Play limit).
+  scripts/whatsnew.py turns this into playstore/whatsnew/whatsnew-<locale> files,
+  which release-play.yml passes to the upload action (whatsNewDirectory).
+  The most recent release is the FIRST <release> element.
+-->
+<whatsnew>
+  <release versionName="1.0.0" versionCode="1" date="2026-06-13">
+    <locale code="fr-FR">Première version de Vincent 🍷
+• Ajout express : scan, photo ou voix, avec reconnaissance et prix estimé par IA
+• Plan des casiers coloré par type de vin, filtres par millésime/prix
+• Fiche vin : accords mets-vin, fenêtre de garde, notes
+• Recherche par goût, cépage, provenance, caviste…
+• Import/export CSV (PLOC, Vivino)
+• Connexion Google et favoris</locale>
+    <locale code="en-US">Vincent 1.0 🍷
+• Quick add: scan, photo or voice, with AI recognition and price estimate
+• Rack plan coloured by wine type, filter by vintage/price
+• Rich bottle sheet: food pairings, drink window, notes
+• Search by taste, grape, region, merchant…
+• CSV import/export (PLOC, Vivino)
+• Google sign-in and favourites</locale>
+  </release>
+</whatsnew>

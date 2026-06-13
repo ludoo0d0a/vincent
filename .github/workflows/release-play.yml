@@ -39,9 +39,13 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           # Play requires an ever-increasing versionCode; tie it to the run number.
           VERSION_CODE: ${{ github.run_number }}
-          # Tag name on tag pushes, else 1.0.<run> for main pushes.
-          VERSION_NAME: ${{ github.ref_type == 'tag' && github.ref_name || format('1.0.{0}', github.run_number) }}
+          # Tag pushes use the tag as versionName; otherwise blank → build reads
+          # playstore/version.properties.
+          VERSION_NAME: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
         run: gradle :composeApp:bundleRelease --no-daemon --stacktrace
+
+      - name: Generate Play release notes (from playstore/whatsnew.xml)
+        run: python3 scripts/whatsnew.py "${{ github.run_number }}"
 
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@v1
@@ -49,5 +53,6 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.geoking.vincent
           releaseFiles: composeApp/build/outputs/bundle/release/composeApp-release.aab
+          whatsNewDirectory: playstore/whatsnew
           track: ${{ github.event.inputs.track || 'internal' }}
           status: completed
