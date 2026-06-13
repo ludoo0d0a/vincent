@@ -41,8 +41,9 @@ android {
         applicationId = "com.vincent"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        // CI overrides these via env so Play always gets an increasing versionCode.
+        versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
+        versionName = (System.getenv("VERSION_NAME") ?: "1.0").removePrefix("v")
     }
 
     packaging {
@@ -51,9 +52,26 @@ android {
         }
     }
 
+    // Release signing is driven by env vars (set by the release workflow from
+    // repository secrets). Absent locally → release stays unsigned, debug is fine.
+    val keystorePath = System.getenv("KEYSTORE_FILE")
+    signingConfigs {
+        create("release") {
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            if (keystorePath != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

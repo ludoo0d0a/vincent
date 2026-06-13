@@ -111,3 +111,34 @@ composeApp/src/
   Google Sign-In côté `androidMain` pour l'authentification réelle.
 - L'icône de lanceur n'est pas fournie (le thème système `Material.Light` est
   utilisé) — ajouter un `ic_launcher` dans `androidMain/res` pour la prod.
+
+## CI/CD (GitHub Actions)
+
+Deux workflows dans `.github/workflows/` (build via `gradle` autonome 8.13 +
+JDK 17, le wrapper binaire n'étant pas versionné) :
+
+- **`android-ci.yml`** — sur push / PR `main` : `assembleDebug` + artefact APK.
+- **`release-play.yml`** — sur tag `v*` (ou déclenchement manuel avec choix du
+  track) : build d'un **AAB signé** puis upload sur Google Play
+  (`r0adkll/upload-google-play`).
+
+### Secrets de dépôt à créer (Settings → Secrets and variables → Actions)
+
+| Secret | Contenu |
+|---|---|
+| `KEYSTORE_BASE64` | keystore d'upload encodé : `base64 -i release.keystore \| pbcopy` |
+| `KEYSTORE_PASSWORD` | mot de passe du keystore |
+| `KEY_ALIAS` | alias de la clé |
+| `KEY_PASSWORD` | mot de passe de la clé |
+| `PLAY_SERVICE_ACCOUNT_JSON` | JSON du compte de service Google Play (rôle « Release manager », API Play activée) |
+
+`versionCode` est dérivé de `github.run_number` et `versionName` du tag — pas de
+bump manuel. Le release branche signe à partir de ces variables d'env ; en local
+le build release reste non signé (le debug fonctionne sans rien configurer).
+
+### Prérequis Play
+1. L'app doit **déjà exister** sur la Play Console avec **un premier AAB importé
+   manuellement** (l'API ne crée pas l'app).
+2. L'`applicationId` `com.vincent` doit correspondre à celui de la Console
+   (à remplacer par un identifiant réservé bien à vous si besoin).
+3. Compte de service lié dans Play Console → Utilisateurs et autorisations.
