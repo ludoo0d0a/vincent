@@ -56,7 +56,7 @@ Vincent est gratuit. Les prix affichés sont des estimations fournies à titre i
 - **Public visé** : adultes — cocher la déclaration **contenu lié à l'alcool** dans le questionnaire de classification.
 - **Publicités** : non · **Achats intégrés** : non
 - **E-mail développeur** : *(à renseigner)*
-- **Site web** : URL Netlify de la landing
+- **Site web** : `https://vincent.geoking.fr`
 - **Politique de confidentialité** : `https://vincent.geoking.fr/terms.html`
 
 ---
