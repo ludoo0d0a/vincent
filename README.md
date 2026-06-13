@@ -13,11 +13,11 @@ l'instant.
 
 | | |
 |---|---|
-| Langage | Kotlin 2.1.20 (KSP 2.1.20-1.0.31) |
-| UI | Compose Multiplatform 1.7.3 (Material 3) |
-| Build | AGP 8.7.3 · Gradle 8.11.1 |
+| Langage | Kotlin 2.3.21 (KSP 2.3.9) |
+| UI | Compose Multiplatform 1.11.1 (Material 3) |
+| Build | AGP 8.13.2 · Gradle 8.13 |
 | Toolchain | JDK 17 (build via `jvmToolchain(17)` + daemon via `gradle/gradle-daemon-jvm.properties`, auto-provisionné par foojay) |
-| SDK | min 24 · compile/target 35 |
+| SDK | min 24 · compile/target 36 |
 
 ## Lancer
 
