@@ -19,11 +19,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_ID="com.geoking.vincent"
+APP_ID="fr.geoking.vincent"
 ALIAS="vincent"
 KS_PATH="$ROOT/release.keystore"
 CRED="$ROOT/scripts/.keystore-credentials"
-PKG_DIR="composeApp/src/androidMain/kotlin/com/geoking/vincent"
+PKG_DIR="composeApp/src/androidMain/kotlin/fr/geoking/vincent"
 SIGNIN_KT="$PKG_DIR/data/GoogleSignIn.android.kt"
 WINEAI_KT="$PKG_DIR/ai/WineAi.android.kt"
 

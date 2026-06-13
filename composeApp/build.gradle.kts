@@ -49,11 +49,11 @@ kotlin {
 }
 
 android {
-    namespace = "com.geoking.vincent"
+    namespace = "fr.geoking.vincent"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.geoking.vincent"
+        applicationId = "fr.geoking.vincent"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         // CI overrides these via env so Play always gets an increasing versionCode.

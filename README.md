@@ -53,10 +53,10 @@ plus surfaces reached by navigation:
 
 ```
 composeApp/src/
-├── androidMain/com/geoking/vincent/
+├── androidMain/fr.geoking.vincent/
 │   ├── MainActivity.kt     # Android entry point: build Room + Cellar.bootstrap
 │   └── db/                 # BottleEntity, BottleDao, VincentDatabase, RoomCellarRepository
-└── commonMain/com/geoking/vincent/
+└── commonMain/fr.geoking.vincent/
     ├── App.kt              # root navigation (Scaffold + bottom bar + overlays)
     ├── theme/Theme.kt      # lie-de-vin palette + Material3 + type
     ├── model/              # Models.kt (WineColor, Bottle, RackCell…) + SampleData.kt
@@ -201,7 +201,7 @@ local release build stays unsigned (debug works with nothing configured).
 
 1. The app must **already exist** on the Play Console with **a first AAB uploaded
    manually** (the API does not create the app).
-2. The `applicationId` `com.geoking.vincent` must match the one in the Console.
+2. The `applicationId` `fr.geoking.vincent` must match the one in the Console.
 3. The service account must be linked under Play Console → Users and permissions.
 
 ## Landing page

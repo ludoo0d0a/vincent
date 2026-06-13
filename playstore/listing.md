@@ -1,6 +1,6 @@
 # Fiche Play Store — Vincent (textes à copier-coller)
 
-Application : **Vincent** · package `com.geoking.vincent` · langue par défaut **Français (France)**.
+Application : **Vincent** · package `fr.geoking.vincent` · langue par défaut **Français (France)**.
 
 ---
 
