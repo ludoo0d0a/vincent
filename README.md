@@ -109,8 +109,13 @@ composeApp/src/
   l'ajout reprend ces valeurs. ⚠️ Renseigner `GEMINI_API_KEY` dans
   `WineAi.android.kt` (clé gratuite sur aistudio.google.com) — sinon no-op propre.
   Le prix est toujours présenté comme **estimation** (source affichée).
+- **Dictée vocale (câblée).** `ai/Dictation.kt` (expect) + `Dictation.android.kt`
+  (`android.speech.SpeechRecognizer`, fr-FR, gratuit/offline) : transcription en
+  direct + niveau micro pour l'onde, permission `RECORD_AUDIO` demandée au tap.
+  Le texte final est passé à `WineRecognizer.fromText` (Gemini) qui remplit les
+  champs ; l'écran Voix affiche l'onde réelle, la transcription et le résultat.
 - **Reste à brancher** : sync cloud effective des données Room vers le compte ;
-  capture caméra réelle + dictée (Speech-to-Text) pour alimenter le recognizer.
+  capture caméra réelle (bytes → `WineRecognizer.fromImage`).
 - **Bouteilles** : dessinées vectoriellement (`ui/WineBottle`) — capsule, corps,
   étiquette — donc nettes à toute taille, sans asset bitmap. Remplaçables par de
   vraies photos plus tard.
