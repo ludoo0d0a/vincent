@@ -1,164 +1,208 @@
-# Vincent — cave à vin (Kotlin Multiplatform)
+# Vincent — wine cellar (Kotlin Multiplatform)
 
-App de gestion de cave à vin « type block », jeu de mots sur *vin*. Direction
-visuelle *modern minimal*, accent lie-de-vin, statuts par couleur de vin
-(rouge / blanc / rosé / pétillant). Reprend les features de PLOC et Vivino, UI
-inspirée de myBar.
+A "block/rack-type" wine cellar manager — a pun on *vin* (wine). Visual direction:
+*modern minimal*, lie-de-vin accent, status by wine colour (red / white / rosé /
+sparkling). Features inspired by PLOC and Vivino, UI inspired by myBar.
 
-Toute l'UI vit dans **`commonMain`** (Compose Multiplatform) — donc prête à
-être partagée avec iOS/desktop ; seule la cible **Android** est câblée pour
-l'instant.
+All UI lives in **`commonMain`** (Compose Multiplatform) — ready to share with
+iOS/desktop later; only the **Android** target is wired for now.
 
 ## Stack
 
 | | |
 |---|---|
-| Langage | Kotlin 2.3.21 (KSP 2.3.9) |
+| Language | Kotlin 2.3.21 (KSP 2.3.9) |
 | UI | Compose Multiplatform 1.11.1 (Material 3) |
 | Build | AGP 8.13.2 · Gradle 8.13 |
-| Toolchain | JDK 17 (build via `jvmToolchain(17)` + daemon via `gradle/gradle-daemon-jvm.properties`, auto-provisionné par foojay) |
+| Toolchain | JDK 17 (build via `jvmToolchain(17)` + daemon via `gradle/gradle-daemon-jvm.properties`, auto-provisioned by foojay) |
 | SDK | min 24 · compile/target 36 |
 
-## Lancer
+## Run
 
-Le wrapper Gradle binaire (`gradle-wrapper.jar` + `gradlew`) n'est pas versionné
-ici. Deux options :
+The binary Gradle wrapper (`gradle-wrapper.jar` + `gradlew`) is not committed.
+Two options:
 
-**Android Studio (recommandé)** — *Ladybug* ou plus récent :
-ouvrir le dossier `vincent/`, laisser synchroniser, puis ▶ sur la config
-`composeApp`.
+**Android Studio (recommended)** — *Ladybug* or newer: open the `vincent/`
+folder, let it sync, then ▶ on the `composeApp` run configuration.
 
-**Ligne de commande** — générer le wrapper une fois puis builder :
+**Command line** — generate the wrapper once, then build:
 
 ```bash
-gradle wrapper --gradle-version 8.11.1
-./gradlew :composeApp:installDebug    # sur un appareil/émulateur connecté
+gradle wrapper --gradle-version 8.13
+./gradlew :composeApp:installDebug    # on a connected device/emulator
 ```
 
-## Écrans
+## Screens
 
-Bottom-nav Material à 4 onglets (Accueil · Casiers · Bouteilles · Recherche),
-FAB d'ajout, plus les surfaces atteintes par navigation :
+Material bottom-nav with 4 tabs (Home · Racks · Bottles · Search), an add FAB,
+plus surfaces reached by navigation:
 
-| # | Écran | Fichier |
+| # | Screen | File |
 |---|---|---|
-| 1 | Tableau de bord (valeur, donut couleurs) | `screens/DashboardScreen.kt` |
-| 2 | Casiers — sélecteur de mode **Couleur · Prix · Millésime · Catégorie** | `screens/CellarScreen.kt` |
-| 3 | Liste / grille des bouteilles | `screens/BottlesScreen.kt` |
-| 4 | Détail — accords mets-vin, fenêtre de garde, provenance/caviste/occasion | `screens/BottleDetailScreen.kt` |
-| 5 | Ajout — scan / photo / voix | `screens/AddScreen.kt` |
-| 6 | Recherche & filtres (couleur, prix, provenance, caviste, occasion) | `screens/SearchScreen.kt` |
-| 7 | Connexion Google (cloud + favoris) | `screens/LoginScreen.kt` |
-| 8 | Compte & favoris | `screens/AccountScreen.kt` |
-| 9 | Dernières bouteilles (par date + source) | `screens/RecentScreen.kt` |
+| 1 | Dashboard (value, colour donut) | `screens/DashboardScreen.kt` |
+| 2 | Racks — display mode **Colour · Price · Vintage · Category** | `screens/CellarScreen.kt` |
+| 3 | Bottle list / grid | `screens/BottlesScreen.kt` |
+| 4 | Detail — food pairings, drink window, origin/merchant/occasion | `screens/BottleDetailScreen.kt` |
+| 5 | Add — scan / photo / voice | `screens/AddScreen.kt` |
+| 6 | Search & filters (colour, price, origin, merchant, occasion) | `screens/SearchScreen.kt` |
+| 7 | Google sign-in (cloud + favourites) | `screens/LoginScreen.kt` |
+| 8 | Account & favourites | `screens/AccountScreen.kt` |
+| 9 | Recently added (by date + source) | `screens/RecentScreen.kt` |
 
 ## Architecture
 
 ```
 composeApp/src/
 ├── androidMain/com/geoking/vincent/
-│   ├── MainActivity.kt     # entrée Android : build Room + Cellar.bootstrap
+│   ├── MainActivity.kt     # Android entry point: build Room + Cellar.bootstrap
 │   └── db/                 # BottleEntity, BottleDao, VincentDatabase, RoomCellarRepository
 └── commonMain/com/geoking/vincent/
-    ├── App.kt              # navigation racine (Scaffold + bottom bar + overlays)
-    ├── theme/Theme.kt      # palette lie-de-vin + Material3 + typo
+    ├── App.kt              # root navigation (Scaffold + bottom bar + overlays)
+    ├── theme/Theme.kt      # lie-de-vin palette + Material3 + type
     ├── model/              # Models.kt (WineColor, Bottle, RackCell…) + SampleData.kt
-    ├── data/               # Cellar (store réactif) + CellarRepository (seam persistance)
+    ├── data/               # Cellar (reactive store) + CellarRepository (persistence seam)
     ├── ui/                 # WineBottle (Canvas), ColorTag, Stars, ScreenHeader, VCard
-    └── screens/            # les 9 écrans
+    └── screens/            # the 9 screens
 ```
 
 ## Notes
 
-- **État** : `data/Cellar.kt` est la source de vérité unique (Compose snapshot
-  state), seedée par `SampleData`. Les écrans sont **réactifs** : ajouter une
-  bouteille (Ajout → Confirmer), servir −1 / +1, (dé)favoriser et filtrer
-  modifient réellement les données, et le tableau de bord / les favoris / les
-  dernières bouteilles se recalculent. L'API est volontairement étroite
-  (`addBottle` / `adjustQuantity` / `toggleFavorite` + lectures dérivées) pour
-  qu'une implémentation persistante remplace les listes en mémoire sans toucher
-  à l'UI.
-- **Persistance : Room (câblé).** `CellarRepository` (commonMain) est implémenté
-  par `RoomCellarRepository` (androidMain) sur une base Room
-  (`db/VincentDatabase`, entité `BottleEntity`, DAO suspend). `MainActivity`
-  construit la base et appelle `Cellar.bootstrap(repo)` : au 1er lancement le
-  seed est persisté, ensuite les bouteilles enregistrées remplacent le seed, et
-  chaque ajout / service / favori est écrit en *write-through*. Room tourne sur
-  la cible Android via KSP (`kspAndroid`) ; les enums sont stockés par nom, donc
-  pas de `TypeConverter`.
-- **Connexion Google (câblée).** API moderne **Credential Manager** + *Sign in
-  with Google*. Le déclencheur est un `@Composable expect fun
-  rememberGoogleSignIn(...)` (commonMain) dont l'`actual` Android
-  (`data/GoogleSignIn.android.kt`) ouvre le sélecteur de compte ; le compte
-  obtenu alimente `data/Auth.kt` (état observable), l'écran de connexion bascule
-  vers l'app, et l'écran Compte affiche le vrai nom/email + déconnexion.
-  ⚠️ **À renseigner** : la constante `WEB_CLIENT_ID` dans
-  `GoogleSignIn.android.kt` — l'ID client **OAuth Web** (Google Cloud Console /
-  Firebase). Sans lui, le flux échoue à l'exécution (le code compile).
-- **Import / Export CSV (câblé).** `data/CsvFormat.kt` sérialise la cave (format
-  Vincent, round-trip) et parse un CSV entrant avec **mapping de colonnes
-  tolérant** : détecte Vincent / Vivino / PLOC / tableur via les en-têtes (FR/EN)
-  et mappe couleur, millésime, prix, région, note… L'accès fichier passe par le
-  Storage Access Framework (`data/FileTransfer*.kt`, `expect/actual`). Écran
-  **Importer / Exporter** accessible depuis le Compte.
-- **Reconnaissance & prix (IA, câblé).** `ai/WineAi.kt` expose
-  `WineRecognizer` (titre/photo → `Bottle`) et `PriceEstimator` (→ prix estimé).
-  L'`actual` Android `ai/WineAi.android.kt` appelle **Gemini Flash** (HTTP +
-  `org.json`, sortie JSON structurée). Branché sur l'écran d'ajout (scan/photo) :
-  bouton « identifier avec l'IA » → remplit les champs + un prix estimé, puis
-  l'ajout reprend ces valeurs. ⚠️ Renseigner `GEMINI_API_KEY` dans
-  `WineAi.android.kt` (clé gratuite sur aistudio.google.com) — sinon no-op propre.
-  Le prix est toujours présenté comme **estimation** (source affichée).
-- **Accords mets-vin (IA, câblé).** `FoodPairer` (même `GeminiClient`) : la fiche
-  bouteille a un bouton « Suggérer d'autres accords (IA) » → Gemini renvoie une
-  liste de plats, fusionnée avec les accords existants.
-- **Dictée vocale (câblée).** `ai/Dictation.kt` (expect) + `Dictation.android.kt`
-  (`android.speech.SpeechRecognizer`, fr-FR, gratuit/offline) : transcription en
-  direct + niveau micro pour l'onde, permission `RECORD_AUDIO` demandée au tap.
-  Le texte final est passé à `WineRecognizer.fromText` (Gemini) qui remplit les
-  champs ; l'écran Voix affiche l'onde réelle, la transcription et le résultat.
-- **Photo d'étiquette (câblée).** `ai/PhotoCapture.kt` (expect) +
-  `PhotoCapture.android.kt` : appareil photo **système** (`TakePicture` +
-  `FileProvider`, pleine résolution, **sans CameraX** — inutile pour un cliché
-  ponctuel), permission CAMERA au tap. En mode Photo, le bouton capture →
-  `WineRecognizer.fromImage` (Gemini) remplit les champs + prix.
-- **Reste à brancher** : sync cloud effective des données Room vers le compte.
-- **Bouteilles** : dessinées vectoriellement (`ui/WineBottle`) — capsule, corps,
-  étiquette — donc nettes à toute taille, sans asset bitmap. Remplaçables par de
-  vraies photos plus tard.
-- **Connexion Google** : écran UI uniquement ; câbler Credential Manager /
-  Google Sign-In côté `androidMain` pour l'authentification réelle.
-- L'icône de lanceur n'est pas fournie (le thème système `Material.Light` est
-  utilisé) — ajouter un `ic_launcher` dans `androidMain/res` pour la prod.
+- **State** — `data/Cellar.kt` is the single source of truth (Compose snapshot
+  state), seeded by `SampleData`. Screens are **reactive**: adding a bottle
+  (Add → Confirm), serving −1 / +1, (un)favouriting and filtering actually mutate
+  the data, and the dashboard / favourites / recents recompute. The API is kept
+  narrow (`addBottle` / `adjustQuantity` / `toggleFavorite` + derived reads) so a
+  persistent implementation can replace the in-memory lists without touching the UI.
+- **Persistence: Room (wired).** `CellarRepository` (commonMain) is implemented by
+  `RoomCellarRepository` (androidMain) over a Room database (`db/VincentDatabase`,
+  `BottleEntity`, suspend DAO). `MainActivity` builds the DB and calls
+  `Cellar.bootstrap(repo)`: on first launch the seed is persisted, afterwards the
+  stored bottles replace the seed, and every add / serve / favourite is written
+  through. Room runs on the Android target via KSP (`kspAndroid`); enums are stored
+  by name, so no `TypeConverter`.
+- **Google sign-in (wired).** Modern **Credential Manager** + *Sign in with Google*.
+  The trigger is a `@Composable expect fun rememberGoogleSignIn(...)` (commonMain)
+  whose Android `actual` (`data/GoogleSignIn.android.kt`) opens the account picker;
+  the result feeds `data/Auth.kt` (observable state), the login screen switches into
+  the app, and the Account screen shows the real name/email + sign out.
+  ⚠️ **To set**: the `WEB_CLIENT_ID` constant in `GoogleSignIn.android.kt` — the
+  **OAuth Web** client ID (Google Cloud Console / Firebase). Without it the flow
+  fails at runtime (the code still compiles).
+- **CSV import / export (wired).** `data/CsvFormat.kt` serialises the cellar
+  (Vincent format, round-trip) and parses an incoming CSV with **tolerant column
+  mapping**: detects Vincent / Vivino / PLOC / spreadsheet via headers (FR/EN) and
+  maps colour, vintage, price, region, rating… File access goes through the Storage
+  Access Framework (`data/FileTransfer*.kt`, `expect/actual`). An **Import / Export**
+  screen is reachable from Account.
+- **Recognition & price (AI, wired).** `ai/WineAi.kt` exposes `WineRecognizer`
+  (title/photo → `Bottle`) and `PriceEstimator` (→ estimated price). The Android
+  `actual` `ai/WineAi.android.kt` calls **Gemini Flash** (HTTP + `org.json`,
+  structured JSON output). Wired into the Add screen (scan/photo): an
+  "identify with AI" button fills the fields + an estimated price, then the add
+  reuses those values. ⚠️ Set `GEMINI_API_KEY` in `WineAi.android.kt` (free key at
+  aistudio.google.com) — otherwise it no-ops cleanly. Price is always shown as an
+  **estimate** (source displayed).
+- **Food pairings (AI, wired).** `FoodPairer` (same `GeminiClient`): the bottle
+  detail has a "Suggest more pairings (AI)" button → Gemini returns dishes, merged
+  with the existing pairings.
+- **Voice dictation (wired).** `ai/Dictation.kt` (expect) + `Dictation.android.kt`
+  (`android.speech.SpeechRecognizer`, fr-FR, free/offline): live transcript + mic
+  level for the waveform, `RECORD_AUDIO` requested on tap. The final transcript is
+  passed to `WineRecognizer.fromText` (Gemini) which fills the fields; the Voice
+  screen shows the real waveform, transcript and result.
+- **Label photo (wired).** `ai/PhotoCapture.kt` (expect) + `PhotoCapture.android.kt`:
+  **system** camera (`TakePicture` + `FileProvider`, full resolution, **no CameraX**
+  — overkill for a one-shot snap), CAMERA permission on tap. In Photo mode the button
+  captures → `WineRecognizer.fromImage` (Gemini) fills the fields + price.
+- **Still to wire**: effective cloud sync of the Room data to the account.
+- **Bottles** are drawn vectorially (`ui/WineBottle`) — capsule, body, label — so
+  they stay crisp at any size with no bitmap assets. Replaceable with real photos later.
+- The launcher icon is not provided (the system `Material.Light` theme is used) —
+  add an `ic_launcher` under `androidMain/res` for production.
 
 ## CI/CD (GitHub Actions)
 
-Deux workflows dans `.github/workflows/` (build via `gradle` autonome 8.13 +
-JDK 17, le wrapper binaire n'étant pas versionné) :
+Workflows in `.github/workflows/` use a shared composite action
+`.github/actions/setup-gradle` (Temurin JDK 17 + `gradle/actions/setup-gradle`,
+pinned to Gradle 8.13 since the binary wrapper is not committed → call `gradle …`):
 
-- **`android-ci.yml`** — sur push / PR `main` : `assembleDebug` + artefact APK.
-- **`release-play.yml`** — **à chaque push sur `main`** (track **internal**),
-  ainsi que sur tag `v*` et en manuel (choix du track) : build d'un **AAB signé**
-  puis upload sur Google Play (`r0adkll/upload-google-play`). Déploiements
-  sérialisés (`concurrency: play-release`).
+- **`android-ci.yml`** — on push / PR to `main`: `assembleDebug` + APK artifact.
+- **`release-play.yml`** — **on every push to `main`** (track **internal**), plus on
+  `v*` tags and manual dispatch (track choice): builds a **signed AAB** and uploads
+  to Google Play (`r0adkll/upload-google-play`). Deploys are serialized
+  (`concurrency: play-release`).
 
-### Secrets de dépôt à créer (Settings → Secrets and variables → Actions)
+`versionCode` is derived from `github.run_number`, `versionName` is the tag on tag
+pushes (else `1.0.<run>`) — no manual bump. The release job signs from env vars; a
+local release build stays unsigned (debug works with nothing configured).
 
-| Secret | Contenu |
+### Repository secrets to create (Settings → Secrets and variables → Actions)
+
+| Secret | What it is |
 |---|---|
-| `KEYSTORE_BASE64` | keystore d'upload encodé : `base64 -i release.keystore \| pbcopy` |
-| `KEYSTORE_PASSWORD` | mot de passe du keystore |
-| `KEY_ALIAS` | alias de la clé |
-| `KEY_PASSWORD` | mot de passe de la clé |
-| `PLAY_SERVICE_ACCOUNT_JSON` | JSON du compte de service Google Play (rôle « Release manager », API Play activée) |
+| `KEYSTORE_BASE64` | the upload keystore, base64-encoded (see below) |
+| `KEYSTORE_PASSWORD` | the keystore (store) password |
+| `KEY_ALIAS` | the key alias inside the keystore |
+| `KEY_PASSWORD` | the key password (often same as the store password) |
+| `PLAY_SERVICE_ACCOUNT_JSON` | full JSON of a Google Play service account (see below) |
 
-`versionCode` est dérivé de `github.run_number` et `versionName` du tag — pas de
-bump manuel. Le release branche signe à partir de ces variables d'env ; en local
-le build release reste non signé (le debug fonctionne sans rien configurer).
+#### Where to get them — signing keystore
 
-### Prérequis Play
-1. L'app doit **déjà exister** sur la Play Console avec **un premier AAB importé
-   manuellement** (l'API ne crée pas l'app).
-2. L'`applicationId` `com.geoking.vincent` doit correspondre à celui de la Console
-   (à remplacer par un identifiant réservé bien à vous si besoin).
-3. Compte de service lié dans Play Console → Utilisateurs et autorisations.
+1. **Create the keystore** (once; keep `release.keystore` safe and backed up — if you
+   lose it you can't update the app, unless you use Play App Signing):
+
+   ```bash
+   keytool -genkeypair -v \
+     -keystore release.keystore \
+     -alias vincent \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+
+   `keytool` ships with the JDK. It will prompt for:
+   - a **keystore password** → this is `KEYSTORE_PASSWORD`
+   - your name/org (cosmetic, in the certificate)
+   - a **key password** (press Enter to reuse the keystore one) → `KEY_PASSWORD`
+
+   The `-alias` you chose (`vincent` here) is `KEY_ALIAS`.
+
+2. **Encode it to base64** for the secret (it must be a single line, no wrapping):
+
+   ```bash
+   # macOS
+   base64 -i release.keystore | pbcopy
+   # Linux
+   base64 -w0 release.keystore
+   ```
+
+   Paste the result into `KEYSTORE_BASE64`.
+
+3. *(Optional)* the **SHA-1 fingerprint** needed for Google Sign-In comes from the
+   same keystore:
+
+   ```bash
+   keytool -list -v -keystore release.keystore -alias vincent
+   ```
+
+#### Where to get them — Play service account
+
+1. **Google Cloud Console** → the project linked to your Play account → *IAM & Admin
+   → Service Accounts* → **Create service account**.
+2. Create a **JSON key** for it (Keys → Add key → JSON) and download the file. Its
+   full contents go into `PLAY_SERVICE_ACCOUNT_JSON`.
+3. **Google Play Console** → *Users and permissions* → **Invite** that service-account
+   email and grant it **Release manager** (or *Admin*) on the app. Ensure the *Google
+   Play Android Developer API* is enabled in Cloud Console.
+
+### Play prerequisites
+
+1. The app must **already exist** on the Play Console with **a first AAB uploaded
+   manually** (the API does not create the app).
+2. The `applicationId` `com.geoking.vincent` must match the one in the Console.
+3. The service account must be linked under Play Console → Users and permissions.
+
+## Landing page
+
+A static marketing site lives in `website/` and is published by Netlify
+(`netlify.toml`, `publish = "website"`, no build step). It reuses the app's
+lie-de-vin palette and renders live phone-frame "screenshots". Connect the repo in
+Netlify (or drag-and-drop the `website/` folder) — pushes to `main` redeploy it.
