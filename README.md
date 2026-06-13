@@ -56,10 +56,10 @@ FAB d'ajout, plus les surfaces atteintes par navigation :
 
 ```
 composeApp/src/
-├── androidMain/com/vincent/
+├── androidMain/com/geoking/vincent/
 │   ├── MainActivity.kt     # entrée Android : build Room + Cellar.bootstrap
 │   └── db/                 # BottleEntity, BottleDao, VincentDatabase, RoomCellarRepository
-└── commonMain/com/vincent/
+└── commonMain/com/geoking/vincent/
     ├── App.kt              # navigation racine (Scaffold + bottom bar + overlays)
     ├── theme/Theme.kt      # palette lie-de-vin + Material3 + typo
     ├── model/              # Models.kt (WineColor, Bottle, RackCell…) + SampleData.kt
@@ -159,6 +159,6 @@ le build release reste non signé (le debug fonctionne sans rien configurer).
 ### Prérequis Play
 1. L'app doit **déjà exister** sur la Play Console avec **un premier AAB importé
    manuellement** (l'API ne crée pas l'app).
-2. L'`applicationId` `com.vincent` doit correspondre à celui de la Console
+2. L'`applicationId` `com.geoking.vincent` doit correspondre à celui de la Console
    (à remplacer par un identifiant réservé bien à vous si besoin).
 3. Compte de service lié dans Play Console → Utilisateurs et autorisations.

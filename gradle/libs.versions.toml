@@ -7,10 +7,7 @@ androidx-activityCompose = "1.13.0"
 room = "2.8.4"
 coroutines = "1.11.0"
 credentials = "1.6.0"
-googleid = "1.1.1"
-android-compileSdk = "36"
-android-minSdk = "24"
-android-targetSdk = "36"
+googleid = "1.2.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
