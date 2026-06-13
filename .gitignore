@@ -17,3 +17,4 @@ scripts/.keystore-credentials
 playstore/whatsnew/
 /secrets/*.json
 /composeApp/release/
+/secrets/upload_certificate.pem
