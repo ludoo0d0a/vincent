@@ -21,7 +21,18 @@ private const val GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
 private const val MODEL = "gemini-2.0-flash"
 
 /** Single Gemini-backed client implementing both seams. */
-object GeminiClient : WineRecognizer, PriceEstimator {
+object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
+
+    override suspend fun pairings(bottle: Bottle): List<String> = withContext(Dispatchers.IO) {
+        val q = "${bottle.domain} ${bottle.vintage} — ${bottle.color.label}, ${bottle.appellation}"
+        val json = generate(
+            "Propose 6 accords mets-vin concis (un plat chacun, 1–3 mots) pour ce vin. " +
+                "JSON {pairings:[string]}. Vin: \"$q\"",
+            imageB64 = null,
+        ) ?: return@withContext emptyList()
+        val arr = json.optJSONArray("pairings") ?: return@withContext emptyList()
+        (0 until arr.length()).mapNotNull { i -> arr.optString(i).trim().takeIf { it.isNotEmpty() } }
+    }
 
     override suspend fun fromText(title: String): Bottle? = withContext(Dispatchers.IO) {
         val json = generate(
@@ -141,3 +152,4 @@ object GeminiClient : WineRecognizer, PriceEstimator {
 
 actual fun wineRecognizer(): WineRecognizer = GeminiClient
 actual fun priceEstimator(): PriceEstimator = GeminiClient
+actual fun foodPairer(): FoodPairer = GeminiClient

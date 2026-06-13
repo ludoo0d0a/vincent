@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocalBar
@@ -31,6 +32,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,8 +46,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vincent.ai.foodPairer
 import com.vincent.data.Cellar
 import com.vincent.model.Bottle
+import kotlinx.coroutines.launch
 import com.vincent.theme.MonoNumber
 import com.vincent.theme.VincentColors
 import com.vincent.ui.ColorTag
@@ -54,6 +62,10 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
     val live = Cellar.bottle(bottle.id)
     val qty = live?.quantity ?: bottle.quantity
     val fav = live?.favorite ?: bottle.favorite
+    val pairer = foodPairer()
+    val scope = rememberCoroutineScope()
+    var suggested by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pairingBusy by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         // Top actions
         Row(
@@ -101,14 +113,30 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
                 Stat("Casier", bottle.cellarSpot, Modifier.weight(1f))
             }
 
-            // Pairings
-            if (bottle.pairings.isNotEmpty()) {
-                Section("Accords mets-vin") {
-                    bottle.pairings.chunked(2).forEach { rowItems ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 7.dp)) {
-                            rowItems.forEach { Pairing(it) }
-                        }
+            // Pairings — Gemini can suggest more on demand.
+            Section("Accords mets-vin") {
+                val all = (bottle.pairings + suggested).distinct()
+                all.chunked(2).forEach { rowItems ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 7.dp)) {
+                        rowItems.forEach { Pairing(it) }
                     }
+                }
+                OutlinedButton(
+                    onClick = {
+                        pairingBusy = true
+                        scope.launch {
+                            val res = pairer.pairings(bottle)
+                            if (res.isNotEmpty()) suggested = res
+                            pairingBusy = false
+                        }
+                    },
+                    enabled = !pairingBusy,
+                    modifier = Modifier.fillMaxWidth().padding(top = 9.dp).height(40.dp),
+                    shape = RoundedCornerShape(11.dp),
+                ) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(if (pairingBusy) "Analyse…" else "Suggérer d'autres accords (IA)", fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
                 }
             }
 

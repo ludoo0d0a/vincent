@@ -16,6 +16,12 @@ interface PriceEstimator {
     suspend fun estimate(bottle: Bottle): PriceEstimate?
 }
 
+/** Suggests food pairings for a bottle. */
+interface FoodPairer {
+    suspend fun pairings(bottle: Bottle): List<String>
+}
+
 // Platform providers (Android = Gemini Flash). Other targets can return no-ops.
 expect fun wineRecognizer(): WineRecognizer
 expect fun priceEstimator(): PriceEstimator
+expect fun foodPairer(): FoodPairer

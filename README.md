@@ -109,6 +109,9 @@ composeApp/src/
   l'ajout reprend ces valeurs. ⚠️ Renseigner `GEMINI_API_KEY` dans
   `WineAi.android.kt` (clé gratuite sur aistudio.google.com) — sinon no-op propre.
   Le prix est toujours présenté comme **estimation** (source affichée).
+- **Accords mets-vin (IA, câblé).** `FoodPairer` (même `GeminiClient`) : la fiche
+  bouteille a un bouton « Suggérer d'autres accords (IA) » → Gemini renvoie une
+  liste de plats, fusionnée avec les accords existants.
 - **Dictée vocale (câblée).** `ai/Dictation.kt` (expect) + `Dictation.android.kt`
   (`android.speech.SpeechRecognizer`, fr-FR, gratuit/offline) : transcription en
   direct + niveau micro pour l'onde, permission `RECORD_AUDIO` demandée au tap.
