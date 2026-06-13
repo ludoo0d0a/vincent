@@ -30,6 +30,9 @@ kotlin {
             implementation(libs.androidx.room.runtime)
             implementation(libs.androidx.room.ktx)
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.play.services)
+            implementation(libs.google.identity.googleid)
         }
     }
 }

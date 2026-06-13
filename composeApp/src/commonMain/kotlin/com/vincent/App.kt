@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.vincent.data.Auth
 import com.vincent.model.Bottle
 import com.vincent.screens.AccountScreen
 import com.vincent.screens.AddScreen
@@ -48,14 +49,15 @@ private enum class Overlay { ADD, ACCOUNT, RECENT }
 
 @Composable
 fun App() = VincentTheme {
-    var loggedIn by remember { mutableStateOf(false) }
+    var guest by remember { mutableStateOf(false) }
+    val loggedIn = Auth.account != null || guest
     var tab by remember { mutableStateOf(Tab.HOME) }
     var detail by remember { mutableStateOf<Bottle?>(null) }
     var overlay by remember { mutableStateOf<Overlay?>(null) }
 
     Surface(color = VincentColors.Bg, modifier = Modifier.fillMaxSize()) {
         when {
-            !loggedIn -> LoginScreen(onContinue = { loggedIn = true })
+            !loggedIn -> LoginScreen(onGuest = { guest = true })
 
             detail != null -> BottleDetailScreen(
                 bottle = detail!!,
@@ -68,6 +70,7 @@ fun App() = VincentTheme {
                 onBack = { overlay = null },
                 onOpenRecent = { overlay = Overlay.RECENT },
                 onOpenBottle = { detail = it; overlay = null },
+                onSignOut = { Auth.signOut(); guest = false; overlay = null },
             )
 
             overlay == Overlay.RECENT -> RecentScreen(

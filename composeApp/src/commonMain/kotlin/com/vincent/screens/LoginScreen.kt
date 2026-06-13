@@ -34,10 +34,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vincent.data.Auth
+import com.vincent.data.rememberGoogleSignIn
 import com.vincent.theme.VincentColors
 
 @Composable
-fun LoginScreen(onContinue: () -> Unit) {
+fun LoginScreen(onGuest: () -> Unit) {
+    val signIn = rememberGoogleSignIn { account -> if (account != null) Auth.account = account }
     Column(
         Modifier.fillMaxSize().background(
             Brush.verticalGradient(listOf(Color(0xFFF7EEEF), VincentColors.Bg)),
@@ -74,7 +77,7 @@ fun LoginScreen(onContinue: () -> Unit) {
             Row(
                 Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp))
                     .background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp))
-                    .clickable(onClick = onContinue),
+                    .clickable(onClick = signIn),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
@@ -83,7 +86,7 @@ fun LoginScreen(onContinue: () -> Unit) {
                 Text("Continuer avec Google", fontSize = 14.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
             }
             Spacer(Modifier.height(11.dp))
-            Box(Modifier.fillMaxWidth().height(46.dp).clickable(onClick = onContinue), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(46.dp).clickable(onClick = onGuest), contentAlignment = Alignment.Center) {
                 Text("Continuer sans compte", fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Muted)
             }
             Text(

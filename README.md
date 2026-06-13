@@ -85,8 +85,18 @@ composeApp/src/
   chaque ajout / service / favori est écrit en *write-through*. Room tourne sur
   la cible Android via KSP (`kspAndroid`) ; les enums sont stockés par nom, donc
   pas de `TypeConverter`.
-- **Reste à brancher** : sync cloud (compte Google), reconnaissance d'étiquette
-  (ML Kit) et dictée (Speech-to-Text) côté `androidMain`.
+- **Connexion Google (câblée).** API moderne **Credential Manager** + *Sign in
+  with Google*. Le déclencheur est un `@Composable expect fun
+  rememberGoogleSignIn(...)` (commonMain) dont l'`actual` Android
+  (`data/GoogleSignIn.android.kt`) ouvre le sélecteur de compte ; le compte
+  obtenu alimente `data/Auth.kt` (état observable), l'écran de connexion bascule
+  vers l'app, et l'écran Compte affiche le vrai nom/email + déconnexion.
+  ⚠️ **À renseigner** : la constante `WEB_CLIENT_ID` dans
+  `GoogleSignIn.android.kt` — l'ID client **OAuth Web** (Google Cloud Console /
+  Firebase). Sans lui, le flux échoue à l'exécution (le code compile).
+- **Reste à brancher** : sync cloud effective des données Room vers le compte,
+  reconnaissance d'étiquette (ML Kit) et dictée (Speech-to-Text) côté
+  `androidMain`.
 - **Bouteilles** : dessinées vectoriellement (`ui/WineBottle`) — capsule, corps,
   étiquette — donc nettes à toute taille, sans asset bitmap. Remplaçables par de
   vraies photos plus tard.

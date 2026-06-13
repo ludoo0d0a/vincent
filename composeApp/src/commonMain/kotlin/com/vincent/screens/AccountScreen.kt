@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vincent.data.Auth
 import com.vincent.data.Cellar
 import com.vincent.model.Bottle
 import com.vincent.theme.VincentColors
@@ -44,7 +46,9 @@ fun AccountScreen(
     onBack: () -> Unit,
     onOpenRecent: () -> Unit,
     onOpenBottle: (Bottle) -> Unit,
+    onSignOut: () -> Unit,
 ) {
+    val acc = Auth.account
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -66,12 +70,12 @@ fun AccountScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-                    Text("L", color = Color.White, fontWeight = FontWeight.W800, fontSize = 18.sp)
+                    Text(acc?.initial ?: "?", color = Color.White, fontWeight = FontWeight.W800, fontSize = 18.sp)
                 }
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Ludovic V.", color = Color.White, fontWeight = FontWeight.W700, fontSize = 15.sp)
-                    Text("l••••@gmail.com", color = Color.White.copy(alpha = 0.85f), fontSize = 11.5.sp)
+                    Text(acc?.name ?: "Invité", color = Color.White, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                    Text(acc?.email ?: "Connecté sans compte", color = Color.White.copy(alpha = 0.85f), fontSize = 11.5.sp)
                 }
                 GoogleG(22)
             }
@@ -118,6 +122,12 @@ fun AccountScreen(
                 }
                 Spacer(Modifier.height(11.dp))
             }
+            Spacer(Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = onSignOut,
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                shape = RoundedCornerShape(13.dp),
+            ) { Text(if (acc != null) "Se déconnecter" else "Se connecter", fontWeight = FontWeight.W700, color = VincentColors.Accent) }
             Spacer(Modifier.height(24.dp))
         }
     }
