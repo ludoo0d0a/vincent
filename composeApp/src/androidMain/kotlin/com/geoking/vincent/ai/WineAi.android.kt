@@ -1,6 +1,7 @@
 package com.geoking.vincent.ai
 
 import android.util.Base64
+import com.geoking.vincent.BuildConfig
 import com.geoking.vincent.model.AddSource
 import com.geoking.vincent.model.Bottle
 import com.geoking.vincent.model.WineCategory
@@ -12,12 +13,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * Gemini API key — get a free one at https://aistudio.google.com/apikey.
- * The free tier is plenty for personal use. Recognition/estimate return null
- * (graceful no-op) until this is set.
- */
-private const val GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
+// GEMINI_API_KEY comes from local.properties (or CI env) via BuildConfig — never
+// hardcoded. Get a free key at https://aistudio.google.com/apikey. Blank = no-op.
 private const val MODEL = "gemini-2.0-flash"
 
 /** Single Gemini-backed client implementing both seams. */
@@ -66,7 +63,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     }
 
     private fun generate(prompt: String, imageB64: String?): JSONObject? {
-        if (GEMINI_API_KEY.startsWith("YOUR_")) return null
+        if (BuildConfig.GEMINI_API_KEY.isBlank()) return null
         return try {
             val parts = JSONArray().put(JSONObject().put("text", prompt))
             if (imageB64 != null) {
@@ -81,7 +78,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
                 .put("contents", JSONArray().put(JSONObject().put("parts", parts)))
                 .put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
 
-            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$GEMINI_API_KEY")
+            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=${BuildConfig.GEMINI_API_KEY}")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true

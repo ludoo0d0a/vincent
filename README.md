@@ -85,9 +85,9 @@ composeApp/src/
   whose Android `actual` (`data/GoogleSignIn.android.kt`) opens the account picker;
   the result feeds `data/Auth.kt` (observable state), the login screen switches into
   the app, and the Account screen shows the real name/email + sign out.
-  ⚠️ **To set**: the `WEB_CLIENT_ID` constant in `GoogleSignIn.android.kt` — the
-  **OAuth Web** client ID (Google Cloud Console / Firebase). Without it the flow
-  fails at runtime (the code still compiles).
+  ⚠️ **To set**: `WEB_CLIENT_ID` (OAuth **Web** client ID) in `local.properties`
+  (gitignored) — surfaced to the code via `BuildConfig`. Without it the flow fails
+  at runtime (the code still compiles). `./scripts/setup-release.sh oauth` does it.
 - **CSV import / export (wired).** `data/CsvFormat.kt` serialises the cellar
   (Vincent format, round-trip) and parses an incoming CSV with **tolerant column
   mapping**: detects Vincent / Vivino / PLOC / spreadsheet via headers (FR/EN) and
@@ -99,9 +99,9 @@ composeApp/src/
   `actual` `ai/WineAi.android.kt` calls **Gemini Flash** (HTTP + `org.json`,
   structured JSON output). Wired into the Add screen (scan/photo): an
   "identify with AI" button fills the fields + an estimated price, then the add
-  reuses those values. ⚠️ Set `GEMINI_API_KEY` in `WineAi.android.kt` (free key at
-  aistudio.google.com) — otherwise it no-ops cleanly. Price is always shown as an
-  **estimate** (source displayed).
+  reuses those values. ⚠️ Set `GEMINI_API_KEY` in `local.properties` (gitignored,
+  via `BuildConfig`; free key at aistudio.google.com) — otherwise it no-ops cleanly.
+  Price is always shown as an **estimate** (source displayed).
 - **Food pairings (AI, wired).** `FoodPairer` (same `GeminiClient`): the bottle
   detail has a "Suggest more pairings (AI)" button → Gemini returns dishes, merged
   with the existing pairings.

@@ -47,6 +47,12 @@ patch_const(){ # file const value
     warn "This file is tracked by git — avoid committing a real key (consider a local.properties + BuildConfig)."
   else warn "$name not found in $f."; fi
 }
+set_local_prop(){ # key value  → writes to local.properties (gitignored)
+  local key="$1" val="$2" f="$ROOT/local.properties"
+  touch "$f"
+  if grep -q "^$key=" "$f"; then sedi -E "s#^$key=.*#$key=$val#" "$f"; else printf '%s=%s\n' "$key" "$val" >> "$f"; fi
+  ok "$key written to local.properties (gitignored)"
+}
 sha1(){ keytool -list -v -keystore "$KS_PATH" -alias "$ALIAS" -storepass "$1" 2>/dev/null \
         | awk -F'SHA1: ' '/SHA1:/{print $2; exit}'; }
 
@@ -119,7 +125,7 @@ step_oauth(){
   say "   • Android client: package '$APP_ID' + the SHA-1 above."
   say "   • Web application client: create it and COPY its client ID."
   local id; id="$(ask "Paste the WEB client ID (…apps.googleusercontent.com, blank to skip):")"
-  [ -n "$id" ] && patch_const "$SIGNIN_KT" "WEB_CLIENT_ID" "$id" || say "Skipped."
+  [ -n "$id" ] && set_local_prop WEB_CLIENT_ID "$id" || say "Skipped."
 }
 
 # ---- step 4: Gemini key ----------------------------------------------------
@@ -128,7 +134,7 @@ step_gemini(){
   say "Create a free API key in Google AI Studio:"
   open_url "https://aistudio.google.com/apikey"
   local k; k="$(ask "Paste the Gemini API key (blank to skip):")"
-  [ -n "$k" ] && patch_const "$WINEAI_KT" "GEMINI_API_KEY" "$k" || say "Skipped."
+  [ -n "$k" ] && set_local_prop GEMINI_API_KEY "$k" || say "Skipped."
 }
 
 # ---- main ------------------------------------------------------------------

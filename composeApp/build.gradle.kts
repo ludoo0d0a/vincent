@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidApplication)
@@ -5,6 +7,13 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.ksp)
 }
+
+// Secrets read from local.properties (or CI env), surfaced via BuildConfig — never hardcoded.
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun secret(key: String): String = localProps.getProperty(key) ?: System.getenv(key) ?: ""
 
 kotlin {
     jvmToolchain(17)
@@ -44,6 +53,12 @@ android {
         // CI overrides these via env so Play always gets an increasing versionCode.
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
         versionName = (System.getenv("VERSION_NAME") ?: "1.0").removePrefix("v")
+        buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
+        buildConfigField("String", "WEB_CLIENT_ID", "\"${secret("WEB_CLIENT_ID")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     packaging {
