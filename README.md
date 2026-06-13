@@ -137,9 +137,10 @@ Deux workflows dans `.github/workflows/` (build via `gradle` autonome 8.13 +
 JDK 17, le wrapper binaire n'étant pas versionné) :
 
 - **`android-ci.yml`** — sur push / PR `main` : `assembleDebug` + artefact APK.
-- **`release-play.yml`** — sur tag `v*` (ou déclenchement manuel avec choix du
-  track) : build d'un **AAB signé** puis upload sur Google Play
-  (`r0adkll/upload-google-play`).
+- **`release-play.yml`** — **à chaque push sur `main`** (track **internal**),
+  ainsi que sur tag `v*` et en manuel (choix du track) : build d'un **AAB signé**
+  puis upload sur Google Play (`r0adkll/upload-google-play`). Déploiements
+  sérialisés (`concurrency: play-release`).
 
 ### Secrets de dépôt à créer (Settings → Secrets and variables → Actions)
 
