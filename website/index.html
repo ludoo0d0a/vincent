@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vincent — votre cave à vin, bien rangée</title>
+<meta name="description" content="Vincent : l'app Android pour gérer votre cave à vin « type block ». Inventaire express par scan, photo ou voix, plan visuel des casiers, reconnaissance et prix par IA, import PLOC & Vivino.">
+<style>
+:root{
+  --bg:oklch(97% 0.004 255);
+  --surface:#ffffff;
+  --surface-2:oklch(98% 0.004 255);
+  --fg:oklch(23% 0.015 265);
+  --muted:oklch(53% 0.012 265);
+  --faint:oklch(66% 0.01 265);
+  --border:oklch(91% 0.005 265);
+  --accent:oklch(43% 0.13 18);
+  --accent-soft:oklch(94% 0.03 18);
+  --accent-deep:oklch(34% 0.12 18);
+  --red:oklch(46% 0.15 22);
+  --white-wine:oklch(72% 0.11 92);
+  --rose:oklch(70% 0.12 8);
+  --bubbly:oklch(80% 0.08 95);
+  --green:oklch(56% 0.13 150);
+  --font:-apple-system,"Segoe UI","Roboto",system-ui,sans-serif;
+  --serif:"Iowan Old Style","Charter",Georgia,serif;
+  --mono:"SF Mono","Roboto Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.5}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;border-radius:12px;padding:12px 18px;border:1px solid transparent;cursor:pointer}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--surface);color:var(--fg);border-color:var(--border)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+
+/* nav */
+nav{position:sticky;top:0;z-index:50;background:color-mix(in oklch,var(--bg) 86%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:22px;font-weight:800;letter-spacing:-.01em}
+.brand .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(150deg,var(--accent),var(--accent-deep));display:grid;place-items:center;color:#fff}
+.navlinks{display:flex;gap:26px;align-items:center;font-size:14px;font-weight:600;color:var(--muted)}
+.navlinks a:hover{color:var(--fg)}
+@media(max-width:720px){.navlinks .hide{display:none}}
+
+/* hero */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;padding:64px 0 40px}
+.hero h1{font-family:var(--serif);font-size:clamp(34px,5vw,52px);line-height:1.05;letter-spacing:-.02em;margin:16px 0 14px}
+.hero p.lead{font-size:17px;color:var(--muted);max-width:30ch}
+.hero .cta{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}
+.hero .bullets{display:flex;gap:18px;margin-top:24px;flex-wrap:wrap;font-size:13px;color:var(--muted);font-weight:500}
+.hero .bullets span{display:inline-flex;align-items:center;gap:7px}
+.hero .dot{width:9px;height:9px;border-radius:50%}
+.hero-art{display:flex;justify-content:center;position:relative}
+.hero-art::before{content:"";position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,var(--accent-soft),transparent 70%);top:8%;z-index:0}
+
+/* phone */
+.phone{position:relative;width:290px;height:600px;background:#0d0d11;border-radius:38px;padding:7px;box-shadow:0 30px 60px -24px rgba(40,12,20,.5);z-index:2}
+.screen{position:relative;width:100%;height:100%;background:var(--bg);border-radius:31px;overflow:hidden;display:flex;flex-direction:column}
+.punch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:#0d0d11;z-index:40}
+.sbar{height:28px;flex:0 0 28px;display:flex;align-items:center;justify-content:space-between;padding:0 17px;font-size:11px;font-weight:700}
+.sbar.dark{color:#fff}
+.appbar{padding:4px 16px 10px}
+.appbar h2{font-size:18px;font-weight:800}
+.appbar .sub{font-size:11px;color:var(--muted)}
+.body{flex:1;padding:0 14px;overflow:hidden}
+.bnav{flex:0 0 52px;display:flex;align-items:center;justify-content:space-around;background:var(--surface);border-top:1px solid var(--border)}
+.bnav i{width:20px;height:20px;border-radius:5px;background:var(--border)}
+.bnav i.on{background:var(--accent)}
+
+/* dashboard mini */
+.hcard{background:linear-gradient(160deg,var(--accent-deep),var(--accent));border-radius:18px;padding:16px;color:#fff;position:relative;overflow:hidden}
+.hcard::after{content:"";position:absolute;right:-26px;top:-26px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.08)}
+.hcard .lab{font-size:10px;opacity:.8;font-weight:600;letter-spacing:.04em}
+.hcard .big{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.hcard .row{display:flex;gap:16px;margin-top:12px}
+.hcard .row b{font-size:15px;display:block}
+.hcard .row span{font-size:9.5px;opacity:.85}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.mini{padding:11px}
+.mini .k{font-size:10px;color:var(--muted);font-weight:600}
+.mini .v{font-size:17px;font-weight:800;margin-top:2px}
+.sect-h{display:flex;justify-content:space-between;align-items:center;margin:14px 2px 8px;font-size:12px;font-weight:700}
+.sect-h a{color:var(--accent);font-size:11px}
+.donut-card{display:flex;gap:13px;align-items:center;padding:13px}
+.donut{width:74px;height:74px;border-radius:50%;flex:0 0 74px;background:conic-gradient(var(--red) 0 58%,var(--white-wine) 58% 80%,var(--rose) 80% 92%,var(--bubbly) 92% 100%);display:grid;place-items:center}
+.donut .hole{width:46px;height:46px;border-radius:50%;background:var(--surface);display:grid;place-items:center;text-align:center}
+.donut .hole b{font-size:15px;font-weight:800;line-height:1}
+.donut .hole s{font-size:8px;color:var(--muted);text-decoration:none}
+.leg{flex:1;display:flex;flex-direction:column;gap:6px}
+.leg div{display:flex;justify-content:space-between;font-size:11px;align-items:center}
+.leg .lft{display:flex;align-items:center;gap:6px;font-weight:600}
+.leg .pct{font-family:var(--mono);color:var(--muted)}
+
+/* rack mini */
+.seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:9px;font-size:10px;font-weight:700}
+.seg b{flex:1;text-align:center;padding:6px 0;border-radius:7px;color:var(--muted)}
+.seg b.on{background:var(--surface);color:var(--accent)}
+.rack{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:11px}
+.rrow{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.rrow:last-child{margin-bottom:0}
+.rrow s{width:12px;font-family:var(--mono);font-size:9px;color:var(--faint);text-decoration:none}
+.cells{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;flex:1}
+.cell{aspect-ratio:1;border-radius:6px;border:1px solid var(--border);display:grid;place-items:center}
+.cell.e{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 3px,transparent 3px,transparent 6px)}
+.cell .l{font-family:var(--mono);font-size:7px;font-weight:700;background:rgba(255,255,255,.82);color:#2a1717;padding:0 2px;border-radius:3px}
+.cell.red{background:color-mix(in oklch,var(--accent) 16%,#fff);border-color:color-mix(in oklch,var(--accent) 30%,#fff)}
+
+/* scan mini */
+.cam{flex:1;background:radial-gradient(120% 80% at 50% 30%,oklch(30% 0.02 265),oklch(15% 0.015 265));position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.scanframe{width:150px;height:215px;position:relative;display:grid;place-items:center}
+.scanframe i{position:absolute;width:26px;height:26px;border:3px solid #fff}
+.scanframe .a{top:0;left:0;border-right:0;border-bottom:0;border-radius:6px 0 0 0}
+.scanframe .b{top:0;right:0;border-left:0;border-bottom:0;border-radius:0 6px 0 0}
+.scanframe .c{bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 6px}
+.scanframe .d{bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 6px 0}
+.scanbottle{width:60px;height:140px;border-radius:5px;background:linear-gradient(var(--red),oklch(30% 0.11 22))}
+.detected{position:absolute;left:12px;right:12px;bottom:60px;background:var(--surface);border-radius:14px;padding:11px;display:flex;gap:10px;align-items:center;box-shadow:0 14px 30px -8px rgba(0,0,0,.4)}
+.detected .pb{width:24px;height:42px;border-radius:4px;background:linear-gradient(var(--red),oklch(30% 0.11 22))}
+.detected .di{flex:1;min-width:0}
+.detected .badge{font-size:8px;font-weight:800;color:var(--accent);display:flex;align-items:center;gap:3px}
+.detected .di b{font-size:12px;font-weight:700;display:block}
+.detected .di span{font-size:10px;color:var(--muted)}
+.detected .di em{font-size:10px;font-weight:700;color:var(--green);font-style:normal}
+.shutter{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:48px;height:48px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);background-clip:padding-box}
+
+/* sections */
+section{padding:46px 0}
+.band{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
+.fcard{flex:1 1 280px;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px}
+.fcard .ic{width:40px;height:40px;border-radius:11px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin-bottom:13px}
+.fcard h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.fcard p{font-size:14px;color:var(--muted)}
+.feature{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;padding:40px 0}
+.feature.rev .txt{order:2}
+.feature .txt h2{font-family:var(--serif);font-size:30px;letter-spacing:-.01em;margin:10px 0 12px;line-height:1.1}
+.feature .txt p{font-size:15.5px;color:var(--muted);max-width:46ch}
+.feature .txt ul{list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.feature .txt li{display:flex;gap:10px;font-size:14px;font-weight:500}
+.feature .txt li svg{color:var(--accent);flex:0 0 auto;margin-top:2px}
+.feature .art{display:flex;justify-content:center}
+.section-head{text-align:center;max-width:620px;margin:0 auto 36px}
+.section-head h2{font-family:var(--serif);font-size:32px;letter-spacing:-.01em;margin:10px 0 8px}
+.section-head p{color:var(--muted);font-size:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:900px){.hero,.feature{grid-template-columns:1fr;gap:32px}.feature.rev .txt{order:0}.grid4{grid-template-columns:1fr 1fr}.hero-art{order:-1}}
+@media(max-width:520px){.grid4{grid-template-columns:1fr}}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+.scard .ic{color:var(--accent);margin-bottom:10px}
+.scard h3{font-size:15px;margin-bottom:5px}
+.scard p{font-size:13px;color:var(--muted)}
+
+.cta{background:linear-gradient(160deg,var(--accent-deep),var(--accent));border-radius:24px;padding:48px;text-align:center;color:#fff;margin:20px 0}
+.cta h2{font-family:var(--serif);font-size:32px;margin-bottom:10px}
+.cta p{opacity:.9;max-width:46ch;margin:0 auto 22px}
+.cta .btn-primary{background:#fff;color:var(--accent)}
+
+footer{border-top:1px solid var(--border);padding:30px 0;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);justify-content:center;margin-top:18px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="#"><span class="mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3h8l-.6 6a3.4 3.4 0 0 1-3.4 3 3.4 3.4 0 0 1-3.4-3L8 3Z"/><path d="M12 12v6M9 21h6"/></svg></span>Vincent</a>
+  <div class="navlinks">
+    <a class="hide" href="#features">Fonctionnalités</a>
+    <a class="hide" href="#captures">Captures</a>
+    <a class="hide" href="#ia">IA</a>
+    <a class="btn btn-primary" href="#download" style="padding:9px 15px">Télécharger</a>
+  </div>
+</div></nav>
+
+<header class="wrap hero">
+  <div>
+    <div class="eyebrow">Cave à vin · Android</div>
+    <h1>Votre cave à vin, enfin bien rangée.</h1>
+    <p class="lead">Vincent inventorie, range et valorise vos bouteilles. Scan, photo ou voix — l'IA reconnaît l'étiquette et estime le prix. Plan visuel des casiers, recherche fine, import PLOC & Vivino.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#download">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3v18l9-5 9 5V3z" opacity="0"/><path d="M4 3.5 13.5 12 4 20.5z M14.8 13.3l3 1.7-3 1.7-2-1.9z"/></svg>
+        Google Play
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/ludoo0d0a/vincent" target="_blank" rel="noopener">Code source</a>
+    </div>
+    <div class="bullets">
+      <span><i class="dot" style="background:var(--red)"></i>Rouge</span>
+      <span><i class="dot" style="background:var(--white-wine)"></i>Blanc</span>
+      <span><i class="dot" style="background:var(--rose)"></i>Rosé</span>
+      <span><i class="dot" style="background:var(--bubbly)"></i>Pétillant</span>
+    </div>
+  </div>
+  <div class="hero-art">
+    <!-- Screenshot 1 — Tableau de bord (réutilisé du mockup) -->
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar"><span>9:41</span><span>100%</span></div>
+      <div class="appbar"><h2>Ma cave</h2><div class="sub">Cave de l'appartement · Paris</div></div>
+      <div class="body">
+        <div class="hcard">
+          <div class="lab">VALEUR ESTIMÉE</div><div class="big">4 280 €</div>
+          <div class="row"><div><b>142</b><span>bouteilles</span></div><div><b>38</b><span>références</span></div><div><b>9</b><span>à boire</span></div></div>
+        </div>
+        <div class="mini-grid">
+          <div class="card mini"><div class="k">Prix moyen</div><div class="v">30 €</div></div>
+          <div class="card mini"><div class="k">Ce mois-ci</div><div class="v">+12</div></div>
+        </div>
+        <div class="sect-h"><span>Répartition</span><a>Détails</a></div>
+        <div class="card donut-card">
+          <div class="donut"><div class="hole"><b>142</b><s>btl</s></div></div>
+          <div class="leg">
+            <div><span class="lft"><i class="dot" style="background:var(--red);width:9px;height:9px;border-radius:50%"></i>Rouge</span><span class="pct">58%</span></div>
+            <div><span class="lft"><i class="dot" style="background:var(--white-wine);width:9px;height:9px;border-radius:50%"></i>Blanc</span><span class="pct">22%</span></div>
+            <div><span class="lft"><i class="dot" style="background:var(--rose);width:9px;height:9px;border-radius:50%"></i>Rosé</span><span class="pct">12%</span></div>
+            <div><span class="lft"><i class="dot" style="background:var(--bubbly);width:9px;height:9px;border-radius:50%"></i>Pétillant</span><span class="pct">8%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="bnav"><i class="on"></i><i></i><i></i><i></i></div>
+    </div></div>
+  </div>
+</header>
+
+<section id="features"><div class="wrap">
+  <div class="band">
+    <div class="fcard">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+      <h3>Inventaire express</h3>
+      <p>Ajoutez une bouteille en quelques secondes : scan d'étiquette, photo ou dictée vocale. Vincent remplit le reste.</p>
+    </div>
+    <div class="fcard">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></div>
+      <h3>Plan des casiers</h3>
+      <p>Visualisez vos casiers « type block », colorés par couleur de vin. Filtrez par millésime ou par prix d'un geste.</p>
+    </div>
+    <div class="fcard">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></svg></div>
+      <h3>IA & prix</h3>
+      <p>Reconnaissance d'étiquette et estimation de prix par IA, accords mets-vin suggérés. Tout est éditable.</p>
+    </div>
+  </div>
+</div></section>
+
+<section id="captures"><div class="wrap">
+
+  <!-- Feature: casiers -->
+  <div class="feature">
+    <div class="txt">
+      <div class="eyebrow">Casiers</div>
+      <h2>Votre cave, d'un coup d'œil</h2>
+      <p>Chaque case affiche la couleur du vin. Basculez l'étiquette entre couleur, prix, millésime ou catégorie, et filtrez par tranche d'années ou de prix.</p>
+      <ul>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Plan multi-caves &amp; emplacements précis</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Filtres par millésime &amp; prix</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Valorisation automatique de la cave</li>
+      </ul>
+    </div>
+    <div class="art">
+      <div class="phone"><div class="screen">
+        <div class="punch"></div>
+        <div class="sbar"><span>9:41</span><span>100%</span></div>
+        <div class="appbar"><h2>Casiers</h2><div class="sub">30 emplacements · 22 occupés</div></div>
+        <div class="body">
+          <div class="seg"><b>Couleur</b><b>Prix</b><b class="on">Millésime</b><b>Catégorie</b></div>
+          <div class="rack">
+            <div class="rrow"><s>A</s><div class="cells"><div class="cell red"><span class="l">16</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell red"><span class="l">21</span></div><div class="cell e"></div><div class="cell red"><span class="l">15</span></div></div></div>
+            <div class="rrow"><s>B</s><div class="cells"><div class="cell red"><span class="l">17</span></div><div class="cell red"><span class="l">16</span></div><div class="cell red"><span class="l">16</span></div><div class="cell red"><span class="l">22</span></div><div class="cell red"><span class="l">21</span></div><div class="cell e"></div></div></div>
+            <div class="rrow"><s>C</s><div class="cells"><div class="cell red"><span class="l">22</span></div><div class="cell red"><span class="l">23</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell e"></div><div class="cell e"></div></div></div>
+            <div class="rrow"><s>D</s><div class="cells"><div class="cell red"><span class="l">NM</span></div><div class="cell red"><span class="l">14</span></div><div class="cell red"><span class="l">20</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell red"><span class="l">17</span></div></div></div>
+            <div class="rrow"><s>E</s><div class="cells"><div class="cell red"><span class="l">16</span></div><div class="cell e"></div><div class="cell red"><span class="l">19</span></div><div class="cell red"><span class="l">23</span></div><div class="cell e"></div><div class="cell e"></div></div></div>
+          </div>
+          <div class="card" style="margin-top:10px;padding:11px;display:flex;gap:10px;align-items:center">
+            <div style="width:26px;height:38px;border-radius:4px;background:linear-gradient(var(--red),oklch(30% 0.11 22))"></div>
+            <div style="flex:1"><b style="font-size:12px">Emplacement B3</b><div style="font-size:10px;color:var(--muted)">Léoville-Barton 2016 · 68 €</div></div>
+          </div>
+        </div>
+        <div class="bnav"><i></i><i class="on"></i><i></i><i></i></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Feature: IA -->
+  <div class="feature rev" id="ia">
+    <div class="txt">
+      <div class="eyebrow">Reconnaissance IA</div>
+      <h2>Photographiez. C'est rangé.</h2>
+      <p>Pointez l'étiquette : l'IA identifie le domaine, le millésime et la couleur, et propose un prix estimé. Fonctionne aussi par dictée vocale ou saisie de titre.</p>
+      <ul>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Scan d'étiquette &amp; code-barres</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Dictée vocale en français</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Prix estimé &amp; accords mets-vin</li>
+      </ul>
+    </div>
+    <div class="art">
+      <div class="phone"><div class="screen">
+        <div class="punch"></div>
+        <div class="sbar dark"><span>9:41</span><span>100%</span></div>
+        <div class="cam">
+          <div class="scanframe">
+            <i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i>
+            <div class="scanbottle"></div>
+          </div>
+          <div class="detected">
+            <div class="pb"></div>
+            <div class="di">
+              <div class="badge"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></svg>IDENTIFIÉ PAR L'IA</div>
+              <b>Château Margaux 2015</b>
+              <span>Margaux · Bordeaux · Rouge</span>
+              <em>≈ 620 € · estimation IA</em>
+            </div>
+          </div>
+          <div class="shutter"></div>
+        </div>
+        <div class="bnav"><i></i><i></i><i class="on"></i><i></i></div>
+      </div></div>
+    </div>
+  </div>
+
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <div class="eyebrow">Tout ce qu'il faut</div>
+    <h2>Une cave complète dans la poche</h2>
+    <p>De l'inventaire au partage, Vincent couvre tout le cycle de vie de vos bouteilles.</p>
+  </div>
+  <div class="grid4">
+    <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z"/></svg></div><h3>Favoris &amp; cloud</h3><p>Compte Google, sauvegarde et favoris synchronisés.</p></div>
+    <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div><h3>Import PLOC &amp; Vivino</h3><p>Reprenez votre cave existante par CSV en un instant.</p></div>
+    <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><h3>Recherche fine</h3><p>Goût, cépage, provenance, caviste, prix — combinables.</p></div>
+    <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14v6a7 7 0 0 1-14 0Z"/><path d="M9 21h6M12 16v5"/></svg></div><h3>Accords mets-vin</h3><p>Des suggestions de plats pour chaque bouteille.</p></div>
+  </div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--red);width:11px;height:11px;border-radius:50%"></i>Rouge</span>
+    <span><i class="dot" style="background:var(--white-wine);width:11px;height:11px;border-radius:50%"></i>Blanc</span>
+    <span><i class="dot" style="background:var(--rose);width:11px;height:11px;border-radius:50%"></i>Rosé</span>
+    <span><i class="dot" style="background:var(--bubbly);width:11px;height:11px;border-radius:50%"></i>Pétillant</span>
+  </div>
+</div></section>
+
+<section id="download"><div class="wrap">
+  <div class="cta">
+    <h2>Rangez votre première bouteille ce soir</h2>
+    <p>Vincent est gratuit. Disponible en accès anticipé sur le canal interne Google Play.</p>
+    <a class="btn btn-primary" href="https://github.com/ludoo0d0a/vincent" target="_blank" rel="noopener">Obtenir Vincent</a>
+  </div>
+</div></section>
+
+<footer class="wrap">
+  <div>© 2026 Vincent — cave à vin. Fait avec passion (et un peu d'IA).</div>
+  <div><a href="https://github.com/ludoo0d0a/vincent" target="_blank" rel="noopener">GitHub</a></div>
+</footer>
+
+</body>
+</html>
