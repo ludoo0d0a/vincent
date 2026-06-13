@@ -20,7 +20,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 APP_ID="fr.geoking.vincent"
-ALIAS="vincent"
+ALIAS="key0"
 KS_PATH="$ROOT/release.keystore"
 CRED="$ROOT/scripts/.keystore-credentials"
 PKG_DIR="composeApp/src/androidMain/kotlin/fr/geoking/vincent"
