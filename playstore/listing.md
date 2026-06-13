@@ -57,7 +57,7 @@ Vincent est gratuit. Les prix affichés sont des estimations fournies à titre i
 - **Publicités** : non · **Achats intégrés** : non
 - **E-mail développeur** : *(à renseigner)*
 - **Site web** : URL Netlify de la landing
-- **Politique de confidentialité** : `https://<votre-site>.netlify.app/terms.html`
+- **Politique de confidentialité** : `https://vincent.geoking.fr/terms.html`
 
 ---
 
