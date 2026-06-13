@@ -136,6 +136,10 @@ pinned to Gradle 8.13 since the binary wrapper is not committed → call `gradle
 pushes (else `1.0.<run>`) — no manual bump. The release job signs from env vars; a
 local release build stays unsigned (debug works with nothing configured).
 
+> **Fastest path:** run `./scripts/setup-release.sh` — a guided, re-runnable
+> wizard that generates the keystore, opens each Google console page, and registers
+> every secret via `gh`. Run a single step with `./scripts/setup-release.sh keystore|play|oauth|gemini`.
+
 ### Repository secrets to create (Settings → Secrets and variables → Actions)
 
 | Secret | What it is |
