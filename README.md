@@ -130,10 +130,11 @@ composeApp/src/
 - **Still to wire**: effective cloud sync of the Room data to the account.
 - **Bottles** are drawn vectorially (`ui/WineBottle`) — capsule, body, label — so
   they stay crisp at any size with no bitmap assets. Replaceable with real photos later.
-- **Launcher icon (wired).** Adaptive icon under `androidMain/res`: a white wine-glass
-  mark on a lie-de-vin gradient (`drawable/ic_launcher_foreground.xml` + `…_background.xml`,
-  `mipmap-anydpi-v26/ic_launcher*.xml`, with a `monochrome` layer for Android 13 themed
-  icons) plus PNG fallbacks (`mipmap-*dpi/`) for API 24–25.
+- **Launcher icon (wired).** The brand PNG `playstore/icon-512.png` (wine glass on a
+  lie-de-vin gradient): used full-bleed as the adaptive **background** bitmap
+  (`drawable-nodpi/ic_launcher_bg.png`, transparent `drawable/ic_launcher_fg.xml`
+  foreground → no white-border legacy treatment on API 26+), with square PNG mipmaps
+  (`mipmap-*dpi/`) as the API 24–25 fallback.
 - **No fullscreen / insets.** The app stays within the system bars: the root applies
   `WindowInsets.systemBars` padding (and the Scaffold/NavigationBar add none), so the
   top back button and bottom navigation are never hidden under the status/nav bars.
