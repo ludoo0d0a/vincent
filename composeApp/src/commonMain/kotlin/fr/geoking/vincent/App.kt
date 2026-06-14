@@ -23,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,55 +51,64 @@ enum class Tab(val label: String, val icon: ImageVector) {
     SEARCH("Recherche", Icons.Filled.Search),
 }
 
-private enum class Overlay { ADD, ACCOUNT, RECENT, TRANSFER }
+/** A screen pushed above the tabbed home. Back pops the top of the stack. */
+private sealed interface Dest {
+    data class Detail(val bottle: Bottle) : Dest
+    data object Add : Dest
+    data object Account : Dest
+    data object Recent : Dest
+    data object Transfer : Dest
+}
 
 @Composable
 fun App() = VincentTheme {
     var guest by remember { mutableStateOf(false) }
     val loggedIn = Auth.account != null || guest
     var tab by remember { mutableStateOf(Tab.HOME) }
-    var detail by remember { mutableStateOf<Bottle?>(null) }
-    var overlay by remember { mutableStateOf<Overlay?>(null) }
+    // Real navigation stack above the tabbed home; back pops one level.
+    val stack = remember { mutableStateListOf<Dest>() }
+    fun pop() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
+
+    // System back button: while screens are stacked, pop instead of exiting.
+    NavBackHandler(enabled = loggedIn && stack.isNotEmpty()) { pop() }
 
     Surface(color = VincentColors.Bg, modifier = Modifier.fillMaxSize()) {
         // No fullscreen: keep all content within the system bars so the top
         // back button and the bottom navigation are never hidden behind them.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
-        when {
-            !loggedIn -> LoginScreen(onGuest = { guest = true })
+            if (!loggedIn) {
+                LoginScreen(onGuest = { guest = true })
+            } else when (val top = stack.lastOrNull()) {
+                null -> MainScaffold(
+                    tab = tab,
+                    onTab = { tab = it },
+                    onOpenBottle = { stack.add(Dest.Detail(it)) },
+                    onAdd = { stack.add(Dest.Add) },
+                    onAccount = { stack.add(Dest.Account) },
+                )
 
-            detail != null -> BottleDetailScreen(
-                bottle = detail!!,
-                onBack = { detail = null },
-            )
+                is Dest.Detail -> BottleDetailScreen(
+                    bottle = top.bottle,
+                    onBack = ::pop,
+                )
 
-            overlay == Overlay.ADD -> AddScreen(onClose = { overlay = null })
+                Dest.Add -> AddScreen(onClose = ::pop)
 
-            overlay == Overlay.ACCOUNT -> AccountScreen(
-                onBack = { overlay = null },
-                onOpenRecent = { overlay = Overlay.RECENT },
-                onOpenTransfer = { overlay = Overlay.TRANSFER },
-                onOpenBottle = { detail = it; overlay = null },
-                onSignOut = { Auth.signOut(); guest = false; overlay = null },
-            )
+                Dest.Account -> AccountScreen(
+                    onBack = ::pop,
+                    onOpenRecent = { stack.add(Dest.Recent) },
+                    onOpenTransfer = { stack.add(Dest.Transfer) },
+                    onOpenBottle = { stack.add(Dest.Detail(it)) },
+                    onSignOut = { Auth.signOut(); guest = false; stack.clear() },
+                )
 
-            overlay == Overlay.TRANSFER -> ImportExportScreen(
-                onBack = { overlay = Overlay.ACCOUNT },
-            )
+                Dest.Transfer -> ImportExportScreen(onBack = ::pop)
 
-            overlay == Overlay.RECENT -> RecentScreen(
-                onBack = { overlay = Overlay.ACCOUNT },
-                onOpenBottle = { detail = it; overlay = null },
-            )
-
-            else -> MainScaffold(
-                tab = tab,
-                onTab = { tab = it },
-                onOpenBottle = { detail = it },
-                onAdd = { overlay = Overlay.ADD },
-                onAccount = { overlay = Overlay.ACCOUNT },
-            )
-        }
+                Dest.Recent -> RecentScreen(
+                    onBack = ::pop,
+                    onOpenBottle = { stack.add(Dest.Detail(it)) },
+                )
+            }
         }
     }
 }
