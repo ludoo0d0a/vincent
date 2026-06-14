@@ -45,6 +45,7 @@ kotlin {
             implementation(libs.androidx.credentials.play.services)
             implementation(libs.google.identity.googleid)
             implementation(libs.google.code.scanner)
+            implementation(libs.google.app.update.ktx)
         }
     }
 }

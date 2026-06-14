@@ -123,6 +123,10 @@ composeApp/src/
 - **Manual entry (wired).** A real form in the Add screen (`screens/AddScreen.kt`) for
   domaine/appellation/colour/category/vintage/price/quantity/rack — the reliable path when
   AI/lookup miss. The confirm button stays disabled until there is a real bottle.
+- **In-app updates (wired).** `MainActivity` uses **Play In-App Updates** (flexible):
+  on startup it checks Play, shows the update popup, downloads in the background, and
+  **auto-completes (restarts) as soon as the download finishes**. Only active for
+  Play-installed builds; a no-op in debug/sideload.
 - **Still to wire**: effective cloud sync of the Room data to the account.
 - **Bottles** are drawn vectorially (`ui/WineBottle`) — capsule, body, label — so
   they stay crisp at any size with no bitmap assets. Replaceable with real photos later.
