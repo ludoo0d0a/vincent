@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vincent — votre cave à vin, bien rangée</title>
-<meta name="description" content="Vincent : l'app Android pour gérer votre cave à vin « type block ». Inventaire express par scan, photo ou voix, plan visuel des casiers, reconnaissance et prix par IA, import PLOC & Vivino.">
+<meta name="description" content="Vincent : l'app Android pour gérer votre cave à vin « type block ». Inventaire express par scan, code-barres, photo ou voix, plan visuel des casiers, reconnaissance et prix par IA, import PLOC & Vivino.">
 <style>
 :root{
   --bg:oklch(97% 0.004 255);
@@ -104,10 +104,15 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:6
 .rrow:last-child{margin-bottom:0}
 .rrow s{width:12px;font-family:var(--mono);font-size:9px;color:var(--faint);text-decoration:none}
 .cells{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;flex:1}
-.cell{aspect-ratio:1;border-radius:6px;border:1px solid var(--border);display:grid;place-items:center}
-.cell.e{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 3px,transparent 3px,transparent 6px)}
-.cell .l{font-family:var(--mono);font-size:7px;font-weight:700;background:rgba(255,255,255,.82);color:#2a1717;padding:0 2px;border-radius:3px}
-.cell.red{background:color-mix(in oklch,var(--accent) 16%,#fff);border-color:color-mix(in oklch,var(--accent) 30%,#fff)}
+.cell{aspect-ratio:1;border-radius:6px;border:2.5px solid var(--border);display:grid;place-items:center}
+.cell.e{border-width:1px;background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 3px,transparent 3px,transparent 6px)}
+.cell .l{font-family:var(--mono);font-size:8px;font-weight:800;background:rgba(255,255,255,.86);color:#2a1717;padding:1px 3px;border-radius:4px}
+/* border = wine colour; interior a light tint of it */
+.cell.red{background:color-mix(in oklch,var(--red) 16%,#fff);border-color:var(--red)}
+.cell.white{background:color-mix(in oklch,var(--white-wine) 26%,#fff);border-color:var(--white-wine)}
+.cell.rose{background:color-mix(in oklch,var(--rose) 22%,#fff);border-color:var(--rose)}
+.cell.bub{background:color-mix(in oklch,var(--bubbly) 30%,#fff);border-color:var(--bubbly)}
+.cell.sel{outline:2px solid var(--accent);outline-offset:1px}
 
 /* scan mini */
 .cam{flex:1;background:radial-gradient(120% 80% at 50% 30%,oklch(30% 0.02 265),oklch(15% 0.015 265));position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -230,12 +235,12 @@ footer{border-top:1px solid var(--border);padding:30px 0;color:var(--muted);font
     <div class="fcard">
       <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
       <h3>Inventaire express</h3>
-      <p>Ajoutez une bouteille en quelques secondes : scan d'étiquette, photo ou dictée vocale. Vincent remplit le reste.</p>
+      <p>Ajoutez une bouteille en quelques secondes : scan d'étiquette, code-barres, photo, dictée vocale — ou saisie manuelle. Vincent remplit le reste.</p>
     </div>
     <div class="fcard">
       <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></div>
       <h3>Plan des casiers</h3>
-      <p>Visualisez vos casiers « type block », colorés par couleur de vin. Filtrez par millésime ou par prix d'un geste.</p>
+      <p>Visualisez vos casiers « type block », bord à la couleur du vin. Caves sur mesure (grille ou quinconce), filtres millésime et prix.</p>
     </div>
     <div class="fcard">
       <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></svg></div>
@@ -252,26 +257,27 @@ footer{border-top:1px solid var(--border);padding:30px 0;color:var(--muted);font
     <div class="txt">
       <div class="eyebrow">Casiers</div>
       <h2>Votre cave, d'un coup d'œil</h2>
-      <p>Chaque case affiche la couleur du vin. Basculez l'étiquette entre couleur, prix, millésime ou catégorie, et filtrez par tranche d'années ou de prix.</p>
+      <p>Le bord de chaque case garde toujours la couleur du vin ; le remplissage suit le mode choisi (couleur, prix, millésime ou catégorie). Touchez une case pour voir la bouteille, filtrez par tranche d'années ou de prix.</p>
       <ul>
-        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Plan multi-caves &amp; emplacements précis</li>
-        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Filtres par millésime &amp; prix</li>
-        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Valorisation automatique de la cave</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Bord toujours à la couleur du vin</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Caves sur mesure — grille &amp; quinconce, éditeur de casier</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Filtres millésime &amp; prix · valorisation automatique</li>
       </ul>
     </div>
     <div class="art">
       <div class="phone"><div class="screen">
         <div class="punch"></div>
         <div class="sbar"><span>9:41</span><span>100%</span></div>
-        <div class="appbar"><h2>Casiers</h2><div class="sub">30 emplacements · 22 occupés</div></div>
+        <div class="appbar"><h2>Casiers</h2><div class="sub">36 emplacements · 29 occupés</div></div>
         <div class="body">
           <div class="seg"><b>Couleur</b><b>Prix</b><b class="on">Millésime</b><b>Catégorie</b></div>
           <div class="rack">
-            <div class="rrow"><s>A</s><div class="cells"><div class="cell red"><span class="l">16</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell red"><span class="l">21</span></div><div class="cell e"></div><div class="cell red"><span class="l">15</span></div></div></div>
-            <div class="rrow"><s>B</s><div class="cells"><div class="cell red"><span class="l">17</span></div><div class="cell red"><span class="l">16</span></div><div class="cell red"><span class="l">16</span></div><div class="cell red"><span class="l">22</span></div><div class="cell red"><span class="l">21</span></div><div class="cell e"></div></div></div>
-            <div class="rrow"><s>C</s><div class="cells"><div class="cell red"><span class="l">22</span></div><div class="cell red"><span class="l">23</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell e"></div><div class="cell e"></div></div></div>
-            <div class="rrow"><s>D</s><div class="cells"><div class="cell red"><span class="l">NM</span></div><div class="cell red"><span class="l">14</span></div><div class="cell red"><span class="l">20</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell red"><span class="l">17</span></div></div></div>
-            <div class="rrow"><s>E</s><div class="cells"><div class="cell red"><span class="l">16</span></div><div class="cell e"></div><div class="cell red"><span class="l">19</span></div><div class="cell red"><span class="l">23</span></div><div class="cell e"></div><div class="cell e"></div></div></div>
+            <div class="rrow"><s>A</s><div class="cells"><div class="cell red"><span class="l">16</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell white"><span class="l">21</span></div><div class="cell e"></div><div class="cell red"><span class="l">15</span></div></div></div>
+            <div class="rrow"><s>B</s><div class="cells"><div class="cell red"><span class="l">17</span></div><div class="cell red"><span class="l">16</span></div><div class="cell red sel"><span class="l">16</span></div><div class="cell white"><span class="l">22</span></div><div class="cell white"><span class="l">21</span></div><div class="cell e"></div></div></div>
+            <div class="rrow"><s>C</s><div class="cells"><div class="cell rose"><span class="l">22</span></div><div class="cell rose"><span class="l">23</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell e"></div><div class="cell e"></div></div></div>
+            <div class="rrow"><s>D</s><div class="cells"><div class="cell bub"><span class="l">NM</span></div><div class="cell bub"><span class="l">14</span></div><div class="cell white"><span class="l">20</span></div><div class="cell red"><span class="l">18</span></div><div class="cell red"><span class="l">19</span></div><div class="cell red"><span class="l">17</span></div></div></div>
+            <div class="rrow"><s>E</s><div class="cells"><div class="cell red"><span class="l">16</span></div><div class="cell e"></div><div class="cell white"><span class="l">19</span></div><div class="cell rose"><span class="l">23</span></div><div class="cell e"></div><div class="cell red"><span class="l">20</span></div></div></div>
+            <div class="rrow"><s>F</s><div class="cells"><div class="cell red"><span class="l">19</span></div><div class="cell white"><span class="l">20</span></div><div class="cell red"><span class="l">18</span></div><div class="cell e"></div><div class="cell rose"><span class="l">22</span></div><div class="cell bub"><span class="l">NM</span></div></div></div>
           </div>
           <div class="card" style="margin-top:10px;padding:11px;display:flex;gap:10px;align-items:center">
             <div style="width:26px;height:38px;border-radius:4px;background:linear-gradient(var(--red),oklch(30% 0.11 22))"></div>
@@ -288,11 +294,11 @@ footer{border-top:1px solid var(--border);padding:30px 0;color:var(--muted);font
     <div class="txt">
       <div class="eyebrow">Reconnaissance IA</div>
       <h2>Photographiez. C'est rangé.</h2>
-      <p>Pointez l'étiquette : l'IA identifie le domaine, le millésime et la couleur, et propose un prix estimé. Fonctionne aussi par dictée vocale ou saisie de titre.</p>
+      <p>Pointez l'étiquette : l'IA identifie le domaine, le millésime et la couleur, et propose un prix estimé. Le code-barres interroge une base produits mondiale, et tout reste éditable — ou saisissable à la main.</p>
       <ul>
-        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Scan d'étiquette &amp; code-barres</li>
-        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Dictée vocale en français</li>
-        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Prix estimé &amp; accords mets-vin</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Étiquette, code-barres, photo ou voix</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Code-barres → base mondiale Open Food Facts</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4L19 7"/></svg>Prix estimé, accords mets-vin &amp; saisie manuelle</li>
       </ul>
     </div>
     <div class="art">
@@ -329,7 +335,7 @@ footer{border-top:1px solid var(--border);padding:30px 0;color:var(--muted);font
     <p>De l'inventaire au partage, Vincent couvre tout le cycle de vie de vos bouteilles.</p>
   </div>
   <div class="grid4">
-    <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z"/></svg></div><h3>Favoris &amp; cloud</h3><p>Compte Google, sauvegarde et favoris synchronisés.</p></div>
+    <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z"/></svg></div><h3>Compte &amp; favoris</h3><p>Connexion Google et favoris. Vos données restent privées, sur l'appareil.</p></div>
     <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div><h3>Import PLOC &amp; Vivino</h3><p>Reprenez votre cave existante par CSV en un instant.</p></div>
     <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><h3>Recherche fine</h3><p>Goût, cépage, provenance, caviste, prix — combinables.</p></div>
     <div class="scard"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14v6a7 7 0 0 1-14 0Z"/><path d="M9 21h6M12 16v5"/></svg></div><h3>Accords mets-vin</h3><p>Des suggestions de plats pour chaque bouteille.</p></div>
