@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import fr.geoking.vincent.ai.PriceEstimate
 import fr.geoking.vincent.ai.priceEstimator
+import fr.geoking.vincent.ai.rememberBarcodeScanner
 import fr.geoking.vincent.ai.rememberDictation
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.ai.wineRecognizer
@@ -53,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.barcodeLookup
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineCategory
@@ -74,6 +77,31 @@ fun AddScreen(onClose: () -> Unit) {
     var aiPrice by remember { mutableStateOf<PriceEstimate?>(null) }
     var busy by remember { mutableStateOf(false) }
     var manualBottle by remember { mutableStateOf<Bottle?>(null) }
+    var manualSeed by remember { mutableStateOf<ManualSeed?>(null) }
+    var scanMsg by remember { mutableStateOf<String?>(null) }
+    // Barcode → Open Food Facts lookup → prefill the manual form (vintage/price stay
+    // for the user to complete, since EANs rarely encode them).
+    val lookup = remember { barcodeLookup() }
+    val scanBarcode = rememberBarcodeScanner { code ->
+        if (code != null) {
+            busy = true
+            scope.launch {
+                val info = lookup.byBarcode(code)
+                busy = false
+                manualSeed = if (info != null) {
+                    scanMsg = null
+                    ManualSeed(
+                        domain = info.brand.ifBlank { info.name },
+                        appellation = if (info.brand.isNotBlank()) info.name else "",
+                    )
+                } else {
+                    scanMsg = "Code-barres $code introuvable — complétez à la main ou utilisez la photo."
+                    ManualSeed()
+                }
+                mode = AddMode.MANUAL
+            }
+        }
+    }
     // Scan & Photo both snap the label/bottle with the system camera (full-res) and let
     // the vision model read it → Gemini fromImage. No hardcoded recognition result.
     val startCapture = rememberPhotoCapture { bytes ->
@@ -135,6 +163,14 @@ fun AddScreen(onClose: () -> Unit) {
             }
         }
 
+        if (scanMsg != null) {
+            Text(
+                scanMsg!!,
+                fontSize = 11.5.sp, color = VincentColors.Muted, lineHeight = 15.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+
         Spacer(Modifier.height(12.dp))
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
             when (mode) {
@@ -146,6 +182,7 @@ fun AddScreen(onClose: () -> Unit) {
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     busy = busy,
                     onIdentify = identify,
+                    onScanBarcode = if (mode == AddMode.SCAN) scanBarcode else null,
                 )
                 AddMode.VOICE -> VoicePane(
                     transcript = transcript,
@@ -155,7 +192,7 @@ fun AddScreen(onClose: () -> Unit) {
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     onMic = startDictation,
                 )
-                AddMode.MANUAL -> ManualPane(onBottle = { manualBottle = it })
+                AddMode.MANUAL -> ManualPane(seed = manualSeed, onBottle = { manualBottle = it })
             }
         }
 
@@ -183,9 +220,17 @@ fun AddScreen(onClose: () -> Unit) {
     }
 }
 
+/** Values pushed into the manual form, e.g. from a barcode lookup. */
+private data class ManualSeed(
+    val domain: String = "",
+    val appellation: String = "",
+    val color: WineColor = WineColor.RED,
+    val category: WineCategory = WineCategory.BORDEAUX,
+)
+
 /** Manual entry — a real form; emits a Bottle (or null while the name is empty). */
 @Composable
-private fun ManualPane(onBottle: (Bottle?) -> Unit) {
+private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
     var domain by remember { mutableStateOf("") }
     var appellation by remember { mutableStateOf("") }
     var color by remember { mutableStateOf(WineColor.RED) }
@@ -194,6 +239,11 @@ private fun ManualPane(onBottle: (Bottle?) -> Unit) {
     var price by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("1") }
     var spot by remember { mutableStateOf("") }
+
+    // Apply a barcode prefill when one arrives (only overwrites the name fields).
+    LaunchedEffect(seed) {
+        seed?.let { domain = it.domain; appellation = it.appellation; color = it.color; category = it.category }
+    }
 
     LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot) {
         onBottle(
@@ -302,6 +352,7 @@ private fun ScanPane(
     priceLabel: String?,
     busy: Boolean,
     onIdentify: () -> Unit,
+    onScanBarcode: (() -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize()) {
         Box(
@@ -309,6 +360,19 @@ private fun ScanPane(
                 .background(Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF15151B)))),
             contentAlignment = Alignment.Center,
         ) {
+            // barcode shortcut (scan mode only)
+            if (onScanBarcode != null) {
+                Row(
+                    Modifier.align(Alignment.TopCenter).padding(top = 14.dp)
+                        .clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.14f))
+                        .clickable(onClick = onScanBarcode).padding(horizontal = 14.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("Scanner le code-barres", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700)
+                }
+            }
             // viewfinder frame
             Box(Modifier.size(width = 180.dp, height = 260.dp), contentAlignment = Alignment.Center) {
                 WineBottle(WineColor.RED, Modifier.size(width = 74.dp, height = 170.dp))

@@ -114,6 +114,15 @@ composeApp/src/
   **system** camera (`TakePicture` + `FileProvider`, full resolution, **no CameraX**
   — overkill for a one-shot snap), CAMERA permission on tap. In Photo mode the button
   captures → `WineRecognizer.fromImage` (Gemini) fills the fields + price.
+- **Barcode (wired).** `ai/Barcode.kt` (expect) + `Barcode.android.kt`: **Google Code
+  Scanner** (`play-services-code-scanner`, no camera permission, module preloaded via
+  the manifest `mlkit.vision.DEPENDENCIES` meta-data) reads the EAN/UPC. `data/ProductLookup.kt`
+  (expect) + `ProductLookup.android.kt` resolves it against **Open Food Facts** (free,
+  no key) and prefills the **manual** form (name/brand). EANs rarely encode vintage/price,
+  so the user completes those — or falls back to the label photo (AI).
+- **Manual entry (wired).** A real form in the Add screen (`screens/AddScreen.kt`) for
+  domaine/appellation/colour/category/vintage/price/quantity/rack — the reliable path when
+  AI/lookup miss. The confirm button stays disabled until there is a real bottle.
 - **Still to wire**: effective cloud sync of the Room data to the account.
 - **Bottles** are drawn vectorially (`ui/WineBottle`) — capsule, body, label — so
   they stay crisp at any size with no bitmap assets. Replaceable with real photos later.
