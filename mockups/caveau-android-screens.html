@@ -1,0 +1,618 @@
+
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caveau — App cave à vin (maquettes Android)</title>
+<style>
+:root{
+  --bg:oklch(96.5% 0.004 255);
+  --surface:#ffffff;
+  --surface-2:oklch(97.5% 0.004 255);
+  --fg:oklch(23% 0.015 265);
+  --muted:oklch(53% 0.012 265);
+  --faint:oklch(66% 0.01 265);
+  --border:oklch(91% 0.005 265);
+  --accent:oklch(43% 0.13 18);        /* lie-de-vin */
+  --accent-soft:oklch(94% 0.03 18);
+  --red:oklch(46% 0.15 22);
+  --white-wine:oklch(72% 0.11 92);
+  --rose:oklch(70% 0.12 8);
+  --bubbly:oklch(80% 0.08 95);
+  --green:oklch(56% 0.13 150);
+  --amber:oklch(72% 0.14 70);
+  --font:-apple-system,"Roboto","Segoe UI",system-ui,sans-serif;
+  --mono:"SF Mono","Roboto Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased}
+body{padding:48px 32px 80px}
+
+/* ---------- Gallery chrome ---------- */
+.board-head{max-width:1280px;margin:0 auto 44px}
+.kick{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.board-head h1{font-size:40px;letter-spacing:-.02em;margin:10px 0 8px;font-weight:700}
+.board-head p{color:var(--muted);font-size:15.5px;max-width:640px;line-height:1.55}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px}
+.legend span{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);font-weight:500}
+.dot{width:11px;height:11px;border-radius:50%}
+
+.grid{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:48px 36px;justify-items:center}
+.frame-wrap{display:flex;flex-direction:column;align-items:center;gap:14px}
+.frame-label{text-align:center}
+.frame-label .n{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.1em}
+.frame-label .t{font-size:14.5px;font-weight:600;margin-top:2px}
+.frame-label .d{font-size:12.5px;color:var(--muted);margin-top:2px;max-width:300px;line-height:1.4}
+
+/* ---------- Pixel device frame ---------- */
+.phone{width:320px;height:700px;background:#0d0d11;border-radius:40px;padding:7px;box-shadow:0 24px 60px -22px rgba(20,10,15,.45),0 4px 14px -6px rgba(0,0,0,.18)}
+.screen{position:relative;width:100%;height:100%;background:var(--bg);border-radius:33px;overflow:hidden;display:flex;flex-direction:column}
+.punch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:#0d0d11;z-index:40}
+
+/* status bar */
+.sbar{height:30px;flex:0 0 30px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:600;color:var(--fg);z-index:30}
+.sbar.onaccent{color:#fff}
+.sbar .si{display:flex;align-items:center;gap:5px}
+.sbar svg{display:block}
+
+/* generic app scaffold */
+.app{flex:1;display:flex;flex-direction:column;min-height:0}
+.appbar{display:flex;align-items:center;justify-content:space-between;padding:6px 18px 12px}
+.appbar h2{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.appbar .sub{font-size:11.5px;color:var(--muted);font-weight:500;margin-top:1px}
+.iconbtn{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--surface-2);color:var(--fg);border:1px solid var(--border)}
+.body{flex:1;overflow:hidden;padding:0 16px}
+.body.scroll{overflow-y:auto}
+
+/* bottom nav */
+.bnav{flex:0 0 60px;display:flex;align-items:center;justify-content:space-around;background:var(--surface);border-top:1px solid var(--border);padding-bottom:6px}
+.bnav a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--faint);font-weight:600}
+.bnav a.on{color:var(--accent)}
+.bnav .nicon{width:24px;height:24px;display:grid;place-items:center}
+.fab{position:absolute;bottom:74px;right:18px;width:54px;height:54px;border-radius:18px;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 10px 22px -6px oklch(43% 0.13 18 / .55);z-index:25}
+
+/* shared bits */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:3px 8px;border-radius:7px}
+.tag .dot{width:7px;height:7px}
+.tag-red{background:color-mix(in oklch,var(--red) 14%,#fff);color:var(--red)}
+.tag-white{background:color-mix(in oklch,var(--white-wine) 24%,#fff);color:oklch(45% 0.08 80)}
+.tag-rose{background:color-mix(in oklch,var(--rose) 20%,#fff);color:oklch(48% 0.12 8)}
+.tag-bub{background:color-mix(in oklch,var(--bubbly) 26%,#fff);color:oklch(46% 0.06 90)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+
+/* ===== screen 1 : dashboard ===== */
+.hero-stat{background:linear-gradient(160deg,oklch(36% 0.12 18),oklch(46% 0.13 14));border-radius:20px;padding:18px;color:#fff;position:relative;overflow:hidden}
+.hero-stat::after{content:"";position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.08)}
+.hero-stat .lab{font-size:11px;opacity:.8;font-weight:600;letter-spacing:.04em}
+.hero-stat .big{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.hero-stat .row{display:flex;gap:18px;margin-top:14px;position:relative;z-index:2}
+.hero-stat .row div span{display:block}
+.hero-stat .row .v{font-size:16px;font-weight:700}
+.hero-stat .row .k{font-size:10.5px;opacity:.8}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.mini{padding:12px 13px}
+.mini .k{font-size:10.5px;color:var(--muted);font-weight:600}
+.mini .v{font-size:19px;font-weight:800;letter-spacing:-.01em;margin-top:3px}
+.mini .v small{font-size:11px;font-weight:600;color:var(--green)}
+.sect-h{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 9px}
+.sect-h h3{font-size:13.5px;font-weight:700}
+.sect-h a{font-size:11.5px;color:var(--accent);font-weight:600}
+.donut-card{display:flex;gap:16px;align-items:center;padding:14px}
+.donut{width:84px;height:84px;border-radius:50%;flex:0 0 84px;
+  background:conic-gradient(var(--red) 0 58%,var(--white-wine) 58% 80%,var(--rose) 80% 92%,var(--bubbly) 92% 100%);
+  display:grid;place-items:center}
+.donut .hole{width:54px;height:54px;border-radius:50%;background:var(--surface);display:grid;place-items:center;text-align:center}
+.donut .hole b{font-size:17px;font-weight:800;line-height:1}
+.donut .hole span{font-size:8.5px;color:var(--muted)}
+.leg{display:flex;flex-direction:column;gap:7px;flex:1}
+.leg .li{display:flex;align-items:center;justify-content:space-between;font-size:11.5px}
+.leg .li .lft{display:flex;align-items:center;gap:7px;font-weight:600}
+.leg .li .pct{font-family:var(--mono);color:var(--muted)}
+
+/* ===== screen 2 : rack / casiers ===== */
+.rack-tabs{display:flex;gap:6px;margin:2px 0 10px}
+.rack-tabs .rt{font-size:12px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted)}
+.rack-tabs .rt.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.rack{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:13px}
+.rack-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.rack-row:last-child{margin-bottom:0}
+.rack-row .rl{width:16px;font-family:var(--mono);font-size:10px;color:var(--faint);text-align:center}
+.cells{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;flex:1}
+.cell{aspect-ratio:1;border-radius:7px;border:1px solid var(--border);position:relative;display:grid;place-items:center}
+.cell.empty{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,transparent 4px,transparent 8px)}
+.cell .cap{width:9px;height:9px;border-radius:50%}
+.cell.red{background:color-mix(in oklch,var(--red) 16%,#fff);border-color:color-mix(in oklch,var(--red) 30%,#fff)}
+.cell.red .cap{background:var(--red)}
+.cell.white{background:color-mix(in oklch,var(--white-wine) 26%,#fff);border-color:color-mix(in oklch,var(--white-wine) 45%,#fff)}
+.cell.white .cap{background:var(--white-wine)}
+.cell.rose{background:color-mix(in oklch,var(--rose) 22%,#fff);border-color:color-mix(in oklch,var(--rose) 40%,#fff)}
+.cell.rose .cap{background:var(--rose)}
+.cell.bub{background:color-mix(in oklch,var(--bubbly) 30%,#fff)}
+.cell.bub .cap{background:var(--bubbly)}
+.cell.sel{outline:2.5px solid var(--accent);outline-offset:1px}
+.rack-foot{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:11px;font-weight:500}
+.peek{margin-top:11px;padding:12px;display:flex;gap:11px;align-items:center}
+.peek .pb{width:34px;height:46px;border-radius:5px;background:linear-gradient(var(--red),oklch(34% 0.12 22));flex:0 0 34px}
+.peek .pi{flex:1;min-width:0}
+.peek .pi b{font-size:13px;font-weight:700;display:block}
+.peek .pi span{font-size:11px;color:var(--muted)}
+
+/* ===== screen 3 : list / grid ===== */
+.searchbar{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:10px 13px;margin-bottom:11px}
+.searchbar input{border:0;outline:0;font-size:13px;flex:1;background:none;color:var(--fg);font-family:var(--font)}
+.searchbar input::placeholder{color:var(--faint)}
+.chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:10px;margin-bottom:3px}
+.chip{flex:0 0 auto;font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+.chip.on{background:var(--fg);color:#fff;border-color:var(--fg)}
+.bgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.bottle{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:11px;display:flex;flex-direction:column}
+.bottle .img{height:96px;border-radius:9px;display:grid;place-items:center;margin-bottom:9px;position:relative}
+.bottle .img .pb{width:30px;height:74px;border-radius:4px 4px 2px 2px}
+.bottle .qty{position:absolute;top:6px;right:6px;background:rgba(13,13,17,.78);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;font-family:var(--mono)}
+.bottle .nm{font-size:12.5px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+.bottle .rg{font-size:10.5px;color:var(--muted);margin-top:2px}
+.bottle .ft{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
+.bottle .pr{font-family:var(--mono);font-size:12px;font-weight:700}
+.stars{font-size:10px;color:var(--amber);letter-spacing:1px}
+
+/* ===== screen 4 : detail ===== */
+.det-hero{background:linear-gradient(165deg,oklch(96% 0.01 30),oklch(92% 0.03 18));border-radius:0 0 22px 22px;padding:6px 18px 20px;display:flex;gap:16px;align-items:flex-end}
+.det-hero .pb{width:62px;height:150px;border-radius:5px;background:linear-gradient(var(--red),oklch(30% 0.11 22));box-shadow:0 14px 26px -10px rgba(60,10,20,.5);flex:0 0 62px}
+.det-hero .meta{flex:1;min-width:0;padding-bottom:4px}
+.det-hero .meta .tag{margin-bottom:7px}
+.det-hero .meta h2{font-size:20px;font-weight:800;line-height:1.12;letter-spacing:-.02em}
+.det-hero .meta .reg{font-size:12px;color:var(--muted);margin-top:4px}
+.rating{display:flex;align-items:center;gap:7px;margin-top:9px}
+.rating .sc{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.rating .of{font-size:11px;color:var(--muted)}
+.det-row{display:flex;gap:9px;padding:13px 18px 0}
+.dstat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:9px 10px;text-align:center}
+.dstat .k{font-size:9.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.dstat .v{font-size:14px;font-weight:800;margin-top:3px}
+.dstat .v.mono{font-family:var(--mono)}
+.det-sec{padding:14px 18px 0}
+.det-sec h4{font-size:12px;font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.notes{font-size:12px;color:var(--muted);line-height:1.5}
+.window{display:flex;align-items:center;gap:8px;margin-top:6px}
+.win-bar{flex:1;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--amber),var(--green),var(--amber));position:relative}
+.win-bar .now{position:absolute;top:-3px;left:46%;width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid var(--green)}
+.loc-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:12px;padding:7px 11px;border-radius:10px}
+.det-cta{display:flex;gap:9px;padding:14px 18px 16px}
+.btn{flex:1;height:44px;border-radius:13px;font-size:13px;font-weight:700;display:grid;place-items:center;border:1px solid var(--border);background:var(--surface);color:var(--fg)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ===== screen 5 : scan ===== */
+.cam{flex:1;background:radial-gradient(120% 80% at 50% 30%,oklch(30% 0.02 265),oklch(16% 0.015 265));position:relative;display:flex;flex-direction:column}
+.cam .vp{flex:1;position:relative;display:grid;place-items:center}
+.scan-frame{width:200px;height:300px;border-radius:14px;position:relative}
+.scan-frame::before,.scan-frame::after{content:"";position:absolute;width:34px;height:34px;border:3px solid #fff;border-radius:5px}
+.scan-frame .c1{position:absolute;top:0;left:0;width:34px;height:34px;border-top:3px solid #fff;border-left:3px solid #fff;border-radius:8px 0 0 0}
+.scan-frame .c2{position:absolute;top:0;right:0;width:34px;height:34px;border-top:3px solid #fff;border-right:3px solid #fff;border-radius:0 8px 0 0}
+.scan-frame .c3{position:absolute;bottom:0;left:0;width:34px;height:34px;border-bottom:3px solid #fff;border-left:3px solid #fff;border-radius:0 0 0 8px}
+.scan-frame .c4{position:absolute;bottom:0;right:0;width:34px;height:34px;border-bottom:3px solid #fff;border-right:3px solid #fff;border-radius:0 0 8px 0}
+.scan-frame::before,.scan-frame::after{display:none}
+.scan-bottle{width:74px;height:170px;border-radius:6px;background:linear-gradient(var(--red),oklch(30% 0.11 22));box-shadow:0 0 40px rgba(0,0,0,.4)}
+.scan-line{position:absolute;left:8px;right:8px;top:46%;height:2px;background:oklch(80% 0.14 150);box-shadow:0 0 10px oklch(80% 0.14 150)}
+.cam .hint{text-align:center;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;padding:14px 0 6px}
+.modes{display:flex;justify-content:center;gap:8px;padding:6px 0 16px}
+.modes .m{font-size:11px;font-weight:700;color:rgba(255,255,255,.6);padding:6px 13px;border-radius:18px}
+.modes .m.on{background:#fff;color:#16161c}
+.shutter{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:60px;height:60px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);background-clip:padding-box}
+.detected{position:absolute;left:14px;right:14px;bottom:96px;background:var(--surface);border-radius:16px;padding:13px;box-shadow:0 16px 40px -10px rgba(0,0,0,.4);display:flex;gap:11px;align-items:center;z-index:5}
+.detected .pb{width:30px;height:48px;border-radius:4px;background:linear-gradient(var(--red),oklch(32% 0.11 22));flex:0 0 30px}
+.detected .di{flex:1;min-width:0}
+.detected .badge{font-size:9px;font-weight:800;color:var(--green);letter-spacing:.05em;display:flex;align-items:center;gap:4px}
+.detected .di b{font-size:13px;font-weight:700;display:block;margin-top:2px;line-height:1.2}
+.detected .di span{font-size:11px;color:var(--muted)}
+.detected .add{width:36px;height:36px;border-radius:11px;background:var(--accent);color:#fff;display:grid;place-items:center;flex:0 0 36px}
+
+/* ===== screen 6 : voice ===== */
+.voice{flex:1;display:flex;flex-direction:column;align-items:center;padding:6px 20px 0}
+.voice .vh{text-align:center;margin-top:8px}
+.voice .vh b{font-size:15px;font-weight:700}
+.voice .vh span{font-size:12px;color:var(--muted);display:block;margin-top:3px}
+.wave{display:flex;align-items:center;justify-content:center;gap:4px;height:90px;margin:18px 0}
+.wave i{width:5px;border-radius:3px;background:var(--accent);opacity:.85}
+.transcript{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:15px;width:100%;font-size:15px;line-height:1.5;text-align:center}
+.transcript .hl{background:var(--accent-soft);color:var(--accent);border-radius:5px;padding:1px 4px;font-weight:700}
+.parsed{width:100%;margin-top:13px;display:flex;flex-direction:column;gap:8px}
+.pfield{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 13px}
+.pfield .k{font-size:11px;color:var(--muted);font-weight:600}
+.pfield .v{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px}
+.mic{width:72px;height:72px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;margin:16px auto 0;box-shadow:0 0 0 8px var(--accent-soft)}
+
+/* ===== screen 7 : search & filters ===== */
+.f-group{margin-bottom:15px}
+.f-group .gl{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px}
+.color-row{display:flex;gap:8px}
+.color-pick{flex:1;border:1.5px solid var(--border);border-radius:12px;padding:10px 0;text-align:center;background:var(--surface)}
+.color-pick .sw{width:22px;height:22px;border-radius:50%;margin:0 auto 6px}
+.color-pick span{font-size:10.5px;font-weight:600}
+.color-pick.on{border-color:var(--accent);background:var(--accent-soft)}
+.range{padding:4px 2px}
+.range .rv{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;font-weight:700;margin-bottom:9px}
+.track{height:5px;border-radius:3px;background:var(--border);position:relative}
+.track .fill{position:absolute;left:14%;right:30%;top:0;bottom:0;background:var(--accent);border-radius:3px}
+.track .kn{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--accent);box-shadow:0 2px 5px rgba(0,0,0,.15)}
+.reg-chips{display:flex;flex-wrap:wrap;gap:7px}
+.apply{margin-top:4px;height:46px;border-radius:14px;background:var(--accent);color:#fff;font-weight:700;font-size:13.5px;display:grid;place-items:center;gap:8px;grid-auto-flow:column}
+.result-count{font-size:12px;color:var(--muted);margin:2px 0 10px;font-weight:600}
+
+@media(max-width:560px){
+  body{padding:28px 14px 60px}
+  .board-head h1{font-size:30px}
+}
+</style>
+</head>
+<body>
+
+<header class="board-head">
+  <div class="kick">Caveau · Maquettes Android</div>
+  <h1>Caveau — gérez votre cave en un geste</h1>
+  <p>App Android de gestion de cave à vin « type block ». Inventaire express par scan, photo ou voix ; plan visuel des casiers ; fiche vin riche et recherche par couleur, prix et région. Direction <em>modern minimal</em>, accent lie-de-vin. 7 écrans, vue screenshots.</p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--red)"></i>Rouge</span>
+    <span><i class="dot" style="background:var(--white-wine)"></i>Blanc</span>
+    <span><i class="dot" style="background:var(--rose)"></i>Rosé</span>
+    <span><i class="dot" style="background:var(--bubbly)"></i>Pétillant</span>
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- ============ 1. TABLEAU DE BORD ============ -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar"><span>9:41</span><span class="si">
+        <svg width="16" height="11" viewBox="0 0 16 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="none"><path d="M7.5 9.2 1 3.6C3 1.4 5.1.4 7.5.4s4.5 1 6.5 3.2L7.5 9.2Z" stroke="currentColor" stroke-width="1.1"/><circle cx="7.5" cy="8.4" r="1.1" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="18" height="10" rx="2.2" stroke="currentColor" fill="none"/><rect x="2" y="2" width="13" height="7" rx="1" fill="currentColor"/><rect x="19.5" y="3.5" width="1.6" height="4" rx="1" fill="currentColor"/></svg>
+      </span></div>
+      <div class="app">
+        <div class="appbar">
+          <div><h2>Ma cave</h2><div class="sub">Cave de l'appartement · Paris</div></div>
+          <div class="iconbtn">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </div>
+        </div>
+        <div class="body">
+          <div class="hero-stat">
+            <div class="lab">VALEUR ESTIMÉE DE LA CAVE</div>
+            <div class="big">4 280 €</div>
+            <div class="row">
+              <div><span class="v">142</span><span class="k">bouteilles</span></div>
+              <div><span class="v">38</span><span class="k">références</span></div>
+              <div><span class="v">9</span><span class="k">à boire</span></div>
+            </div>
+          </div>
+          <div class="mini-grid">
+            <div class="card mini"><div class="k">Prix moyen</div><div class="v">30 €</div></div>
+            <div class="card mini"><div class="k">Ce mois-ci</div><div class="v">+12 <small>ajouts</small></div></div>
+          </div>
+          <div class="sect-h"><h3>Répartition par couleur</h3><a>Détails</a></div>
+          <div class="card donut-card">
+            <div class="donut"><div class="hole"><b>142</b><span>btl</span></div></div>
+            <div class="leg">
+              <div class="li"><span class="lft"><i class="dot" style="background:var(--red)"></i>Rouge</span><span class="pct">58%</span></div>
+              <div class="li"><span class="lft"><i class="dot" style="background:var(--white-wine)"></i>Blanc</span><span class="pct">22%</span></div>
+              <div class="li"><span class="lft"><i class="dot" style="background:var(--rose)"></i>Rosé</span><span class="pct">12%</span></div>
+              <div class="li"><span class="lft"><i class="dot" style="background:var(--bubbly)"></i>Pétillant</span><span class="pct">8%</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="bnav">
+          <a class="on"><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-4v-6h-8v6H4a1 1 0 0 1-1-1Z"/></svg></span>Accueil</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></span>Casiers</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></span>Bouteilles</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>Recherche</a>
+        </div>
+        <div class="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      </div>
+    </div></div>
+    <div class="frame-label"><div class="n">01</div><div class="t">Tableau de bord</div><div class="d">Valeur, volume, répartition par couleur — la cave en un coup d'œil.</div></div>
+  </div>
+
+  <!-- ============ 2. PLAN DES CASIERS (BLOCK) ============ -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar"><span>9:41</span><span class="si">
+        <svg width="16" height="11" viewBox="0 0 16 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="18" height="10" rx="2.2" stroke="currentColor" fill="none"/><rect x="2" y="2" width="13" height="7" rx="1" fill="currentColor"/><rect x="19.5" y="3.5" width="1.6" height="4" rx="1" fill="currentColor"/></svg>
+      </span></div>
+      <div class="app">
+        <div class="appbar">
+          <div><h2>Casiers</h2><div class="sub">Plan visuel du rangement</div></div>
+          <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M5 19l2-2"/></svg></div>
+        </div>
+        <div class="body scroll">
+          <div class="rack-tabs">
+            <div class="rt on">Cave A</div><div class="rt">Cave B</div><div class="rt">Réfrigérée</div>
+          </div>
+          <div class="rack">
+            <div class="rack-row"><span class="rl">A</span><div class="cells">
+              <div class="cell red"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div><div class="cell white"><i class="cap"></i></div><div class="cell empty"></div><div class="cell red"><i class="cap"></i></div>
+            </div></div>
+            <div class="rack-row"><span class="rl">B</span><div class="cells">
+              <div class="cell red"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div><div class="cell sel red"><i class="cap"></i></div><div class="cell white"><i class="cap"></i></div><div class="cell white"><i class="cap"></i></div><div class="cell empty"></div>
+            </div></div>
+            <div class="rack-row"><span class="rl">C</span><div class="cells">
+              <div class="cell rose"><i class="cap"></i></div><div class="cell rose"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div><div class="cell empty"></div><div class="cell empty"></div>
+            </div></div>
+            <div class="rack-row"><span class="rl">D</span><div class="cells">
+              <div class="cell bub"><i class="cap"></i></div><div class="cell bub"><i class="cap"></i></div><div class="cell white"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div><div class="cell red"><i class="cap"></i></div>
+            </div></div>
+            <div class="rack-row"><span class="rl">E</span><div class="cells">
+              <div class="cell red"><i class="cap"></i></div><div class="cell empty"></div><div class="cell white"><i class="cap"></i></div><div class="cell rose"><i class="cap"></i></div><div class="cell empty"></div><div class="cell empty"></div>
+            </div></div>
+            <div class="rack-foot"><span>30 emplacements · 22 occupés</span><span class="mono">73%</span></div>
+          </div>
+          <div class="card peek">
+            <div class="pb"></div>
+            <div class="pi">
+              <b>Emplacement B3</b>
+              <span>Château Léoville-Barton 2016</span>
+            </div>
+            <span class="tag tag-red"><i class="dot"></i>Rouge</span>
+          </div>
+        </div>
+        <div class="bnav">
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-4v-6h-8v6H4a1 1 0 0 1-1-1Z"/></svg></span>Accueil</a>
+          <a class="on"><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></span>Casiers</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></span>Bouteilles</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>Recherche</a>
+        </div>
+      </div>
+    </div></div>
+    <div class="frame-label"><div class="n">02</div><div class="t">Plan des casiers (block)</div><div class="d">Grille de rangement colorée par type de vin ; un emplacement sélectionné révèle son vin.</div></div>
+  </div>
+
+  <!-- ============ 3. LISTE / GRILLE ============ -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar"><span>9:41</span><span class="si">
+        <svg width="16" height="11" viewBox="0 0 16 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="18" height="10" rx="2.2" stroke="currentColor" fill="none"/><rect x="2" y="2" width="13" height="7" rx="1" fill="currentColor"/><rect x="19.5" y="3.5" width="1.6" height="4" rx="1" fill="currentColor"/></svg>
+      </span></div>
+      <div class="app">
+        <div class="appbar">
+          <div><h2>Mes bouteilles</h2><div class="sub">142 bouteilles</div></div>
+          <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+        </div>
+        <div class="body scroll">
+          <div class="searchbar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input placeholder="Domaine, cépage, région…" />
+          </div>
+          <div class="chips">
+            <span class="chip on">Tout</span>
+            <span class="chip"><i class="dot" style="background:var(--red)"></i>Rouge</span>
+            <span class="chip"><i class="dot" style="background:var(--white-wine)"></i>Blanc</span>
+            <span class="chip"><i class="dot" style="background:var(--rose)"></i>Rosé</span>
+            <span class="chip">À boire</span>
+          </div>
+          <div class="bgrid">
+            <div class="bottle">
+              <div class="img" style="background:color-mix(in oklch,var(--red) 9%,#fff)"><div class="pb" style="background:linear-gradient(var(--red),oklch(30% 0.11 22))"></div><span class="qty">×3</span></div>
+              <div class="nm">Léoville-Barton</div><div class="rg">Saint-Julien · 2016</div>
+              <div class="ft"><span class="pr">68 €</span><span class="stars">★★★★☆</span></div>
+            </div>
+            <div class="bottle">
+              <div class="img" style="background:color-mix(in oklch,var(--white-wine) 16%,#fff)"><div class="pb" style="background:linear-gradient(oklch(80% 0.1 92),oklch(64% 0.1 90))"></div><span class="qty">×6</span></div>
+              <div class="nm">Chablis 1er Cru</div><div class="rg">Bourgogne · 2021</div>
+              <div class="ft"><span class="pr">29 €</span><span class="stars">★★★★☆</span></div>
+            </div>
+            <div class="bottle">
+              <div class="img" style="background:color-mix(in oklch,var(--rose) 14%,#fff)"><div class="pb" style="background:linear-gradient(oklch(78% 0.11 8),oklch(64% 0.12 8))"></div><span class="qty">×2</span></div>
+              <div class="nm">Bandol Rosé</div><div class="rg">Provence · 2022</div>
+              <div class="ft"><span class="pr">18 €</span><span class="stars">★★★★★</span></div>
+            </div>
+            <div class="bottle">
+              <div class="img" style="background:color-mix(in oklch,var(--bubbly) 18%,#fff)"><div class="pb" style="background:linear-gradient(oklch(82% 0.07 95),oklch(70% 0.08 95))"></div><span class="qty">×4</span></div>
+              <div class="nm">Champagne Brut</div><div class="rg">Reims · NM</div>
+              <div class="ft"><span class="pr">42 €</span><span class="stars">★★★★☆</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="bnav">
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-4v-6h-8v6H4a1 1 0 0 1-1-1Z"/></svg></span>Accueil</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></span>Casiers</a>
+          <a class="on"><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></span>Bouteilles</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>Recherche</a>
+        </div>
+        <div class="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      </div>
+    </div></div>
+    <div class="frame-label"><div class="n">03</div><div class="t">Liste / grille</div><div class="d">Cartes nettes : visuel, quantité, millésime, note et prix. Filtres rapides par couleur.</div></div>
+  </div>
+
+  <!-- ============ 4. DÉTAIL BOUTEILLE ============ -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar"><span>9:41</span><span class="si">
+        <svg width="16" height="11" viewBox="0 0 16 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="18" height="10" rx="2.2" stroke="currentColor" fill="none"/><rect x="2" y="2" width="13" height="7" rx="1" fill="currentColor"/><rect x="19.5" y="3.5" width="1.6" height="4" rx="1" fill="currentColor"/></svg>
+      </span></div>
+      <div class="app">
+        <div class="appbar" style="padding-bottom:4px">
+          <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></div>
+          <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z"/></svg></div>
+        </div>
+        <div class="body scroll" style="padding:0">
+          <div class="det-hero">
+            <div class="pb"></div>
+            <div class="meta">
+              <span class="tag tag-red"><i class="dot"></i>Rouge</span>
+              <h2>Léoville-Barton 2016</h2>
+              <div class="reg">Saint-Julien · Bordeaux · 13,5%</div>
+              <div class="rating"><span class="stars" style="font-size:13px">★★★★☆</span><span class="sc">4,2</span><span class="of">· 1 284 avis</span></div>
+            </div>
+          </div>
+          <div class="det-row">
+            <div class="dstat"><div class="k">Quantité</div><div class="v mono">×3</div></div>
+            <div class="dstat"><div class="k">Valeur</div><div class="v mono">204 €</div></div>
+            <div class="dstat"><div class="k">Casier</div><div class="v">B3</div></div>
+          </div>
+          <div class="det-sec">
+            <h4>Apogée — à boire</h4>
+            <div class="window">
+              <span class="mono" style="font-size:10px;color:var(--muted)">2024</span>
+              <div class="win-bar"><div class="now"></div></div>
+              <span class="mono" style="font-size:10px;color:var(--muted)">2038</span>
+            </div>
+            <p class="notes" style="margin-top:6px">Dans sa fenêtre idéale — patientez encore quelques années pour l'apogée.</p>
+          </div>
+          <div class="det-sec">
+            <h4>Notes de dégustation</h4>
+            <p class="notes">Cassis, cèdre et tabac blond. Tanins fermes et soyeux, finale longue sur le graphite. Carafer 1 h.</p>
+          </div>
+          <div class="det-sec">
+            <h4>Emplacement</h4>
+            <span class="loc-chip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg>
+              Cave A · Rangée B · Case 3
+            </span>
+          </div>
+          <div class="det-cta">
+            <button class="btn">Servir −1</button>
+            <button class="btn primary">Ajouter +1</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="frame-label"><div class="n">04</div><div class="t">Détail d'une bouteille</div><div class="d">Fiche riche façon Vivino : note, fenêtre de garde, notes de dégustation, emplacement précis.</div></div>
+  </div>
+
+  <!-- ============ 5. AJOUT SCAN / PHOTO ============ -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar onaccent"><span>9:41</span><span class="si">
+        <svg width="16" height="11" viewBox="0 0 16 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="18" height="10" rx="2.2" stroke="currentColor" fill="none"/><rect x="2" y="2" width="13" height="7" rx="1" fill="currentColor"/><rect x="19.5" y="3.5" width="1.6" height="4" rx="1" fill="currentColor"/></svg>
+      </span></div>
+      <div class="app">
+        <div class="cam">
+          <div class="vp">
+            <div class="scan-frame">
+              <span class="c1"></span><span class="c2"></span><span class="c3"></span><span class="c4"></span>
+              <div style="position:absolute;inset:0;display:grid;place-items:center"><div class="scan-bottle"></div></div>
+              <div class="scan-line"></div>
+            </div>
+          </div>
+          <div class="hint">Cadrez l'étiquette — reconnaissance automatique</div>
+          <div class="modes"><span class="m on">Étiquette</span><span class="m">Code-barres</span><span class="m">Photo</span></div>
+          <div class="detected">
+            <div class="pb"></div>
+            <div class="di">
+              <div class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 13 4 4L19 7"/></svg>ÉTIQUETTE RECONNUE</div>
+              <b>Château Margaux 2015</b>
+              <span>Margaux · Bordeaux · Rouge</span>
+            </div>
+            <div class="add"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+          </div>
+          <div class="shutter"></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="frame-label"><div class="n">05</div><div class="t">Ajout rapide · scan / photo</div><div class="d">Viseur plein écran, reconnaissance d'étiquette ou code-barres, ajout en un tap.</div></div>
+  </div>
+
+  <!-- ============ 6. AJOUT VOIX ============ -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar"><span>9:41</span><span class="si">
+        <svg width="16" height="11" viewBox="0 0 16 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="18" height="10" rx="2.2" stroke="currentColor" fill="none"/><rect x="2" y="2" width="13" height="7" rx="1" fill="currentColor"/><rect x="19.5" y="3.5" width="1.6" height="4" rx="1" fill="currentColor"/></svg>
+      </span></div>
+      <div class="app">
+        <div class="appbar">
+          <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+          <div style="font-size:12px;font-weight:700;color:var(--accent)">● Écoute…</div>
+          <div style="width:38px"></div>
+        </div>
+        <div class="voice">
+          <div class="vh"><b>Dictez votre bouteille</b><span>« domaine, millésime, couleur, quantité »</span></div>
+          <div class="wave">
+            <i style="height:18px"></i><i style="height:40px"></i><i style="height:66px"></i><i style="height:30px"></i><i style="height:78px"></i><i style="height:48px"></i><i style="height:84px"></i><i style="height:34px"></i><i style="height:60px"></i><i style="height:22px"></i><i style="height:50px"></i><i style="height:74px"></i><i style="height:28px"></i><i style="height:44px"></i><i style="height:16px"></i>
+          </div>
+          <div class="transcript">« <span class="hl">Château Margaux</span> <span class="hl">2015</span>, <span class="hl">rouge</span>, <span class="hl">deux</span> bouteilles, casier B4 »</div>
+          <div class="parsed">
+            <div class="pfield"><span class="k">Domaine</span><span class="v">Château Margaux</span></div>
+            <div class="pfield"><span class="k">Millésime</span><span class="v mono">2015</span></div>
+            <div class="pfield"><span class="k">Couleur</span><span class="v"><span class="tag tag-red"><i class="dot"></i>Rouge</span></span></div>
+            <div class="pfield"><span class="k">Quantité · Casier</span><span class="v mono">×2 · B4</span></div>
+          </div>
+        </div>
+        <div style="padding:14px 18px 16px"><button class="btn primary" style="width:100%">Confirmer l'ajout</button></div>
+      </div>
+    </div></div>
+    <div class="frame-label"><div class="n">06</div><div class="t">Ajout par la voix</div><div class="d">Dictée libre, transcription en direct, champs extraits automatiquement et éditables.</div></div>
+  </div>
+
+  <!-- ============ 7. RECHERCHE & FILTRES ============ -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+      <div class="punch"></div>
+      <div class="sbar"><span>9:41</span><span class="si">
+        <svg width="16" height="11" viewBox="0 0 16 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="18" height="10" rx="2.2" stroke="currentColor" fill="none"/><rect x="2" y="2" width="13" height="7" rx="1" fill="currentColor"/><rect x="19.5" y="3.5" width="1.6" height="4" rx="1" fill="currentColor"/></svg>
+      </span></div>
+      <div class="app">
+        <div class="appbar">
+          <div><h2>Filtrer</h2><div class="sub">Affinez votre recherche</div></div>
+          <div style="font-size:11.5px;font-weight:600;color:var(--accent)">Réinitialiser</div>
+        </div>
+        <div class="body scroll">
+          <div class="searchbar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input placeholder="Mot-clé, cépage…" />
+          </div>
+          <div class="f-group">
+            <div class="gl">Couleur</div>
+            <div class="color-row">
+              <div class="color-pick on"><div class="sw" style="background:var(--red)"></div><span>Rouge</span></div>
+              <div class="color-pick"><div class="sw" style="background:var(--white-wine)"></div><span>Blanc</span></div>
+              <div class="color-pick"><div class="sw" style="background:var(--rose)"></div><span>Rosé</span></div>
+              <div class="color-pick"><div class="sw" style="background:var(--bubbly)"></div><span>Pétillant</span></div>
+            </div>
+          </div>
+          <div class="f-group">
+            <div class="gl">Prix</div>
+            <div class="range">
+              <div class="rv"><span>10 €</span><span>120 €</span></div>
+              <div class="track"><div class="fill"></div><div class="kn" style="left:14%"></div><div class="kn" style="left:70%"></div></div>
+            </div>
+          </div>
+          <div class="f-group">
+            <div class="gl">Région</div>
+            <div class="reg-chips">
+              <span class="chip on">Bordeaux</span><span class="chip">Bourgogne</span><span class="chip on">Rhône</span><span class="chip">Provence</span><span class="chip">Loire</span><span class="chip">Champagne</span>
+            </div>
+          </div>
+          <button class="apply">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            Voir 47 bouteilles
+          </button>
+        </div>
+        <div class="bnav">
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-4v-6h-8v6H4a1 1 0 0 1-1-1Z"/></svg></span>Accueil</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg></span>Casiers</a>
+          <a><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></span>Bouteilles</a>
+          <a class="on"><span class="nicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>Recherche</a>
+        </div>
+      </div>
+    </div></div>
+    <div class="frame-label"><div class="n">07</div><div class="t">Recherche & filtres</div><div class="d">Couleur, fourchette de prix et région — combinables, avec compteur de résultats en direct.</div></div>
+  </div>
+
+</main>
+</body>
+</html>
