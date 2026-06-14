@@ -1,19 +1,23 @@
 package fr.geoking.vincent.data
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialException
 import fr.geoking.vincent.BuildConfig
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
+private const val TAG = "VincentSignIn"
+
 // WEB_CLIENT_ID (OAuth 2.0 *Web application* client, NOT the Android one) comes from
-// local.properties (or CI env) via BuildConfig. Sign-in fails until it is set.
+// local.properties (or CI env) via BuildConfig. Sign-in also needs an Android OAuth
+// client in the SAME project, registered with this app's package + signing SHA-1.
 
 @Composable
 actual fun rememberGoogleSignIn(onResult: (GoogleAccount?) -> Unit): () -> Unit {
@@ -21,6 +25,11 @@ actual fun rememberGoogleSignIn(onResult: (GoogleAccount?) -> Unit): () -> Unit 
     val scope = rememberCoroutineScope()
     return {
         scope.launch {
+            if (BuildConfig.WEB_CLIENT_ID.isBlank()) {
+                Log.e(TAG, "WEB_CLIENT_ID is blank — set it in local.properties (OAuth Web client ID).")
+                onResult(null)
+                return@launch
+            }
             val account = try {
                 val credentialManager = CredentialManager.create(context)
                 val option = GetSignInWithGoogleOption.Builder(BuildConfig.WEB_CLIENT_ID).build()
@@ -38,9 +47,15 @@ actual fun rememberGoogleSignIn(onResult: (GoogleAccount?) -> Unit): () -> Unit 
                         email = token.id,
                     )
                 } else {
+                    Log.w(TAG, "Unexpected credential type: ${credential.type}")
                     null
                 }
-            } catch (e: GetCredentialException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Surfaces the real cause (e.g. "[16] Caller not whitelisted" → the Android
+                // OAuth client is missing/mismatched for this package + signing SHA-1).
+                Log.e(TAG, "Google sign-in failed: ${e.javaClass.simpleName}: ${e.message}", e)
                 null
             }
             onResult(account)
