@@ -66,8 +66,36 @@ private val rackFilters = listOf(
     RackFilter("> 50 €") { (it.price ?: 0) > 50 },
 )
 
-// Uniform tint used when the rack displays vintages (years share one colour).
-private val VINTAGE_BASE = VincentColors.Accent
+// Cell border ALWAYS encodes the wine colour (whatever the mode/filter).
+private fun wineBorderColor(cell: RackCell): Color = cell.color?.glass ?: VincentColors.Border
+
+// Interior fill encodes the active mode's bucket: wine colour, price group,
+// vintage range or category — so the rack is readable at a glance per mode.
+private fun priceHue(p: Int?): Color = when {
+    p == null -> VincentColors.Muted
+    p <= 25 -> Color(0xFF4CAF82)
+    p <= 50 -> Color(0xFFE0A33A)
+    else -> Color(0xFFC65454)
+}
+
+private fun vintageHue(y: Int?): Color = when {
+    y == null -> VincentColors.Muted
+    y <= 2015 -> Color(0xFF6B4FA0)
+    y <= 2019 -> Color(0xFF4F86C6)
+    else -> Color(0xFF4CA6A6)
+}
+
+private val categoryPalette = listOf(
+    Color(0xFFB5462F), Color(0xFF8E5BB5), Color(0xFF4F86C6),
+    Color(0xFFCB8A3A), Color(0xFF4CA67E), Color(0xFF9AA64C),
+)
+
+private fun interiorBase(cell: RackCell, mode: RackMode): Color = when (mode) {
+    RackMode.COLOR -> cell.color?.glass ?: VincentColors.Accent
+    RackMode.PRICE -> priceHue(cell.price)
+    RackMode.VINTAGE -> vintageHue(yearOf(cell))
+    RackMode.CATEGORY -> cell.category?.let { categoryPalette[it.ordinal % categoryPalette.size] } ?: VincentColors.Muted
+}
 
 @Composable
 fun CellarScreen(
@@ -211,10 +239,9 @@ private fun Cell(cell: RackCell, mode: RackMode, filter: RackFilter?, modifier: 
         return
     }
     val matches = filter?.test?.invoke(cell) ?: true
-    // Uniform colour in vintage mode; wine colour otherwise.
-    val base = if (mode == RackMode.VINTAGE) VINTAGE_BASE else cell.color!!.glass
-    val tint = lerp(Color.White, base, 0.20f)
-    val borderTint = lerp(Color.White, base, 0.34f)
+    // Interior follows the active mode; border ALWAYS keeps the wine colour, thick.
+    val tint = lerp(Color.White, interiorBase(cell, mode), 0.22f)
+    val wineBorder = wineBorderColor(cell)
     val label = when (mode) {
         RackMode.COLOR -> ""
         RackMode.PRICE -> "${cell.price}€"
@@ -225,19 +252,26 @@ private fun Cell(cell: RackCell, mode: RackMode, filter: RackFilter?, modifier: 
         modifier
             .aspectRatio(1f)
             .alpha(if (matches) 1f else 0.32f)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(tint)
-            .border(if (cell.selected) 2.5.dp else 1.dp, if (cell.selected) VincentColors.Accent else borderTint, RoundedCornerShape(7.dp)),
+            .border(if (cell.selected) 4.dp else 3.dp, wineBorder, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
         if (label.isNotEmpty()) {
             Box(
                 Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.White.copy(alpha = 0.82f))
-                    .padding(horizontal = 3.dp, vertical = 1.dp),
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(Color.White.copy(alpha = 0.88f))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
             ) {
-                Text(label, style = MonoNumber, fontSize = 8.sp, color = Color(0xFF2A1717))
+                Text(
+                    label,
+                    style = MonoNumber,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.W800,
+                    color = Color(0xFF2A1717),
+                    maxLines = 1,
+                )
             }
         }
     }
