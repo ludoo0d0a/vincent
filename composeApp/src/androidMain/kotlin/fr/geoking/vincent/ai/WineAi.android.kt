@@ -1,6 +1,7 @@
 package fr.geoking.vincent.ai
 
 import android.util.Base64
+import android.util.Log
 import fr.geoking.vincent.BuildConfig
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
@@ -16,6 +17,7 @@ import java.net.URL
 // GEMINI_API_KEY comes from local.properties (or CI env) via BuildConfig — never
 // hardcoded. Get a free key at https://aistudio.google.com/apikey. Blank = no-op.
 private const val MODEL = "gemini-2.0-flash"
+private const val TAG = "VincentAI"
 
 /** Single Gemini-backed client implementing both seams. */
 object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
@@ -63,7 +65,10 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     }
 
     private fun generate(prompt: String, imageB64: String?): JSONObject? {
-        if (BuildConfig.GEMINI_API_KEY.isBlank()) return null
+        if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+            Log.e(TAG, "GEMINI_API_KEY is blank — set it in local.properties (AI Studio key).")
+            return null
+        }
         return try {
             val parts = JSONArray().put(JSONObject().put("text", prompt))
             if (imageB64 != null) {
@@ -87,7 +92,13 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
                 setRequestProperty("Content-Type", "application/json")
             }
             conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
-            if (conn.responseCode !in 200..299) return null
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+                // 400 = bad request, 403 = key invalid / API not enabled, 429 = quota.
+                Log.e(TAG, "Gemini HTTP $code: ${err?.take(400)}")
+                return null
+            }
             val resp = conn.inputStream.bufferedReader().use { it.readText() }
             val text = JSONObject(resp)
                 .getJSONArray("candidates").getJSONObject(0)
@@ -95,6 +106,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
                 .getString("text")
             JSONObject(text)
         } catch (e: Exception) {
+            Log.e(TAG, "Gemini call failed: ${e.javaClass.simpleName}: ${e.message}", e)
             null
         }
     }
