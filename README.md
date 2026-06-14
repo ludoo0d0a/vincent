@@ -43,7 +43,7 @@ plus surfaces reached by navigation:
 | 2 | Racks — display mode **Colour · Price · Vintage · Category** | `screens/CellarScreen.kt` |
 | 3 | Bottle list / grid | `screens/BottlesScreen.kt` |
 | 4 | Detail — food pairings, drink window, origin/merchant/occasion | `screens/BottleDetailScreen.kt` |
-| 5 | Add — scan / photo / voice | `screens/AddScreen.kt` |
+| 5 | Add — scan / photo / voice / manual form | `screens/AddScreen.kt` |
 | 6 | Search & filters (colour, price, origin, merchant, occasion) | `screens/SearchScreen.kt` |
 | 7 | Google sign-in (cloud + favourites) | `screens/LoginScreen.kt` |
 | 8 | Account & favourites | `screens/AccountScreen.kt` |

@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -24,8 +28,10 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
@@ -55,7 +62,7 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ColorTag
 import fr.geoking.vincent.ui.WineBottle
 
-private enum class AddMode(val label: String) { SCAN("Scan"), PHOTO("Photo"), VOICE("Voix") }
+private enum class AddMode(val label: String) { SCAN("Scan"), PHOTO("Photo"), VOICE("Voix"), MANUAL("Manuel") }
 
 @Composable
 fun AddScreen(onClose: () -> Unit) {
@@ -66,7 +73,9 @@ fun AddScreen(onClose: () -> Unit) {
     var aiBottle by remember { mutableStateOf<Bottle?>(null) }
     var aiPrice by remember { mutableStateOf<PriceEstimate?>(null) }
     var busy by remember { mutableStateOf(false) }
-    // Photo mode: snap the label with the system camera (full-res) → Gemini fromImage.
+    var manualBottle by remember { mutableStateOf<Bottle?>(null) }
+    // Scan & Photo both snap the label/bottle with the system camera (full-res) and let
+    // the vision model read it → Gemini fromImage. No hardcoded recognition result.
     val startCapture = rememberPhotoCapture { bytes ->
         busy = true
         scope.launch {
@@ -75,20 +84,7 @@ fun AddScreen(onClose: () -> Unit) {
             busy = false
         }
     }
-    // Scan = recognised label text; Photo = real photo. Both land in aiBottle/aiPrice.
-    val identify: () -> Unit = {
-        if (mode == AddMode.PHOTO) {
-            startCapture()
-        } else {
-            busy = true
-            scope.launch {
-                val b = recognizer.fromText("Château Margaux 2015")
-                aiBottle = b
-                aiPrice = b?.let { estimator.estimate(it) }
-                busy = false
-            }
-        }
-    }
+    val identify: () -> Unit = { startCapture() }
     // Voice dictation: real SpeechRecognizer → transcript → Gemini parsing on final result.
     var transcript by remember { mutableStateOf("") }
     var listening by remember { mutableStateOf(false) }
@@ -145,8 +141,8 @@ fun AddScreen(onClose: () -> Unit) {
                 AddMode.SCAN, AddMode.PHOTO -> ScanPane(
                     photo = mode == AddMode.PHOTO,
                     color = aiBottle?.color ?: WineColor.RED,
-                    title = aiBottle?.let { "${it.domain} ${it.vintage}" } ?: "Château Margaux 2015",
-                    subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" } ?: "Margaux · Bordeaux · Rouge",
+                    title = aiBottle?.let { "${it.domain} ${it.vintage}" } ?: "En attente d'identification",
+                    subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" } ?: "Cadrez l'étiquette puis touchez l'IA",
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     busy = busy,
                     onIdentify = identify,
@@ -159,50 +155,142 @@ fun AddScreen(onClose: () -> Unit) {
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     onMic = startDictation,
                 )
+                AddMode.MANUAL -> ManualPane(onBottle = { manualBottle = it })
             }
         }
 
+        // Only enabled once we have a real bottle: AI-recognised (scan/photo/voice)
+        // or a manually filled form. No more hardcoded fallback.
+        val ready: Bottle? = if (mode == AddMode.MANUAL) manualBottle
+            else aiBottle?.let { it.copy(price = aiPrice?.amountEur ?: it.price) }
         Button(
-            onClick = {
-                val b = aiBottle?.copy(price = aiPrice?.amountEur ?: 0) ?: buildAdded(mode)
-                Cellar.addBottle(b); onClose()
-            },
+            onClick = { ready?.let { Cellar.addBottle(it); onClose() } },
+            enabled = ready != null,
             modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
-        ) { Text("Confirmer l'ajout", fontWeight = FontWeight.W700) }
+            colors = ButtonDefaults.buttonColors(
+                containerColor = VincentColors.Accent,
+                contentColor = Color.White,
+                disabledContainerColor = VincentColors.Surface2,
+                disabledContentColor = VincentColors.Faint,
+            ),
+        ) {
+            Text(
+                if (mode == AddMode.MANUAL) "Ajouter à la cave" else "Confirmer l'ajout",
+                fontWeight = FontWeight.W700,
+            )
+        }
     }
 }
 
-/** Builds the bottle implied by the active capture mode (mocked recognition result). */
-private fun buildAdded(mode: AddMode): Bottle {
-    val source = when (mode) {
-        AddMode.VOICE -> AddSource.VOICE
-        AddMode.PHOTO -> AddSource.PHOTO
-        AddMode.SCAN -> AddSource.SCAN
+/** Manual entry — a real form; emits a Bottle (or null while the name is empty). */
+@Composable
+private fun ManualPane(onBottle: (Bottle?) -> Unit) {
+    var domain by remember { mutableStateOf("") }
+    var appellation by remember { mutableStateOf("") }
+    var color by remember { mutableStateOf(WineColor.RED) }
+    var category by remember { mutableStateOf(WineCategory.BORDEAUX) }
+    var vintage by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var qty by remember { mutableStateOf("1") }
+    var spot by remember { mutableStateOf("") }
+
+    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot) {
+        onBottle(
+            if (domain.isBlank()) null
+            else Bottle(
+                id = "new-${Cellar.references()}",
+                domain = domain.trim(),
+                appellation = appellation.trim().ifBlank { category.label },
+                color = color,
+                category = category,
+                vintage = vintage.trim().ifBlank { "NM" },
+                price = price.filter { it.isDigit() }.toIntOrNull() ?: 0,
+                quantity = qty.filter { it.isDigit() }.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+                rating = 0.0,
+                cellarSpot = spot.trim().uppercase(),
+                provenance = "",
+                merchant = "—",
+                purchaseDate = "Aujourd'hui",
+                occasion = "",
+                source = AddSource.MANUAL,
+                addedLabel = "à l'instant",
+            )
+        )
     }
-    return Bottle(
-        id = "new-${Cellar.references()}",
-        domain = "Château Margaux",
-        appellation = "Margaux",
-        color = WineColor.RED,
-        category = WineCategory.BORDEAUX,
-        vintage = "2015",
-        price = 620,
-        quantity = 2,
-        rating = 4.8,
-        cellarSpot = "B4",
-        provenance = "Margaux, FR",
-        merchant = "—",
-        purchaseDate = "Aujourd'hui",
-        occasion = "Cave de garde",
-        pairings = listOf("Côte de bœuf", "Truffe", "Gibier à plume"),
-        drinkFrom = 2025,
-        drinkTo = 2045,
-        drinkNow = 0.3f,
-        source = source,
-        addedLabel = "à l'instant",
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Field("Domaine / nom", domain) { domain = it }
+        Field("Appellation", appellation) { appellation = it }
+        ChipRow("Couleur", WineColor.entries, color, { it.label }) { color = it }
+        ChipRow("Catégorie", WineCategory.entries, category, { it.label }) { category = it }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Field("Millésime", vintage, Modifier.weight(1f), numeric = true) { vintage = it }
+            Field("Prix (€)", price, Modifier.weight(1f), numeric = true) { price = it }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Field("Quantité", qty, Modifier.weight(1f), numeric = true) { qty = it }
+            Field("Casier", spot, Modifier.weight(1f)) { spot = it }
+        }
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+@Composable
+private fun Field(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    numeric: Boolean = false,
+    onChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        label = { Text(label, fontSize = 12.sp) },
+        keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+        modifier = modifier.fillMaxWidth(),
     )
+}
+
+@Composable
+private fun <T> ChipRow(
+    label: String,
+    options: List<T>,
+    selected: T,
+    labelOf: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    Column {
+        Text(
+            label, fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
+            modifier = Modifier.padding(bottom = 6.dp, start = 2.dp),
+        )
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { opt ->
+                val on = opt == selected
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp))
+                        .background(if (on) VincentColors.Accent else VincentColors.Surface2)
+                        .border(1.dp, if (on) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(10.dp))
+                        .clickable { onSelect(opt) }
+                        .padding(horizontal = 13.dp, vertical = 9.dp),
+                ) {
+                    Text(
+                        labelOf(opt), fontSize = 12.sp, fontWeight = FontWeight.W600,
+                        color = if (on) Color.White else VincentColors.Fg,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
