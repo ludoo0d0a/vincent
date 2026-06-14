@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,14 +42,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.Rack
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.RackMode
-import fr.geoking.vincent.model.SampleData
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.emptyRack
+import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ColorTag
@@ -102,51 +116,104 @@ fun CellarScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (Bottle) -> Unit,
 ) {
+    var rackIdx by remember { mutableIntStateOf(0) }
+    val rack = Racks.all[rackIdx.coerceIn(0, Racks.all.lastIndex)]
     var mode by remember { mutableStateOf(RackMode.VINTAGE) }
     var filterIdx by remember { mutableIntStateOf(-1) }
     val filter = rackFilters.getOrNull(filterIdx)
-    val occupied = SampleData.rackA.count { it.occupied }
-    val initialSel = SampleData.rackA.indexOfFirst { it.selected }.takeIf { it >= 0 }
-        ?: SampleData.rackA.indexOfFirst { it.occupied }
-    var selectedIdx by remember { mutableIntStateOf(initialSel) }
+    var editing by remember { mutableStateOf(false) }
+    var selectedIdx by remember(rackIdx) {
+        mutableIntStateOf(
+            rack.cells.indexOfFirst { it.selected }.takeIf { it >= 0 }
+                ?: rack.cells.indexOfFirst { it.occupied }.coerceAtLeast(0),
+        )
+    }
 
-    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-        ScreenHeader("Casiers", "${SampleData.rackA.size} emplacements · $occupied occupés")
+    Box(modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+            ScreenHeader("Casiers", "${rack.capacity} emplacements · ${rack.occupiedCount} occupés")
 
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            CellarTabs()
-            Spacer(Modifier.height(10.dp))
-            ModeSelector(mode) { mode = it }
-            Spacer(Modifier.height(10.dp))
-            FilterChips(filterIdx) { filterIdx = if (filterIdx == it) -1 else it }
-            Spacer(Modifier.height(11.dp))
-            RackGrid(mode, filter, selectedIdx) { selectedIdx = it }
-            Spacer(Modifier.height(11.dp))
-            PeekCard(selectedIdx, onOpenBottle)
-            Spacer(Modifier.height(24.dp))
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                CellarTabs(
+                    names = Racks.all.map { it.name },
+                    selected = rackIdx,
+                    onSelect = { rackIdx = it },
+                    onEdit = { editing = true },
+                    onAdd = {
+                        Racks.add(emptyRack("Cave ${('A' + Racks.all.size)}", 4, 4, false))
+                        rackIdx = Racks.all.lastIndex
+                    },
+                )
+                Spacer(Modifier.height(10.dp))
+                ModeSelector(mode) { mode = it }
+                Spacer(Modifier.height(10.dp))
+                FilterChips(filterIdx) { filterIdx = if (filterIdx == it) -1 else it }
+                Spacer(Modifier.height(11.dp))
+                RackGrid(rack, mode, filter, selectedIdx) { selectedIdx = it }
+                Spacer(Modifier.height(11.dp))
+                PeekCard(rack, selectedIdx, onOpenBottle)
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+
+        if (editing) {
+            RackEditor(
+                initial = rack,
+                onCancel = { editing = false },
+                onSave = { name, cols, rows, staggered ->
+                    Racks.update(rackIdx, rack.resized(cols, rows, staggered).copy(name = name))
+                    val updated = Racks.all[rackIdx]
+                    selectedIdx = updated.cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
+                    editing = false
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun CellarTabs() {
-    val tabs = listOf("Cave A", "Cave B", "Réfrigérée")
-    var selected by remember { mutableIntStateOf(0) }
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        tabs.forEachIndexed { i, t ->
-            val on = i == selected
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (on) VincentColors.Accent else VincentColors.Surface)
-                    .border(1.dp, if (on) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(9.dp))
-                    .clickable { selected = i }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-            ) {
-                Text(t, fontSize = 12.sp, fontWeight = FontWeight.W600, color = if (on) Color.White else VincentColors.Muted)
+private fun CellarTabs(
+    names: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    onEdit: () -> Unit,
+    onAdd: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            names.forEachIndexed { i, t ->
+                val on = i == selected
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (on) VincentColors.Accent else VincentColors.Surface)
+                        .border(1.dp, if (on) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(9.dp))
+                        .clickable { onSelect(i) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                ) {
+                    Text(t, fontSize = 12.sp, fontWeight = FontWeight.W600, color = if (on) Color.White else VincentColors.Muted)
+                }
             }
         }
+        IconButtonBox(Icons.Filled.Edit, "Éditer le casier", onEdit)
+        IconButtonBox(Icons.Filled.Add, "Ajouter un casier", onAdd)
     }
+}
+
+@Composable
+private fun IconButtonBox(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(34.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(VincentColors.Surface)
+            .border(1.dp, VincentColors.Border, RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, contentDescription = desc, tint = VincentColors.Accent, modifier = Modifier.size(17.dp)) }
 }
 
 @Composable
@@ -202,20 +269,22 @@ private fun FilterChips(selectedIdx: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
-private fun RackGrid(mode: RackMode, filter: RackFilter?, selectedIdx: Int, onSelect: (Int) -> Unit) {
-    val matching = SampleData.rackA.count { it.occupied && (filter?.test?.invoke(it) ?: true) }
+private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedIdx: Int, onSelect: (Int) -> Unit) {
+    val matching = rack.cells.count { it.occupied && (filter?.test?.invoke(it) ?: true) }
     VCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            SampleData.rackA.chunked(6).forEachIndexed { rowIndex, rowCells ->
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        rowCells.first().row,
+                        rowLabel(rowIndex),
                         fontSize = 10.sp,
                         color = VincentColors.Faint,
                         modifier = Modifier.width(14.dp),
                     )
+                    val shiftRight = rack.staggered && rowIndex % 2 == 1
+                    if (shiftRight) Spacer(Modifier.weight(0.5f))
                     rowCells.forEachIndexed { colIndex, cell ->
-                        val gi = rowIndex * 6 + colIndex
+                        val gi = rowIndex * rack.cols + colIndex
                         Cell(
                             cell, mode, filter,
                             selected = gi == selectedIdx,
@@ -223,15 +292,20 @@ private fun RackGrid(mode: RackMode, filter: RackFilter?, selectedIdx: Int, onSe
                             modifier = Modifier.weight(1f),
                         )
                     }
+                    if (rack.staggered && !shiftRight) Spacer(Modifier.weight(0.5f))
                 }
             }
             Spacer(Modifier.height(2.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    if (filter == null) "Touchez un mode ou un filtre" else "$matching bouteille${if (matching > 1) "s" else ""} dans ce filtre",
+                    if (filter == null) "Touchez une case pour la sélectionner"
+                    else "$matching bouteille${if (matching > 1) "s" else ""} dans ce filtre",
                     fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W500,
                 )
-                Text("73%", style = MonoNumber, color = VincentColors.Muted)
+                Text(
+                    "${(rack.occupiedCount * 100 / rack.capacity.coerceAtLeast(1))}%",
+                    style = MonoNumber, color = VincentColors.Muted,
+                )
             }
         }
     }
@@ -304,8 +378,8 @@ private fun Cell(
 }
 
 @Composable
-private fun PeekCard(selectedIdx: Int, onOpenBottle: (Bottle) -> Unit) {
-    val cell = SampleData.rackA.getOrNull(selectedIdx)
+private fun PeekCard(rack: Rack, selectedIdx: Int, onOpenBottle: (Bottle) -> Unit) {
+    val cell = rack.cells.getOrNull(selectedIdx)
     if (cell == null || !cell.occupied) {
         VCard(Modifier.fillMaxWidth()) {
             Row(Modifier.padding(14.dp)) {
@@ -314,7 +388,7 @@ private fun PeekCard(selectedIdx: Int, onOpenBottle: (Bottle) -> Unit) {
         }
         return
     }
-    val spot = "${cell.row}${selectedIdx % 6 + 1}"
+    val spot = "${rowLabel(selectedIdx / rack.cols)}${selectedIdx % rack.cols + 1}"
     // Best-effort link to a real bottle (colour + vintage + price); else info only.
     val match = Cellar.bottles.firstOrNull {
         it.color == cell.color && it.price == cell.price && it.vintage.takeLast(2) == cell.vintage?.takeLast(2)
@@ -338,4 +412,78 @@ private fun PeekCard(selectedIdx: Int, onOpenBottle: (Bottle) -> Unit) {
             cell.color?.let { ColorTag(it, label = cell.category?.label ?: it.label) }
         }
     }
+}
+
+@Composable
+private fun RackEditor(
+    initial: Rack,
+    onCancel: () -> Unit,
+    onSave: (String, Int, Int, Boolean) -> Unit,
+) {
+    var name by remember { mutableStateOf(initial.name) }
+    var cols by remember { mutableIntStateOf(initial.cols) }
+    var rows by remember { mutableIntStateOf(initial.rows) }
+    var staggered by remember { mutableStateOf(initial.staggered) }
+
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(VincentColors.Surface)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("Éditer le casier", fontSize = 16.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+            OutlinedTextField(
+                value = name, onValueChange = { name = it }, singleLine = true,
+                label = { Text("Nom", fontSize = 12.sp) }, modifier = Modifier.fillMaxWidth(),
+            )
+            Stepper("Colonnes", cols, 1..10) { cols = it }
+            Stepper("Rangées", rows, 1..12) { rows = it }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Quinconce", fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                    Text("Rangées décalées d'une demi-case", fontSize = 10.5.sp, color = VincentColors.Muted)
+                }
+                Switch(checked = staggered, onCheckedChange = { staggered = it })
+            }
+            Text("Capacité : ${cols * rows} emplacements", fontSize = 11.sp, color = VincentColors.Muted)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Annuler") }
+                Button(
+                    onClick = { onSave(name.ifBlank { initial.name }, cols, rows, staggered) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+                ) { Text("Enregistrer") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Stepper(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+        StepBtn("−") { if (value > range.first) onChange(value - 1) }
+        Text("$value", Modifier.width(36.dp), style = MonoNumber, color = VincentColors.Fg, textAlign = TextAlign.Center)
+        StepBtn("+") { if (value < range.last) onChange(value + 1) }
+    }
+}
+
+@Composable
+private fun StepBtn(symbol: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(VincentColors.Surface2)
+            .border(1.dp, VincentColors.Border, RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(symbol, fontSize = 17.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg) }
 }

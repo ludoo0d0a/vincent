@@ -144,48 +144,70 @@ object SampleData {
     const val averagePriceEur = 30
     const val addedThisMonth = 12
 
-    /** A 5×6 rack grid for "Cave A", matching the mockup. */
-    val rackA: List<RackCell> = buildRack()
+    /** Seed racks for the cellar screen — editable at runtime via the Racks store. */
+    fun seedRacks(): List<Rack> = listOf(caveA(), caveB(), refrigeree())
 
-    private fun buildRack(): List<RackCell> {
-        fun c(row: String, color: WineColor, cat: WineCategory, vintage: String, price: Int, sel: Boolean = false) =
-            RackCell(row, true, color, cat, vintage, price, sel)
-        fun empty(row: String) = RackCell(row, false)
-        return listOf(
-            c("A", WineColor.RED, WineCategory.BORDEAUX, "16", 68),
-            c("A", WineColor.RED, WineCategory.RHONE, "18", 42),
-            c("A", WineColor.RED, WineCategory.RHONE, "19", 24),
-            c("A", WineColor.WHITE, WineCategory.BOURGOGNE, "21", 29),
-            empty("A"),
-            c("A", WineColor.RED, WineCategory.BORDEAUX, "15", 55),
+    private data class Spec(val color: WineColor, val cat: WineCategory, val vintage: String, val price: Int)
 
-            c("B", WineColor.RED, WineCategory.BORDEAUX, "17", 33),
-            c("B", WineColor.RED, WineCategory.BORDEAUX, "16", 48),
-            c("B", WineColor.RED, WineCategory.BORDEAUX, "16", 68, sel = true),
-            c("B", WineColor.WHITE, WineCategory.LOIRE, "22", 19),
-            c("B", WineColor.WHITE, WineCategory.BOURGOGNE, "21", 29),
-            empty("B"),
+    private fun c(row: String, color: WineColor, cat: WineCategory, vintage: String, price: Int, sel: Boolean = false) =
+        RackCell(row, true, color, cat, vintage, price, sel)
+    private fun e(row: String) = RackCell(row, false)
 
-            c("C", WineColor.ROSE, WineCategory.PROVENCE, "22", 18),
-            c("C", WineColor.ROSE, WineCategory.PROVENCE, "23", 15),
-            c("C", WineColor.RED, WineCategory.RHONE, "18", 27),
-            c("C", WineColor.RED, WineCategory.BOURGOGNE, "19", 39),
-            empty("C"),
-            empty("C"),
+    // Cave A — 6×6 grid.
+    private fun caveA(): Rack = Rack(
+        "Cave A", 6, 6, false,
+        listOf(
+            c("A", WineColor.RED, WineCategory.BORDEAUX, "16", 68), c("A", WineColor.RED, WineCategory.RHONE, "18", 42), c("A", WineColor.RED, WineCategory.RHONE, "19", 24),
+            c("A", WineColor.WHITE, WineCategory.BOURGOGNE, "21", 29), e("A"), c("A", WineColor.RED, WineCategory.BORDEAUX, "15", 55),
 
-            c("D", WineColor.SPARKLING, WineCategory.CHAMPAGNE, "NM", 42),
-            c("D", WineColor.SPARKLING, WineCategory.CHAMPAGNE, "14", 58),
-            c("D", WineColor.WHITE, WineCategory.BOURGOGNE, "20", 22),
-            c("D", WineColor.RED, WineCategory.BORDEAUX, "18", 31),
-            c("D", WineColor.RED, WineCategory.RHONE, "19", 26),
-            c("D", WineColor.RED, WineCategory.BORDEAUX, "17", 44),
+            c("B", WineColor.RED, WineCategory.BORDEAUX, "17", 33), c("B", WineColor.RED, WineCategory.BORDEAUX, "16", 48), c("B", WineColor.RED, WineCategory.BORDEAUX, "16", 68, sel = true),
+            c("B", WineColor.WHITE, WineCategory.LOIRE, "22", 19), c("B", WineColor.WHITE, WineCategory.BOURGOGNE, "21", 29), e("B"),
 
-            c("E", WineColor.RED, WineCategory.BOURGOGNE, "16", 35),
-            empty("E"),
-            c("E", WineColor.WHITE, WineCategory.BOURGOGNE, "19", 95),
-            c("E", WineColor.ROSE, WineCategory.PROVENCE, "23", 16),
-            empty("E"),
-            empty("E"),
+            c("C", WineColor.ROSE, WineCategory.PROVENCE, "22", 18), c("C", WineColor.ROSE, WineCategory.PROVENCE, "23", 15), c("C", WineColor.RED, WineCategory.RHONE, "18", 27),
+            c("C", WineColor.RED, WineCategory.BOURGOGNE, "19", 39), e("C"), e("C"),
+
+            c("D", WineColor.SPARKLING, WineCategory.CHAMPAGNE, "NM", 42), c("D", WineColor.SPARKLING, WineCategory.CHAMPAGNE, "14", 58), c("D", WineColor.WHITE, WineCategory.BOURGOGNE, "20", 22),
+            c("D", WineColor.RED, WineCategory.BORDEAUX, "18", 31), c("D", WineColor.RED, WineCategory.RHONE, "19", 26), c("D", WineColor.RED, WineCategory.BORDEAUX, "17", 44),
+
+            c("E", WineColor.RED, WineCategory.BOURGOGNE, "16", 35), e("E"), c("E", WineColor.WHITE, WineCategory.BOURGOGNE, "19", 95),
+            c("E", WineColor.ROSE, WineCategory.PROVENCE, "23", 16), e("E"), c("E", WineColor.RED, WineCategory.RHONE, "20", 28),
+
+            c("F", WineColor.RED, WineCategory.BORDEAUX, "19", 37), c("F", WineColor.WHITE, WineCategory.LOIRE, "20", 21), c("F", WineColor.RED, WineCategory.BOURGOGNE, "18", 52),
+            e("F"), c("F", WineColor.ROSE, WineCategory.PROVENCE, "22", 17), c("F", WineColor.SPARKLING, WineCategory.CHAMPAGNE, "NM", 39),
+        ),
+    )
+
+    // Cave B — 4×8, bottles stored "en quinconce" (staggered rows).
+    private val mixB = listOf(
+        Spec(WineColor.SPARKLING, WineCategory.CHAMPAGNE, "NM", 45),
+        Spec(WineColor.WHITE, WineCategory.BOURGOGNE, "21", 32),
+        Spec(WineColor.WHITE, WineCategory.LOIRE, "22", 19),
+        Spec(WineColor.RED, WineCategory.BORDEAUX, "16", 58),
+        Spec(WineColor.RED, WineCategory.RHONE, "18", 27),
+        Spec(WineColor.ROSE, WineCategory.PROVENCE, "23", 16),
+    )
+
+    private fun caveB(): Rack {
+        val cols = 4; val rows = 8
+        val cells = (0 until cols * rows).map { i ->
+            val rl = rowLabel(i / cols)
+            if (i % 5 == 4) e(rl) else mixB[i % mixB.size].let { c(rl, it.color, it.cat, it.vintage, it.price) }
+        }
+        return Rack("Cave B", cols, rows, true, cells)
+    }
+
+    // Réfrigérée — small 4×3, mostly whites/champagne.
+    private fun refrigeree(): Rack {
+        val cols = 4; val rows = 3
+        val chilled = listOf(
+            Spec(WineColor.SPARKLING, WineCategory.CHAMPAGNE, "NM", 49),
+            Spec(WineColor.WHITE, WineCategory.BOURGOGNE, "20", 24),
+            Spec(WineColor.ROSE, WineCategory.PROVENCE, "23", 17),
         )
+        val cells = (0 until cols * rows).map { i ->
+            val rl = rowLabel(i / cols)
+            if (i == 5 || i == 10) e(rl) else chilled[i % chilled.size].let { c(rl, it.color, it.cat, it.vintage, it.price) }
+        }
+        return Rack("Réfrigérée", cols, rows, false, cells)
     }
 }
