@@ -20,7 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocalBar
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.rememberGoogleSignIn
 import fr.geoking.vincent.theme.VincentColors
@@ -60,7 +63,8 @@ fun LoginScreen(onGuest: () -> Unit) {
             Spacer(Modifier.height(18.dp))
             Text("Vincent", fontSize = 30.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
             Text(
-                "Votre cave dans la poche. Synchronisée, sauvegardée, partout avec vous.",
+                if (FeatureFlags.CLOUD_SYNC) "Votre cave dans la poche. Synchronisée, sauvegardée, partout avec vous."
+                else "Votre cave dans la poche. Simple, privée, toujours à portée de main.",
                 fontSize = 13.sp, color = VincentColors.Muted, textAlign = TextAlign.Center, lineHeight = 19.sp,
                 modifier = Modifier.padding(top = 8.dp).width(240.dp),
             )
@@ -69,9 +73,15 @@ fun LoginScreen(onGuest: () -> Unit) {
         // Bottom actions
         Column(Modifier.padding(horizontal = 22.dp).padding(bottom = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 14.dp)) {
-                Perk(Icons.Filled.CloudUpload, "Stockage cloud")
-                Perk(Icons.Filled.Favorite, "Favoris")
-                Perk(Icons.Filled.Devices, "Multi-appareils")
+                if (FeatureFlags.CLOUD_SYNC) {
+                    Perk(Icons.Filled.CloudUpload, "Stockage cloud")
+                    Perk(Icons.Filled.Favorite, "Favoris")
+                    Perk(Icons.Filled.Devices, "Multi-appareils")
+                } else {
+                    Perk(Icons.Filled.PhotoCamera, "Ajout rapide")
+                    Perk(Icons.Filled.Favorite, "Favoris")
+                    Perk(Icons.Filled.Lock, "100% privé")
+                }
             }
             // Google button
             Row(

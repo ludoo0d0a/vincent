@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.Bottle
@@ -59,7 +60,11 @@ fun AccountScreen(
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("Mon compte", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("Synchronisé avec Google", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(
+                    if (FeatureFlags.CLOUD_SYNC) "Synchronisé avec Google"
+                    else if (acc != null) "Connecté avec Google" else "Données sur cet appareil",
+                    fontSize = 11.5.sp, color = VincentColors.Muted,
+                )
             }
         }
 
@@ -82,24 +87,44 @@ fun AccountScreen(
             }
 
             Spacer(Modifier.height(11.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                VCard(Modifier.weight(1f)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Green, modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("Sauvegarde", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+            if (FeatureFlags.CLOUD_SYNC) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VCard(Modifier.weight(1f)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Green, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("Sauvegarde", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            }
+                            Text("À jour", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
+                            Text("il y a 2 min", fontSize = 10.5.sp, color = VincentColors.Green, fontWeight = FontWeight.W700)
                         }
-                        Text("À jour", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                        Text("il y a 2 min", fontSize = 10.5.sp, color = VincentColors.Green, fontWeight = FontWeight.W700)
+                    }
+                    VCard(Modifier.weight(1f)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Stockage cloud", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text("${Cellar.totalBottles()} / 500", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
+                            Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Border)) {
+                                Box(Modifier.fillMaxWidth((Cellar.totalBottles() / 500f).coerceIn(0.02f, 1f)).height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Accent))
+                            }
+                        }
                     }
                 }
-                VCard(Modifier.weight(1f)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Stockage cloud", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
-                        Text("${Cellar.totalBottles()} / 500", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                        Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Border)) {
-                            Box(Modifier.fillMaxWidth((Cellar.totalBottles() / 500f).coerceIn(0.02f, 1f)).height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Accent))
+            } else {
+                // Cloud sync not wired — show honest local stats instead.
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VCard(Modifier.weight(1f)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Bouteilles", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text("${Cellar.totalBottles()}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
+                            Text("sur cet appareil", fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                        }
+                    }
+                    VCard(Modifier.weight(1f)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Références", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text("${Cellar.references()}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
+                            Text("vins distincts", fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                         }
                     }
                 }
