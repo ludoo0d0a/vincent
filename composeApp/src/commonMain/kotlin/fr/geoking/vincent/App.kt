@@ -1,7 +1,11 @@
 package fr.geoking.vincent
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FormatListBulleted
@@ -57,6 +61,9 @@ fun App() = VincentTheme {
     var overlay by remember { mutableStateOf<Overlay?>(null) }
 
     Surface(color = VincentColors.Bg, modifier = Modifier.fillMaxSize()) {
+        // No fullscreen: keep all content within the system bars so the top
+        // back button and the bottom navigation are never hidden behind them.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
         when {
             !loggedIn -> LoginScreen(onGuest = { guest = true })
 
@@ -92,6 +99,7 @@ fun App() = VincentTheme {
                 onAccount = { overlay = Overlay.ACCOUNT },
             )
         }
+        }
     }
 }
 
@@ -105,8 +113,13 @@ private fun MainScaffold(
 ) {
     Scaffold(
         containerColor = VincentColors.Bg,
+        // Root already applies system-bar insets; don't add them again here.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            NavigationBar(containerColor = VincentColors.Surface) {
+            NavigationBar(
+                containerColor = VincentColors.Surface,
+                windowInsets = WindowInsets(0, 0, 0, 0),
+            ) {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
                         selected = t == tab,
