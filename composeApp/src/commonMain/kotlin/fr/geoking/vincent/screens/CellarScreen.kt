@@ -106,6 +106,9 @@ fun CellarScreen(
     var filterIdx by remember { mutableIntStateOf(-1) }
     val filter = rackFilters.getOrNull(filterIdx)
     val occupied = SampleData.rackA.count { it.occupied }
+    val initialSel = SampleData.rackA.indexOfFirst { it.selected }.takeIf { it >= 0 }
+        ?: SampleData.rackA.indexOfFirst { it.occupied }
+    var selectedIdx by remember { mutableIntStateOf(initialSel) }
 
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
         ScreenHeader("Casiers", "${SampleData.rackA.size} emplacements · $occupied occupés")
@@ -117,9 +120,9 @@ fun CellarScreen(
             Spacer(Modifier.height(10.dp))
             FilterChips(filterIdx) { filterIdx = if (filterIdx == it) -1 else it }
             Spacer(Modifier.height(11.dp))
-            RackGrid(mode, filter)
+            RackGrid(mode, filter, selectedIdx) { selectedIdx = it }
             Spacer(Modifier.height(11.dp))
-            PeekCard(onOpenBottle)
+            PeekCard(selectedIdx, onOpenBottle)
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -199,11 +202,11 @@ private fun FilterChips(selectedIdx: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
-private fun RackGrid(mode: RackMode, filter: RackFilter?) {
+private fun RackGrid(mode: RackMode, filter: RackFilter?, selectedIdx: Int, onSelect: (Int) -> Unit) {
     val matching = SampleData.rackA.count { it.occupied && (filter?.test?.invoke(it) ?: true) }
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            SampleData.rackA.chunked(6).forEach { rowCells ->
+            SampleData.rackA.chunked(6).forEachIndexed { rowIndex, rowCells ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         rowCells.first().row,
@@ -211,7 +214,15 @@ private fun RackGrid(mode: RackMode, filter: RackFilter?) {
                         color = VincentColors.Faint,
                         modifier = Modifier.width(14.dp),
                     )
-                    rowCells.forEach { cell -> Cell(cell, mode, filter, Modifier.weight(1f)) }
+                    rowCells.forEachIndexed { colIndex, cell ->
+                        val gi = rowIndex * 6 + colIndex
+                        Cell(
+                            cell, mode, filter,
+                            selected = gi == selectedIdx,
+                            onClick = { if (cell.occupied) onSelect(gi) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(2.dp))
@@ -227,7 +238,14 @@ private fun RackGrid(mode: RackMode, filter: RackFilter?) {
 }
 
 @Composable
-private fun Cell(cell: RackCell, mode: RackMode, filter: RackFilter?, modifier: Modifier = Modifier) {
+private fun Cell(
+    cell: RackCell,
+    mode: RackMode,
+    filter: RackFilter?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     if (!cell.occupied) {
         Box(
             modifier
@@ -253,10 +271,18 @@ private fun Cell(cell: RackCell, mode: RackMode, filter: RackFilter?, modifier: 
             .aspectRatio(1f)
             .alpha(if (matches) 1f else 0.32f)
             .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
             .background(tint)
-            .border(if (cell.selected) 4.dp else 3.dp, wineBorder, RoundedCornerShape(8.dp)),
+            .border(if (selected) 4.dp else 3.dp, wineBorder, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
+        // Selection cue: inset accent ring (keeps the wine-colour border intact).
+        if (selected) {
+            Box(
+                Modifier.matchParentSize().padding(3.dp)
+                    .border(1.5.dp, VincentColors.Accent, RoundedCornerShape(5.dp)),
+            )
+        }
         if (label.isNotEmpty()) {
             Box(
                 Modifier
@@ -278,17 +304,38 @@ private fun Cell(cell: RackCell, mode: RackMode, filter: RackFilter?, modifier: 
 }
 
 @Composable
-private fun PeekCard(onOpenBottle: (Bottle) -> Unit) {
-    val bottle = Cellar.bottles.first { it.cellarSpot == "B3" || it.id == "leoville-2016" }
-    VCard(Modifier.fillMaxWidth().clickable { onOpenBottle(bottle) }) {
+private fun PeekCard(selectedIdx: Int, onOpenBottle: (Bottle) -> Unit) {
+    val cell = SampleData.rackA.getOrNull(selectedIdx)
+    if (cell == null || !cell.occupied) {
+        VCard(Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(14.dp)) {
+                Text("Touchez une case occupée pour voir la bouteille", fontSize = 12.5.sp, color = VincentColors.Muted)
+            }
+        }
+        return
+    }
+    val spot = "${cell.row}${selectedIdx % 6 + 1}"
+    // Best-effort link to a real bottle (colour + vintage + price); else info only.
+    val match = Cellar.bottles.firstOrNull {
+        it.color == cell.color && it.price == cell.price && it.vintage.takeLast(2) == cell.vintage?.takeLast(2)
+    }
+    val cardModifier = Modifier.fillMaxWidth().let { if (match != null) it.clickable { onOpenBottle(match) } else it }
+    VCard(cardModifier) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            WineBottle(WineColor.RED, Modifier.size(width = 30.dp, height = 46.dp))
+            WineBottle(cell.color ?: WineColor.RED, Modifier.size(width = 30.dp, height = 46.dp))
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f)) {
-                Text("Emplacement B3", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                Text("${bottle.domain} ${bottle.vintage} · ${bottle.price} €", fontSize = 11.sp, color = VincentColors.Muted)
+                Text("Emplacement $spot", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                Text(
+                    buildString {
+                        append(cell.vintage.orEmpty())
+                        append(" · ${cell.price} €")
+                        cell.category?.let { append(" · ${it.label}") }
+                    },
+                    fontSize = 11.sp, color = VincentColors.Muted,
+                )
             }
-            ColorTag(bottle.color, label = bottle.category.label)
+            cell.color?.let { ColorTag(it, label = cell.category?.label ?: it.label) }
         }
     }
 }
