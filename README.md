@@ -130,8 +130,13 @@ composeApp/src/
 - **Still to wire**: effective cloud sync of the Room data to the account.
 - **Bottles** are drawn vectorially (`ui/WineBottle`) — capsule, body, label — so
   they stay crisp at any size with no bitmap assets. Replaceable with real photos later.
-- The launcher icon is not provided (the system `Material.Light` theme is used) —
-  add an `ic_launcher` under `androidMain/res` for production.
+- **Launcher icon (wired).** Adaptive icon under `androidMain/res`: a white wine-glass
+  mark on a lie-de-vin gradient (`drawable/ic_launcher_foreground.xml` + `…_background.xml`,
+  `mipmap-anydpi-v26/ic_launcher*.xml`, with a `monochrome` layer for Android 13 themed
+  icons) plus PNG fallbacks (`mipmap-*dpi/`) for API 24–25.
+- **No fullscreen / insets.** The app stays within the system bars: the root applies
+  `WindowInsets.systemBars` padding (and the Scaffold/NavigationBar add none), so the
+  top back button and bottom navigation are never hidden under the status/nav bars.
 
 ## CI/CD (GitHub Actions)
 
