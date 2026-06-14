@@ -65,11 +65,12 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ColorTag
 import fr.geoking.vincent.ui.WineBottle
 
-private enum class AddMode(val label: String) { SCAN("Scan"), PHOTO("Photo"), VOICE("Voix"), MANUAL("Manuel") }
+// One "Identifier" screen handles BOTH barcode and label; plus voice and manual.
+private enum class AddMode(val label: String) { IDENTIFY("Identifier"), VOICE("Voix"), MANUAL("Manuel") }
 
 @Composable
 fun AddScreen(onClose: () -> Unit) {
-    var mode by remember { mutableStateOf(AddMode.SCAN) }
+    var mode by remember { mutableStateOf(AddMode.IDENTIFY) }
     val recognizer = wineRecognizer()
     val estimator = priceEstimator()
     val scope = rememberCoroutineScope()
@@ -102,7 +103,7 @@ fun AddScreen(onClose: () -> Unit) {
             }
         }
     }
-    // Scan & Photo both snap the label/bottle with the system camera (full-res) and let
+    // Label capture: snap the label/bottle with the system camera (full-res) and let
     // the vision model read it → Gemini fromImage. No hardcoded recognition result.
     val startCapture = rememberPhotoCapture { bytes ->
         busy = true
@@ -174,15 +175,14 @@ fun AddScreen(onClose: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
             when (mode) {
-                AddMode.SCAN, AddMode.PHOTO -> ScanPane(
-                    photo = mode == AddMode.PHOTO,
+                AddMode.IDENTIFY -> ScanPane(
                     color = aiBottle?.color ?: WineColor.RED,
                     title = aiBottle?.let { "${it.domain} ${it.vintage}" } ?: "En attente d'identification",
-                    subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" } ?: "Cadrez l'étiquette puis touchez l'IA",
+                    subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" } ?: "Code-barres ou étiquette",
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     busy = busy,
                     onIdentify = identify,
-                    onScanBarcode = if (mode == AddMode.SCAN) scanBarcode else null,
+                    onScanBarcode = scanBarcode,
                 )
                 AddMode.VOICE -> VoicePane(
                     transcript = transcript,
@@ -345,7 +345,6 @@ private fun <T> ChipRow(
 
 @Composable
 private fun ScanPane(
-    photo: Boolean,
     color: WineColor,
     title: String,
     subtitle: String,
@@ -360,7 +359,7 @@ private fun ScanPane(
                 .background(Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF15151B)))),
             contentAlignment = Alignment.Center,
         ) {
-            // barcode shortcut (scan mode only)
+            // Action 1 — barcode (Google Code Scanner → Open Food Facts).
             if (onScanBarcode != null) {
                 Row(
                     Modifier.align(Alignment.TopCenter).padding(top = 14.dp)
@@ -382,11 +381,11 @@ private fun ScanPane(
                 Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(Color(0xFF7BE6A8)))
             }
             Text(
-                if (photo) "Prenez la bouteille en photo" else "Cadrez l'étiquette — reconnaissance auto",
+                "Scannez le code-barres, ou cadrez l'étiquette et touchez ✨",
                 color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.W600,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp),
             )
-            // detected card
+            // Action 2 — label → IA. Detected card with the AI capture button.
             Row(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(14.dp).clip(RoundedCornerShape(16.dp)).background(VincentColors.Surface).padding(13.dp),
                 verticalAlignment = Alignment.CenterVertically,
