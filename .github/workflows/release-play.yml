@@ -12,7 +12,7 @@ on:
         type: choice
         options: [ internal, alpha, beta, production ]
       changesNotSentForReview:
-        description: 'Commit the edit without sending it for review (required until the app has been reviewed once; then set false for auto-review)'
+        description: 'changesNotSentForReview'
         default: true
         type: boolean
 
