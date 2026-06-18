@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -177,10 +178,11 @@ fun AddScreen(onClose: () -> Unit) {
             when (mode) {
                 AddMode.IDENTIFY -> ScanPane(
                     color = aiBottle?.color ?: WineColor.RED,
-                    title = aiBottle?.let { "${it.domain} ${it.vintage}" } ?: "En attente d'identification",
-                    subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" } ?: "Code-barres ou étiquette",
+                    title = aiBottle?.let { "${it.domain} ${it.vintage}" }.orEmpty(),
+                    subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" }.orEmpty(),
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     busy = busy,
+                    hasResult = aiBottle != null,
                     onIdentify = identify,
                     onScanBarcode = scanBarcode,
                 )
@@ -350,64 +352,99 @@ private fun ScanPane(
     subtitle: String,
     priceLabel: String?,
     busy: Boolean,
+    hasResult: Boolean,
     onIdentify: () -> Unit,
     onScanBarcode: (() -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize()) {
+        // Viewfinder + loading animation overlay.
         Box(
             Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(18.dp))
                 .background(Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF15151B)))),
             contentAlignment = Alignment.Center,
         ) {
-            // Action 1 — barcode (Google Code Scanner → Open Food Facts).
-            if (onScanBarcode != null) {
-                Row(
-                    Modifier.align(Alignment.TopCenter).padding(top = 14.dp)
-                        .clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.14f))
-                        .clickable(onClick = onScanBarcode).padding(horizontal = 14.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text("Scanner le code-barres", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700)
-                }
-            }
-            // viewfinder frame
-            Box(Modifier.size(width = 180.dp, height = 260.dp), contentAlignment = Alignment.Center) {
-                WineBottle(WineColor.RED, Modifier.size(width = 74.dp, height = 170.dp))
+            Box(Modifier.size(width = 170.dp, height = 240.dp), contentAlignment = Alignment.Center) {
+                WineBottle(if (hasResult) color else WineColor.RED, Modifier.size(width = 72.dp, height = 165.dp))
                 listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd).forEach { a ->
-                    Box(Modifier.align(a).size(30.dp).border(3.dp, Color.White, RoundedCornerShape(8.dp)))
+                    Box(Modifier.align(a).size(28.dp).border(3.dp, Color.White, RoundedCornerShape(8.dp)))
                 }
                 Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(Color(0xFF7BE6A8)))
             }
-            Text(
-                "Scannez le code-barres, ou cadrez l'étiquette et touchez ✨",
-                color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.W600,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp),
-            )
-            // Action 2 — label → IA. Detected card with the AI capture button.
-            Row(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(14.dp).clip(RoundedCornerShape(16.dp)).background(VincentColors.Surface).padding(13.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                WineBottle(color, Modifier.size(width = 28.dp, height = 50.dp))
-                Spacer(Modifier.width(11.dp))
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(11.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(if (busy) "ANALYSE…" else "IDENTIFIER AVEC L'IA", fontSize = 9.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
-                    }
-                    Text(title, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg, modifier = Modifier.padding(top = 2.dp))
-                    Text(subtitle, fontSize = 11.sp, color = VincentColors.Muted)
-                    if (priceLabel != null) {
-                        Text(priceLabel, fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Green, modifier = Modifier.padding(top = 2.dp))
+            if (busy) {
+                Box(
+                    Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(42.dp))
+                        Spacer(Modifier.height(12.dp))
+                        Text("Analyse de l'étiquette…", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.W700)
                     }
                 }
-                Box(
-                    Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Accent).clickable(onClick = onIdentify),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.AutoAwesome, contentDescription = "Identifier", tint = Color.White, modifier = Modifier.size(20.dp)) }
+            } else {
+                Text(
+                    "Scannez le code-barres ou cadrez l'étiquette",
+                    color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.W600,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                )
+            }
+        }
+
+        // Result (clear) — only once the AI returned a bottle.
+        Spacer(Modifier.height(12.dp))
+        if (hasResult) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(VincentColors.Surface)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp)).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WineBottle(color, Modifier.size(width = 30.dp, height = 54.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("IDENTIFIÉ PAR L'IA", fontSize = 9.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
+                    }
+                    Text(title, fontSize = 15.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 3.dp))
+                    Text(subtitle, fontSize = 12.sp, color = VincentColors.Muted)
+                    if (priceLabel != null) {
+                        Text(priceLabel, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Green, modifier = Modifier.padding(top = 3.dp))
+                    }
+                }
+            }
+        } else if (!busy) {
+            Text(
+                "Choisissez une méthode d'identification ci-dessous.",
+                fontSize = 12.5.sp, color = VincentColors.Muted,
+                modifier = Modifier.padding(vertical = 14.dp),
+            )
+        }
+
+        // Two clearly-separated actions: barcode (secondary) vs label→AI (primary).
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (onScanBarcode != null) {
+                Row(
+                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(14.dp))
+                        .background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp))
+                        .clickable(enabled = !busy, onClick = onScanBarcode),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+                ) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Code-barres", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                }
+            }
+            Row(
+                Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(14.dp))
+                    .background(if (busy) VincentColors.AccentSoft else VincentColors.Accent)
+                    .clickable(enabled = !busy, onClick = onIdentify),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = if (busy) VincentColors.Accent else Color.White, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Étiquette · IA", fontSize = 13.sp, fontWeight = FontWeight.W700, color = if (busy) VincentColors.Accent else Color.White)
             }
         }
     }
