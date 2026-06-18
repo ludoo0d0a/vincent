@@ -11,6 +11,10 @@ on:
         default: internal
         type: choice
         options: [ internal, alpha, beta, production ]
+      changesNotSentForReview:
+        description: 'Commit the edit without sending it for review (required until the app has been reviewed once; then set false for auto-review)'
+        default: true
+        type: boolean
 
 # Serialize deploys: a Play edit must finish before the next starts.
 concurrency:
@@ -56,3 +60,7 @@ jobs:
           whatsNewDirectory: playstore/whatsnew
           track: ${{ github.event.inputs.track || 'internal' }}
           status: completed
+          # True by default (incl. push events): the first releases of an app can't be
+          # auto-sent for review — Play asks to commit the edit and review from the UI.
+          # Flip to false via manual dispatch once the app review flow is active.
+          changesNotSentForReview: ${{ github.event.inputs.changesNotSentForReview || 'true' }}
