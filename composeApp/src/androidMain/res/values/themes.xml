@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Edge-to-edge friendly: no deprecated android:statusBarColor /
+         android:navigationBarColor. Bars are transparent and the system draws
+         edge-to-edge (enforced on API 35+); icon contrast is set in code via
+         WindowInsetsControllerCompat (non-deprecated). -->
+    <style name="Theme.Vincent" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>
