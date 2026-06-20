@@ -784,6 +784,11 @@ body{padding:48px 32px 80px}
             </div>
           </div>
           <div class="hint">Scannez le code-barres, ou cadrez l'étiquette — identification par IA</div>
+          <!-- État d'échec IA (clé invalide / quota / réseau) : message clair plutôt que rien. -->
+          <div style="margin:0 14px 6px;display:flex;align-items:center;gap:8px;background:color-mix(in oklch,var(--red) 16%,#fff);border:1px solid color-mix(in oklch,var(--red) 30%,#fff);border-radius:11px;padding:9px 12px;color:var(--red);font-size:11.5px;font-weight:600">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.4v.2"/></svg>
+            Identification impossible — réessayez ou passez en manuel.
+          </div>
           <div class="modes"><span class="m on">Identifier</span><span class="m">Voix</span><span class="m">Manuel</span></div>
           <div class="detected">
             <div class="bot" style="--bcol:oklch(33% 0.11 24);width:28px;height:50px"><span class="neck"></span><span class="body"><span class="lbl"></span></span></div>
