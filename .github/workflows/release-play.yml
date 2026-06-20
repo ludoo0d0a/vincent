@@ -12,8 +12,8 @@ on:
         type: choice
         options: [ internal, alpha, beta, production ]
       changesNotSentForReview:
-        description: 'changesNotSentForReview'
-        default: true
+        description: 'Skip auto-review (only for brand-new apps before first Console review)'
+        default: false
         type: boolean
 
 # Serialize deploys: a Play edit must finish before the next starts.
@@ -51,7 +51,8 @@ jobs:
       - name: Generate Play release notes (from playstore/whatsnew.xml)
         run: python3 scripts/whatsnew.py "${{ github.run_number }}"
 
-      - name: Upload to Google Play
+      - name: Upload to Google Play (skip review)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.changesNotSentForReview == true
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -60,7 +61,15 @@ jobs:
           whatsNewDirectory: playstore/whatsnew
           track: ${{ github.event.inputs.track || 'internal' }}
           status: completed
-          # True by default (incl. push events): the first releases of an app can't be
-          # auto-sent for review — Play asks to commit the edit and review from the UI.
-          # Flip to false via manual dispatch once the app review flow is active.
-          changesNotSentForReview: ${{ github.event.inputs.changesNotSentForReview || 'true' }}
+          changesNotSentForReview: true
+
+      - name: Upload to Google Play
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.changesNotSentForReview != true
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: fr.geoking.vincent
+          releaseFiles: composeApp/build/outputs/bundle/release/composeApp-release.aab
+          whatsNewDirectory: playstore/whatsnew
+          track: ${{ github.event.inputs.track || 'internal' }}
+          status: completed
