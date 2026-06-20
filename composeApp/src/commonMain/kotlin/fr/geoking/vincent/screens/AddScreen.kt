@@ -287,7 +287,7 @@ private data class ManualSeed(
 
 /** Manual entry — search cellar + form; emits a Bottle (or null while the name is empty). */
 @Composable
-private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
+private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -> Unit) {
     var domain by remember { mutableStateOf("") }
     var appellation by remember { mutableStateOf("") }
     var color by remember { mutableStateOf(WineColor.RED) }
@@ -296,6 +296,9 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
     var price by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("1") }
     var spot by remember { mutableStateOf("") }
+    // Placement chosen via the wizard (rack, empty cell). Null = not placed.
+    var placeRack by remember { mutableStateOf<Int?>(null) }
+    var placeCell by remember { mutableStateOf<Int?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var debouncedQuery by remember { mutableStateOf("") }
 
@@ -328,12 +331,13 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
         }
     }
 
-    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot) {
+    // All fields optional — a bottle can be saved with no name/colour/vintage/spot.
+    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell) {
+        val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
         onBottle(
-            if (domain.isBlank()) null
-            else Bottle(
+            Bottle(
                 id = "new-${Cellar.references()}",
-                domain = domain.trim(),
+                domain = domain.trim().ifBlank { "Bouteille" },
                 appellation = appellation.trim().ifBlank { category.label },
                 color = color,
                 category = category,
@@ -341,14 +345,15 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
                 price = price.filter { it.isDigit() }.toIntOrNull() ?: 0,
                 quantity = qty.filter { it.isDigit() }.toIntOrNull()?.coerceAtLeast(1) ?: 1,
                 rating = 0.0,
-                cellarSpot = spot.trim().uppercase(),
+                cellarSpot = spot.trim().uppercase().ifBlank { "—" },
                 provenance = "",
                 merchant = "—",
                 purchaseDate = "Aujourd'hui",
                 occasion = "",
                 source = AddSource.MANUAL,
                 addedLabel = "à l'instant",
-            )
+            ),
+            placement,
         )
     }
 
@@ -405,11 +410,90 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
             Field("Millésime", vintage, Modifier.weight(1f), numeric = true) { vintage = it }
             Field("Prix (€)", price, Modifier.weight(1f), numeric = true) { price = it }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Field("Quantité", qty, Modifier.weight(1f), numeric = true) { qty = it }
-            Field("Casier", spot, Modifier.weight(1f)) { spot = it }
-        }
+        Field("Quantité", qty, numeric = true) { qty = it }
+        PlacementSection(
+            placeRack = placeRack,
+            placeCell = placeCell,
+            onClear = { placeRack = null; placeCell = null; spot = "" },
+            onPick = { ri, ci, label -> placeRack = ri; placeCell = ci; spot = label },
+        )
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** Optional placement wizard: pick a rack, then an empty spot (or leave unplaced). */
+@Composable
+private fun PlacementSection(
+    placeRack: Int?,
+    placeCell: Int?,
+    onClear: () -> Unit,
+    onPick: (Int, Int, String) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    var browse by remember { mutableStateOf(placeRack ?: 0) }
+    val placed = placeRack != null && placeCell != null
+    val placedLabel = if (placed) {
+        val r = Racks.all.getOrNull(placeRack!!)
+        if (r != null) "${r.name} · ${rowLabel(placeCell!! / r.cols)}${placeCell!! % r.cols + 1}" else "—"
+    } else null
+
+    Column {
+        Text(
+            "Emplacement (optionnel)", fontSize = 11.sp, color = VincentColors.Muted,
+            fontWeight = FontWeight.W600, modifier = Modifier.padding(bottom = 6.dp, start = 2.dp),
+        )
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface)
+                .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
+                .clickable { open = !open }.padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                placedLabel ?: "Sans emplacement — touchez pour placer",
+                fontSize = 13.sp, fontWeight = FontWeight.W600,
+                color = if (placed) VincentColors.Fg else VincentColors.Muted,
+                modifier = Modifier.weight(1f),
+            )
+            if (placed) {
+                Text("Retirer", fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent,
+                    modifier = Modifier.clickable { onClear() })
+            }
+        }
+        if (open) {
+            Spacer(Modifier.height(8.dp))
+            // 1) choose a rack
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Racks.all.forEachIndexed { i, r ->
+                    val on = i == browse
+                    Box(
+                        Modifier.clip(RoundedCornerShape(10.dp))
+                            .background(if (on) VincentColors.Accent else VincentColors.Surface2)
+                            .border(1.dp, if (on) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(10.dp))
+                            .clickable { browse = i }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    ) { Text(r.name, fontSize = 12.sp, fontWeight = FontWeight.W600, color = if (on) Color.White else VincentColors.Fg) }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            // 2) choose an empty spot in that rack
+            val rack = Racks.all.getOrNull(browse)
+            val empties = rack?.cells?.indices?.filter { !rack.cells[it].occupied }.orEmpty()
+            if (rack == null || empties.isEmpty()) {
+                Text("Aucun emplacement libre ici.", fontSize = 11.5.sp, color = VincentColors.Muted, modifier = Modifier.padding(start = 2.dp))
+            } else {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    empties.forEach { ci ->
+                        val label = "${rowLabel(ci / rack.cols)}${ci % rack.cols + 1}"
+                        val sel = browse == placeRack && ci == placeCell
+                        Box(
+                            Modifier.clip(RoundedCornerShape(9.dp))
+                                .background(if (sel) VincentColors.Accent else VincentColors.AccentSoft)
+                                .clickable { onPick(browse, ci, label); open = false }
+                                .padding(horizontal = 12.dp, vertical = 9.dp),
+                        ) { Text(label, style = MonoNumber, color = if (sel) Color.White else VincentColors.Accent) }
+                    }
+                }
+            }
+        }
     }
 }
 
