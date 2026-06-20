@@ -17,7 +17,7 @@ import java.net.URL
 
 // GEMINI_API_KEY comes from local.properties (or CI env) via BuildConfig — never
 // hardcoded. Get a free key at https://aistudio.google.com/apikey. Blank = no-op.
-private const val MODEL = "gemini-2.0-flash"
+private const val MODEL = "gemini-2.5-flash"
 private const val TAG = "VincentAI"
 
 /** Single Gemini-backed client implementing both seams. */
