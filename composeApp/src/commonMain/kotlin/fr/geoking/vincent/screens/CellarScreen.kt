@@ -159,11 +159,21 @@ fun CellarScreen(
         if (editing) {
             RackEditor(
                 initial = rack,
+                canDelete = Racks.all.size > 1,
                 onCancel = { editing = false },
                 onSave = { name, cols, rows, staggered ->
                     Racks.update(rackIdx, rack.resized(cols, rows, staggered).copy(name = name))
                     val updated = Racks.all[rackIdx]
                     selectedIdx = updated.cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
+                    editing = false
+                },
+                onDuplicate = {
+                    rackIdx = Racks.duplicate(rackIdx)
+                    editing = false
+                },
+                onDelete = {
+                    Racks.remove(rackIdx)
+                    rackIdx = rackIdx.coerceIn(0, Racks.all.lastIndex)
                     editing = false
                 },
             )
@@ -417,8 +427,11 @@ private fun PeekCard(rack: Rack, selectedIdx: Int, onOpenBottle: (Bottle) -> Uni
 @Composable
 private fun RackEditor(
     initial: Rack,
+    canDelete: Boolean,
     onCancel: () -> Unit,
     onSave: (String, Int, Int, Boolean) -> Unit,
+    onDuplicate: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial.name) }
     var cols by remember { mutableIntStateOf(initial.cols) }
@@ -453,6 +466,16 @@ private fun RackEditor(
                 Switch(checked = staggered, onCheckedChange = { staggered = it })
             }
             Text("Capacité : ${cols * rows} emplacements", fontSize = 11.sp, color = VincentColors.Muted)
+            // Manage: clone or delete this rack.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onDuplicate, modifier = Modifier.weight(1f)) { Text("Dupliquer") }
+                OutlinedButton(
+                    onClick = onDelete,
+                    enabled = canDelete,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = VincentColors.Red),
+                ) { Text("Supprimer") }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Annuler") }
                 Button(
