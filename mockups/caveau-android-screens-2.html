@@ -821,16 +821,30 @@ body{padding:48px 32px 80px}
           </div>
           <div class="transcript">« <span class="hl">Château Margaux</span> <span class="hl">2015</span>, <span class="hl">rouge</span>, <span class="hl">deux</span> bouteilles, casier B4 »</div>
           <div class="parsed">
+            <div style="display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;color:var(--accent);letter-spacing:.05em;margin-bottom:2px">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></svg>COMPRIS PAR L'IA — VÉRIFIEZ &amp; COMPLÉTEZ
+            </div>
             <div class="pfield"><span class="k">Domaine</span><span class="v">Château Margaux</span></div>
             <div class="pfield"><span class="k">Millésime</span><span class="v mono">2015</span></div>
-            <div class="pfield"><span class="k">Couleur</span><span class="v"><span class="tag tag-red"><i class="dot"></i>Rouge</span></span></div>
-            <div class="pfield"><span class="k">Quantité · Casier</span><span class="v mono">×2 · B4</span></div>
+            <div class="pfield"><span class="k">Couleur</span>
+              <span style="display:flex;gap:9px;align-items:center">
+                <i title="Rouge" style="width:20px;height:20px;border-radius:50%;background:var(--red);outline:2px solid var(--accent);outline-offset:2px"></i>
+                <i title="Blanc" style="width:20px;height:20px;border-radius:50%;background:var(--white-wine)"></i>
+                <i title="Rosé" style="width:20px;height:20px;border-radius:50%;background:var(--rose)"></i>
+                <i title="Pétillant" style="width:20px;height:20px;border-radius:50%;background:var(--bubbly)"></i>
+              </span>
+            </div>
+            <div class="pfield"><span class="k">Quantité</span><span class="v mono">×2</span></div>
+            <div class="pfield"><span class="k">Emplacement</span><span class="v" style="color:var(--accent);font-weight:700">Cave A · B4 ›</span></div>
           </div>
         </div>
-        <div style="padding:12px 18px 16px"><button class="btn primary" style="width:100%">Confirmer l'ajout</button></div>
+        <div style="padding:8px 18px 16px">
+          <div style="font-size:10.5px;color:var(--faint);text-align:center;margin-bottom:8px">Champs optionnels — enregistrez même incomplet, avec ou sans emplacement.</div>
+          <button class="btn primary" style="width:100%">Ajouter à la cave</button>
+        </div>
       </div>
     </div></div>
-    <div class="frame-label"><div class="n">06</div><div class="t">Ajout par la voix</div><div class="d">Dictée libre, transcription en direct, champs extraits automatiquement et éditables.</div></div>
+    <div class="frame-label"><div class="n">06</div><div class="t">Ajout par la voix → revue</div><div class="d">Dictée libre, transcription en direct, puis formulaire de revue pré-rempli par l'IA : couleur au color picker, placement casier → emplacement vide. Tous les champs optionnels.</div></div>
   </div>
 
   <!-- ============ 7. RECHERCHE & FILTRES ============ -->
