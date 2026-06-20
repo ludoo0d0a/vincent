@@ -784,8 +784,10 @@ body{padding:48px 32px 80px}
             </div>
           </div>
           <div class="hint">Scannez le code-barres, ou cadrez l'étiquette — identification par IA</div>
-          <!-- État d'échec IA (clé invalide / quota / réseau) : message clair plutôt que rien. -->
-          <div style="margin:0 14px 6px;display:flex;align-items:center;gap:8px;background:color-mix(in oklch,var(--red) 16%,#fff);border:1px solid color-mix(in oklch,var(--red) 30%,#fff);border-radius:11px;padding:9px 12px;color:var(--red);font-size:11.5px;font-weight:600">
+          <!-- État d'échec IA (clé invalide / quota / réseau) : message clair plutôt que rien.
+               position:relative + z-index:6 → passe au-dessus de la carte .detected (z-index:5)
+               et du shutter, sinon l'erreur est masquée « en dessous ». -->
+          <div style="position:relative;z-index:6;margin:0 14px 6px;display:flex;align-items:center;gap:8px;background:color-mix(in oklch,var(--red) 16%,#fff);border:1px solid color-mix(in oklch,var(--red) 32%,#fff);border-radius:11px;padding:9px 12px;color:var(--red);font-size:11.5px;font-weight:600;box-shadow:0 8px 22px -10px rgba(0,0,0,.55)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.4v.2"/></svg>
             Identification impossible — réessayez ou passez en manuel.
           </div>
