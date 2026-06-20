@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,9 +53,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -65,6 +68,7 @@ import fr.geoking.vincent.data.barcodeLookup
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.Rack
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.model.WineCategory
@@ -75,6 +79,7 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
+import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
 
 // One "Identifier" screen handles BOTH barcode and label; plus voice and manual.
@@ -537,27 +542,111 @@ private fun PlacementSection(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            // 2) choose an empty spot in that rack
+            // 2) pick an empty spot on the rack grid
             val rack = Racks.all.getOrNull(browse)
-            val empties = rack?.cells?.indices?.filter { !rack.cells[it].occupied }.orEmpty()
-            if (rack == null || empties.isEmpty()) {
+            val hasEmpty = rack?.cells?.any { !it.occupied } == true
+            if (rack == null || !hasEmpty) {
                 Text("Aucun emplacement libre ici.", fontSize = 11.5.sp, color = VincentColors.Muted, modifier = Modifier.padding(start = 2.dp))
             } else {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    empties.forEach { ci ->
+                PlacementRackGrid(
+                    rack = rack,
+                    selectedCell = if (browse == placeRack) placeCell else null,
+                    onPick = { ci ->
                         val label = "${rowLabel(ci / rack.cols)}${ci % rack.cols + 1}"
-                        val sel = browse == placeRack && ci == placeCell
-                        Box(
-                            Modifier.clip(RoundedCornerShape(9.dp))
-                                .background(if (sel) VincentColors.Accent else VincentColors.AccentSoft)
-                                .clickable { onPick(browse, ci, label); open = false }
-                                .padding(horizontal = 12.dp, vertical = 9.dp),
-                        ) { Text(label, style = MonoNumber, color = if (sel) Color.White else VincentColors.Accent) }
-                    }
-                }
+                        onPick(browse, ci, label)
+                        open = false
+                    },
+                )
             }
         }
     }
+}
+
+/** Visual rack grid for manual placement — tap an empty cell to select it. */
+@Composable
+private fun PlacementRackGrid(
+    rack: Rack,
+    selectedCell: Int?,
+    onPick: (Int) -> Unit,
+) {
+    VCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        rowLabel(rowIndex),
+                        fontSize = 10.sp,
+                        color = VincentColors.Faint,
+                        modifier = Modifier.width(14.dp),
+                    )
+                    val shiftRight = rack.staggered && rowIndex % 2 == 1
+                    if (shiftRight) Spacer(Modifier.weight(0.5f))
+                    rowCells.forEachIndexed { colIndex, cell ->
+                        val gi = rowIndex * rack.cols + colIndex
+                        PlacementGridCell(
+                            cell = cell,
+                            selected = gi == selectedCell,
+                            onClick = { if (!cell.occupied) onPick(gi) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (rack.staggered && !shiftRight) Spacer(Modifier.weight(0.5f))
+                }
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "Touchez une case libre",
+                fontSize = 11.sp,
+                color = VincentColors.Muted,
+                fontWeight = FontWeight.W500,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlacementGridCell(
+    cell: RackCell,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!cell.occupied) {
+        Box(
+            modifier
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(7.dp))
+                .background(if (selected) VincentColors.AccentSoft else VincentColors.Surface2)
+                .border(
+                    1.dp,
+                    if (selected) VincentColors.Accent else VincentColors.Border,
+                    RoundedCornerShape(7.dp),
+                )
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = "Sélectionner",
+                tint = if (selected) VincentColors.Accent else VincentColors.Faint,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        return
+    }
+    val wineBorder = cell.color?.glass ?: VincentColors.Border
+    val tint = lerp(Color.White, cell.color?.glass ?: VincentColors.Accent, 0.22f)
+    Box(
+        modifier
+            .aspectRatio(1f)
+            .alpha(0.45f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(tint)
+            .border(3.dp, wineBorder, RoundedCornerShape(8.dp)),
+    )
 }
 
 @Composable
