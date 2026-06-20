@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocalBar
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Button
@@ -39,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -49,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.ai.foodPairer
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
@@ -83,6 +86,8 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
     }
     var suggested by remember { mutableStateOf<List<String>>(emptyList()) }
     var pairingBusy by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+    val compareLinks = remember(live.domain, live.vintage, live.appellation) { bottlePriceCompareLinks(live) }
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         // Top actions
         Row(
@@ -140,6 +145,37 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
                 Stat("Quantité", "×$qty", Modifier.weight(1f))
                 Stat("Valeur", "${live.price * qty} €", Modifier.weight(1f))
                 Stat("Casier", live.cellarSpot, Modifier.weight(1f))
+            }
+
+            if (compareLinks.isNotEmpty()) {
+                Section("Comparer les prix") {
+                    Text(
+                        "Consultez les offres sur le web — Vincent ne collecte ni ne stocke ces prix.",
+                        fontSize = 11.sp,
+                        color = VincentColors.Muted,
+                        lineHeight = 15.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    compareLinks.chunked(3).forEachIndexed { index, row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = if (index == 0) 8.dp else 7.dp),
+                        ) {
+                            row.forEach { link ->
+                                OutlinedButton(
+                                    onClick = { uriHandler.openUri(link.url) },
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    shape = RoundedCornerShape(11.dp),
+                                ) {
+                                    Text(link.label, fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                                    Spacer(Modifier.width(3.dp))
+                                    Icon(Icons.Filled.OpenInNew, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
             }
 
             // Pairings — Gemini can suggest more on demand.
