@@ -3,6 +3,11 @@ package fr.geoking.vincent.model
 /** Row label from a 0-based index: 0 → A, 1 → B … */
 fun rowLabel(rowIndex: Int): String = ('A' + rowIndex).toString()
 
+/** A chosen empty cell in a rack (used when adding from the cellar grid). */
+data class RackPlacement(val rackIndex: Int, val cellIndex: Int) {
+    fun spotLabel(cols: Int): String = "${rowLabel(cellIndex / cols)}${cellIndex % cols + 1}"
+}
+
 /** A named rack: a [cols]×[rows] grid of [RackCell], optionally staggered (quinconce). */
 data class Rack(
     val name: String,

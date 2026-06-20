@@ -62,6 +62,7 @@ import fr.geoking.vincent.data.barcodeLookup
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackCell
+import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.model.rowLabel
@@ -74,9 +75,9 @@ import fr.geoking.vincent.ui.WineBottle
 private enum class AddMode(val label: String) { IDENTIFY("Identifier"), VOICE("Voix"), MANUAL("Manuel") }
 
 @Composable
-fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
+fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
     // Opened from an empty rack cell → start on the manual form with the spot pre-filled.
-    var mode by remember { mutableStateOf(if (initialSpot != null) AddMode.MANUAL else AddMode.IDENTIFY) }
+    var mode by remember { mutableStateOf(if (initialPlacement != null) AddMode.MANUAL else AddMode.IDENTIFY) }
     val recognizer = wineRecognizer()
     val estimator = priceEstimator()
     val scope = rememberCoroutineScope()
@@ -86,7 +87,16 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
     var manualBottle by remember { mutableStateOf<Bottle?>(null) }
     // Optional placement chosen in the manual wizard: (rackIndex, cellIndex).
     var manualPlacement by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var manualSeed by remember { mutableStateOf(initialSpot?.let { ManualSeed(spot = it) }) }
+    var manualSeed by remember {
+        mutableStateOf(initialPlacement?.let { p ->
+            val rack = Racks.all.getOrNull(p.rackIndex)
+            ManualSeed(
+                spot = rack?.let { p.spotLabel(it.cols) }.orEmpty(),
+                placeRack = p.rackIndex,
+                placeCell = p.cellIndex,
+            )
+        })
+    }
     var scanMsg by remember { mutableStateOf<String?>(null) }
     var aiError by remember { mutableStateOf<String?>(null) }
     // Barcode → Open Food Facts lookup → prefill the manual form (vintage/price stay
@@ -283,6 +293,8 @@ private data class ManualSeed(
     val vintage: String = "",
     val price: String = "",
     val spot: String = "",
+    val placeRack: Int? = null,
+    val placeCell: Int? = null,
 )
 
 /** Manual entry — search cellar + form; emits a Bottle (or null while the name is empty). */
@@ -295,10 +307,10 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     var vintage by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("1") }
-    var spot by remember { mutableStateOf("") }
+    var spot by remember(seed) { mutableStateOf(seed?.spot.orEmpty()) }
     // Placement chosen via the wizard (rack, empty cell). Null = not placed.
-    var placeRack by remember { mutableStateOf<Int?>(null) }
-    var placeCell by remember { mutableStateOf<Int?>(null) }
+    var placeRack by remember(seed) { mutableStateOf(seed?.placeRack) }
+    var placeCell by remember(seed) { mutableStateOf(seed?.placeCell) }
     var searchQuery by remember { mutableStateOf("") }
     var debouncedQuery by remember { mutableStateOf("") }
 
@@ -328,6 +340,10 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
             domain = it.domain; appellation = it.appellation; color = it.color; category = it.category
             vintage = it.vintage; price = it.price
             if (it.spot.isNotBlank()) spot = it.spot
+            if (it.placeRack != null && it.placeCell != null) {
+                placeRack = it.placeRack
+                placeCell = it.placeCell
+            }
         }
     }
 
@@ -414,6 +430,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         PlacementSection(
             placeRack = placeRack,
             placeCell = placeCell,
+            initialOpen = placeRack != null && placeCell != null,
             onClear = { placeRack = null; placeCell = null; spot = "" },
             onPick = { ri, ci, label -> placeRack = ri; placeCell = ci; spot = label },
         )
@@ -426,11 +443,12 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
 private fun PlacementSection(
     placeRack: Int?,
     placeCell: Int?,
+    initialOpen: Boolean = false,
     onClear: () -> Unit,
     onPick: (Int, Int, String) -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
-    var browse by remember { mutableStateOf(placeRack ?: 0) }
+    var open by remember { mutableStateOf(initialOpen) }
+    var browse by remember(placeRack) { mutableStateOf(placeRack ?: 0) }
     val placed = placeRack != null && placeCell != null
     val placedLabel = if (placed) {
         val r = Racks.all.getOrNull(placeRack!!)

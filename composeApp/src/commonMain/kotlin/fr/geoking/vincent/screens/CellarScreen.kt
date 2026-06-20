@@ -54,6 +54,7 @@ import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.Rack
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.RackMode
+import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.model.emptyRack
 import fr.geoking.vincent.model.rowLabel
@@ -118,7 +119,7 @@ private fun interiorBase(cell: RackCell, mode: RackMode): Color = when (mode) {
 fun CellarScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (Bottle) -> Unit,
-    onAddToCell: (String) -> Unit = {},
+    onAddToCell: (RackPlacement) -> Unit = {},
 ) {
     var rackIdx by remember { mutableIntStateOf(0) }
     val rack = Racks.all[rackIdx.coerceIn(0, Racks.all.lastIndex)]
@@ -135,7 +136,6 @@ fun CellarScreen(
     // Index of the bottle being moved (null when not in move mode).
     var moving by remember(rackIdx) { mutableStateOf<Int?>(null) }
 
-    fun spotOf(i: Int) = "${rowLabel(i / rack.cols)}${i % rack.cols + 1}"
     val onCellTap: (Int) -> Unit = { i ->
         val c = rack.cells.getOrNull(i)
         val mv = moving
@@ -148,7 +148,10 @@ fun CellarScreen(
                 moving = null
             }
             c != null && c.occupied -> selectedIdx = i
-            else -> onAddToCell(spotOf(i))
+            else -> {
+                selectedIdx = i
+                onAddToCell(RackPlacement(rackIdx, i))
+            }
         }
     }
 
@@ -175,7 +178,8 @@ fun CellarScreen(
                 RackGrid(rack, mode, filter, selectedIdx, moving, onCellTap)
                 Spacer(Modifier.height(11.dp))
                 PeekCard(
-                    rack, selectedIdx, moving == selectedIdx, onOpenBottle,
+                    rack, rackIdx, selectedIdx, moving == selectedIdx, onOpenBottle,
+                    onAddBottle = { onAddToCell(RackPlacement(rackIdx, selectedIdx)) },
                     onMove = { moving = if (moving == selectedIdx) null else selectedIdx },
                     onConsume = {
                         Racks.update(rackIdx, rack.replaceCell(selectedIdx, RackCell(rowLabel(selectedIdx / rack.cols), false)))
@@ -450,17 +454,23 @@ private fun Cell(
 @Composable
 private fun PeekCard(
     rack: Rack,
+    rackIdx: Int,
     selectedIdx: Int,
     moving: Boolean,
     onOpenBottle: (Bottle) -> Unit,
+    onAddBottle: () -> Unit,
     onMove: () -> Unit,
     onConsume: () -> Unit,
 ) {
     val cell = rack.cells.getOrNull(selectedIdx)
     if (cell == null || !cell.occupied) {
+        val spot = RackPlacement(rackIdx, selectedIdx).spotLabel(rack.cols)
         VCard(Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(14.dp)) {
-                Text("Touchez une case occupée pour la sélectionner", fontSize = 12.5.sp, color = VincentColors.Muted)
+            Column(Modifier.padding(12.dp)) {
+                Text("Emplacement $spot", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                Text("Case libre — ajoutez une bouteille ici.", fontSize = 11.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp))
+                Spacer(Modifier.height(11.dp))
+                PeekAction("Ajouter bouteille", Icons.Filled.Add, onAddBottle, Modifier.fillMaxWidth())
             }
         }
         return

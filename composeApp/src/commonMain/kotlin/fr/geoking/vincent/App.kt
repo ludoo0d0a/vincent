@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.screens.AccountScreen
 import fr.geoking.vincent.screens.AddScreen
 import fr.geoking.vincent.screens.BottleDetailScreen
@@ -54,8 +55,8 @@ enum class Tab(val label: String, val icon: ImageVector) {
 /** A screen pushed above the tabbed home. Back pops the top of the stack. */
 private sealed interface Dest {
     data class Detail(val bottle: Bottle) : Dest
-    /** [spot] pre-fills the rack location when adding from an empty cell. */
-    data class Add(val spot: String? = null) : Dest
+    /** [placement] pre-fills the rack cell when adding from the cellar grid. */
+    data class Add(val placement: RackPlacement? = null) : Dest
     data object Account : Dest
     data object Recent : Dest
     data object Transfer : Dest
@@ -94,7 +95,7 @@ fun App() = VincentTheme {
                     onBack = ::pop,
                 )
 
-                is Dest.Add -> AddScreen(onClose = ::pop, initialSpot = top.spot)
+                is Dest.Add -> AddScreen(onClose = ::pop, initialPlacement = top.placement)
 
                 Dest.Account -> AccountScreen(
                     onBack = ::pop,
@@ -121,7 +122,7 @@ private fun MainScaffold(
     onTab: (Tab) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
     onAdd: () -> Unit,
-    onAddToCell: (String) -> Unit,
+    onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
 ) {
     Scaffold(
