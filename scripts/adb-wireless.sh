@@ -20,12 +20,15 @@ adb_wireless_save_target() {
 }
 
 adb_wireless_resolve_target() {
-  local hint="${1:-}"
+  local hint="${1:-}" saved=""
   if [ -n "$hint" ] && adb_wireless_looks_like_target "$hint"; then
     printf '%s' "$hint"
     return 0
   fi
-  adb_wireless_read_config
+  if saved="$(adb_wireless_read_config)"; then
+    [ -n "$saved" ] && printf '%s' "$saved"
+  fi
+  return 0
 }
 
 adb_wireless_is_connected() {

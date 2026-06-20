@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Vincent — build an APK and install it on a connected device or emulator.
+# Vincent — build an APK, wait for a device, then install.
 #
 # Usage:
 #   ./scripts/deploy-device.sh              # prompts: debug/release, launch y/n
@@ -21,10 +21,33 @@ die(){ printf '%s✗ %s%s\n' "$c_err" "$*" "$c_off" >&2; exit 1; }
 ok(){  printf '%s✓ %s%s\n' "$c_ok" "$*" "$c_off"; }
 warn(){ printf '%s⚠ %s%s\n' "$c_err" "$*" "$c_off" >&2; }
 
+cleanup() {
+  type adb_wireless_stop_background >/dev/null 2>&1 && adb_wireless_stop_background || true
+}
+
+on_interrupt() {
+  echo
+  printf '%sInterrompu.%s\n' "$c_dim" "$c_off" >&2
+  cleanup
+  exit 130
+}
+
+trap cleanup EXIT
+trap on_interrupt INT TERM
+
+read_interactive() {
+  local __var="$1"
+  if ( : </dev/tty ) 2>/dev/null; then
+    IFS= read -r "$__var" </dev/tty || return $?
+  else
+    IFS= read -r "$__var" || return $?
+  fi
+}
+
 prompt_default() {
   local prompt="$1" default="$2" reply
-  printf '%s [%s]: ' "$prompt" "$default"
-  read -r reply
+  printf '%s [%s]: ' "$prompt" "$default" >&2
+  read_interactive reply
   printf '%s' "${reply:-$default}"
 }
 
@@ -50,6 +73,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ -z "$BUILD_TYPE" ] || [ "$LAUNCH" -lt 0 ]; then
+  echo >&2
+  echo "${c_bold}Configuration du déploiement${c_off}" >&2
+fi
+
 if [ -z "$BUILD_TYPE" ]; then
   reply="$(prompt_default "Type de build (debug/release)" "debug")"
   reply="$(tolower "$reply")"
@@ -68,97 +96,6 @@ if [ "$LAUNCH" -lt 0 ]; then
     n|no|non) LAUNCH=0 ;;
     *) die "Réponse invalide : $reply (y ou n)" ;;
   esac
-fi
-
-# ---- adb -------------------------------------------------------------------
-ADB="$(command -v adb 2>/dev/null || true)"
-[ -n "$ADB" ] || die "adb introuvable. Installe Android SDK platform-tools ou ouvre Android Studio."
-
-# shellcheck source=adb-wireless.sh
-source "$ROOT/scripts/adb-wireless.sh"
-
-WIRELESS_TARGET="$(adb_wireless_resolve_target "$DEVICE")"
-if [ -n "$WIRELESS_TARGET" ]; then
-  if [ -n "$DEVICE" ] && adb_wireless_looks_like_target "$DEVICE"; then
-    adb_wireless_save_target "$WIRELESS_TARGET"
-  fi
-  adb_wireless_ensure_connected "$WIRELESS_TARGET" || true
-fi
-
-cleanup() {
-  adb_wireless_stop_background
-}
-trap cleanup EXIT INT TERM
-
-list_devices() {
-  DEVICES=()
-  while IFS= read -r d; do
-    [ -n "$d" ] && DEVICES+=("$d")
-  done < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
-}
-
-try_wireless_reconnect() {
-  [ -n "$WIRELESS_TARGET" ] || return 1
-  adb_wireless_is_connected "$WIRELESS_TARGET" && return 0
-  adb_wireless_ensure_connected "$WIRELESS_TARGET" || return 1
-  sleep 2
-}
-
-wait_for_device() {
-  while true; do
-    try_wireless_reconnect || true
-    list_devices
-    if [ "${#DEVICES[@]}" -eq 0 ]; then
-      if [ -n "$WIRELESS_TARGET" ]; then
-        sleep 3
-        continue
-      fi
-      warn "Aucun appareil connecté."
-      echo "Branche un téléphone (USB debugging) ou lance un émulateur, puis appuie sur Entrée."
-      read -r
-      continue
-    fi
-    if [ -n "$DEVICE" ]; then
-      for d in "${DEVICES[@]}"; do
-        [ "$d" = "$DEVICE" ] && return 0
-      done
-      if [ -n "$WIRELESS_TARGET" ] && [ "$DEVICE" = "$WIRELESS_TARGET" ]; then
-        sleep 3
-        continue
-      fi
-      warn "Appareil $DEVICE introuvable."
-      echo "Appareils visibles : ${DEVICES[*]}"
-      if [ -n "$WIRELESS_TARGET" ]; then
-        sleep 3
-        continue
-      fi
-      echo "Connecte l'appareil, puis appuie sur Entrée."
-      read -r
-      continue
-    fi
-    if [ -n "$WIRELESS_TARGET" ]; then
-      for d in "${DEVICES[@]}"; do
-        if [ "$d" = "$WIRELESS_TARGET" ]; then
-          DEVICE="$d"
-          return 0
-        fi
-      done
-    fi
-    if [ "${#DEVICES[@]}" -gt 1 ]; then
-      die "Plusieurs appareils (${DEVICES[*]}). Passe -s SERIAL."
-    fi
-    DEVICE="${DEVICES[0]}"
-    return 0
-  done
-}
-
-wait_for_device
-export ANDROID_SERIAL="$DEVICE"
-ok "Appareil : $DEVICE"
-
-if [ -n "$WIRELESS_TARGET" ]; then
-  adb_wireless_start_background "$WIRELESS_TARGET"
-  ok "Reconnexion sans fil active pendant le déploiement ($WIRELESS_TARGET)"
 fi
 
 # ---- JDK 17 ----------------------------------------------------------------
@@ -187,18 +124,115 @@ else
 fi
 ok "Gradle : ${GRADLE[*]}"
 
-# ---- build + install -------------------------------------------------------
-GRADLE_TASK=":composeApp:installDebug"
+# ---- build -----------------------------------------------------------------
+GRADLE_TASK=":composeApp:assembleDebug"
 APK="$ROOT/composeApp/build/outputs/apk/debug/composeApp-debug.apk"
 if [ "$BUILD_TYPE" = "release" ]; then
-  GRADLE_TASK=":composeApp:installRelease"
+  GRADLE_TASK=":composeApp:assembleRelease"
   APK="$ROOT/composeApp/build/outputs/apk/release/composeApp-release.apk"
 fi
 
 echo
-echo "${c_dim}→ build et installation ${BUILD_TYPE} sur ${DEVICE}…${c_off}"
+echo "${c_dim}→ build ${BUILD_TYPE}…${c_off}"
 "${GRADLE[@]}" "$GRADLE_TASK" --no-daemon --stacktrace
-[ -f "$APK" ] && ok "APK : $APK"
+[ -f "$APK" ] || die "APK introuvable : $APK"
+ok "APK : $APK"
+
+# ---- adb + install ---------------------------------------------------------
+ADB="$(command -v adb 2>/dev/null || true)"
+[ -n "$ADB" ] || die "adb introuvable. Installe Android SDK platform-tools ou ouvre Android Studio."
+
+# shellcheck source=adb-wireless.sh
+source "$ROOT/scripts/adb-wireless.sh"
+
+WIRELESS_TARGET="$(adb_wireless_resolve_target "$DEVICE")"
+if [ -n "$WIRELESS_TARGET" ]; then
+  if [ -n "$DEVICE" ] && adb_wireless_looks_like_target "$DEVICE"; then
+    adb_wireless_save_target "$WIRELESS_TARGET"
+  fi
+  adb_wireless_ensure_connected "$WIRELESS_TARGET" || true
+fi
+
+list_devices() {
+  DEVICES=()
+  while IFS= read -r d; do
+    [ -n "$d" ] && DEVICES+=("$d")
+  done < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
+}
+
+try_wireless_reconnect() {
+  [ -n "$WIRELESS_TARGET" ] || return 1
+  adb_wireless_is_connected "$WIRELESS_TARGET" && return 0
+  adb_wireless_ensure_connected "$WIRELESS_TARGET" || return 1
+  sleep 2
+}
+
+wait_for_device() {
+  echo
+  echo "${c_dim}→ en attente d'un appareil pour l'installation…${c_off}"
+  while true; do
+    try_wireless_reconnect || true
+    list_devices
+    if [ "${#DEVICES[@]}" -eq 0 ]; then
+      if [ -n "$WIRELESS_TARGET" ]; then
+        sleep 3
+        continue
+      fi
+      warn "Aucun appareil connecté."
+      echo "Branche un téléphone (USB debugging) ou lance un émulateur, puis appuie sur Entrée."
+      echo "ou Ctrl+C pour quitter."
+      read_interactive _
+      continue
+    fi
+    if [ -n "$DEVICE" ]; then
+      for d in "${DEVICES[@]}"; do
+        [ "$d" = "$DEVICE" ] && return 0
+      done
+      if [ -n "$WIRELESS_TARGET" ] && [ "$DEVICE" = "$WIRELESS_TARGET" ]; then
+        sleep 3
+        continue
+      fi
+      warn "Appareil $DEVICE introuvable."
+      echo "Appareils visibles : ${DEVICES[*]}"
+      if [ -n "$WIRELESS_TARGET" ]; then
+        sleep 3
+        continue
+      fi
+      echo "Connecte l'appareil, puis appuie sur Entrée."
+      echo "ou Ctrl+C pour quitter."
+      read_interactive _
+      continue
+    fi
+    if [ -n "$WIRELESS_TARGET" ]; then
+      for d in "${DEVICES[@]}"; do
+        if [ "$d" = "$WIRELESS_TARGET" ]; then
+          DEVICE="$d"
+          return 0
+        fi
+      done
+    fi
+    if [ "${#DEVICES[@]}" -gt 1 ]; then
+      die "Plusieurs appareils (${DEVICES[*]}). Passe -s SERIAL."
+    fi
+    DEVICE="${DEVICES[0]}"
+    return 0
+  done
+}
+
+wait_for_device
+export ANDROID_SERIAL="$DEVICE"
+ok "Appareil : $DEVICE"
+
+if [ -n "$WIRELESS_TARGET" ]; then
+  adb_wireless_start_background "$WIRELESS_TARGET"
+  ok "Reconnexion sans fil active pendant l'installation ($WIRELESS_TARGET)"
+fi
+
+echo
+echo "${c_dim}→ installation ${BUILD_TYPE} sur ${DEVICE}…${c_off}"
+adb_wireless_ensure_connected "$DEVICE" || true
+"$ADB" -s "$DEVICE" install -r "$APK" >/dev/null
+ok "APK installé sur ${DEVICE}"
 
 if [ "$LAUNCH" -eq 1 ]; then
   echo
