@@ -5,10 +5,13 @@ import fr.geoking.vincent.model.Bottle
 /** An estimated market price (always shown as an estimate, with its source/date). */
 data class PriceEstimate(val amountEur: Int, val source: String, val asOf: String)
 
+/** Outcome of an AI recognition attempt — bottle and/or a user-visible error. */
+data class RecognizeOutcome(val bottle: Bottle? = null, val error: String? = null)
+
 /** Resolves a noisy title or a label photo into a structured [Bottle]. */
 interface WineRecognizer {
-    suspend fun fromText(title: String): Bottle?
-    suspend fun fromImage(jpeg: ByteArray): Bottle?
+    suspend fun fromText(title: String): RecognizeOutcome
+    suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome
 }
 
 /** Estimates a bottle's current market price. */

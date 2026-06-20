@@ -45,6 +45,7 @@ import fr.geoking.vincent.ai.rememberBarcodeScanner
 import fr.geoking.vincent.ai.rememberDictation
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.ai.wineRecognizer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,11 +57,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.barcodeLookup
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ColorTag
@@ -80,8 +84,11 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
     var aiPrice by remember { mutableStateOf<PriceEstimate?>(null) }
     var busy by remember { mutableStateOf(false) }
     var manualBottle by remember { mutableStateOf<Bottle?>(null) }
+    // Optional placement chosen in the manual wizard: (rackIndex, cellIndex).
+    var manualPlacement by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var manualSeed by remember { mutableStateOf(initialSpot?.let { ManualSeed(spot = it) }) }
     var scanMsg by remember { mutableStateOf<String?>(null) }
+    var aiError by remember { mutableStateOf<String?>(null) }
     // Barcode → Open Food Facts lookup → prefill the manual form (vintage/price stay
     // for the user to complete, since EANs rarely encode them).
     val lookup = remember { barcodeLookup() }
@@ -92,7 +99,7 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
                 val info = lookup.byBarcode(code)
                 busy = false
                 manualSeed = if (info != null) {
-                    scanMsg = null
+                    scanMsg = "Prérempli depuis Open Food Facts — complétez millésime et prix."
                     ManualSeed(
                         domain = info.brand.ifBlank { info.name },
                         appellation = if (info.brand.isNotBlank()) info.name else "",
@@ -109,9 +116,12 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
     // the vision model read it → Gemini fromImage. No hardcoded recognition result.
     val startCapture = rememberPhotoCapture { bytes ->
         busy = true
+        aiError = null
         scope.launch {
-            aiBottle = recognizer.fromImage(bytes)
+            val outcome = recognizer.fromImage(bytes)
+            aiBottle = outcome.bottle
             aiPrice = aiBottle?.let { estimator.estimate(it) }
+            aiError = outcome.error
             busy = false
         }
     }
@@ -127,10 +137,27 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
             listening = l
             if (!l && transcript.isNotBlank()) {
                 busy = true
+                aiError = null
                 scope.launch {
-                    aiBottle = recognizer.fromText(transcript)
-                    aiPrice = aiBottle?.let { estimator.estimate(it) }
+                    val outcome = recognizer.fromText(transcript)
+                    val b = outcome.bottle
+                    aiBottle = b
+                    aiError = outcome.error
                     busy = false
+                    // Land on the editable review form, pre-filled from the dictation.
+                    if (b != null) {
+                        val est = estimator.estimate(b)
+                        aiPrice = est
+                        manualSeed = ManualSeed(
+                            domain = b.domain,
+                            appellation = b.appellation,
+                            color = b.color,
+                            category = b.category,
+                            vintage = if (b.vintage == "NM") "" else b.vintage,
+                            price = (est?.amountEur ?: b.price.takeIf { it > 0 })?.toString() ?: "",
+                        )
+                        mode = AddMode.MANUAL
+                    }
                 }
             }
         },
@@ -160,7 +187,10 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
                 val on = m == mode
                 Box(
                     Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (on) VincentColors.Surface else Color.Transparent)
-                        .clickable { mode = m }.padding(vertical = 8.dp),
+                        .clickable {
+                            mode = m
+                            if (m != AddMode.IDENTIFY && m != AddMode.VOICE) aiError = null
+                        }.padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) { Text(m.label, fontSize = 12.sp, fontWeight = FontWeight.W700, color = if (on) VincentColors.Accent else VincentColors.Muted) }
             }
@@ -184,6 +214,7 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     busy = busy,
                     hasResult = aiBottle != null,
+                    errorMsg = aiError,
                     onIdentify = identify,
                     onScanBarcode = scanBarcode,
                 )
@@ -193,9 +224,14 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
                     level = level,
                     parsed = aiBottle,
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
+                    errorMsg = aiError,
+                    busy = busy,
                     onMic = startDictation,
                 )
-                AddMode.MANUAL -> ManualPane(seed = manualSeed, onBottle = { manualBottle = it })
+                AddMode.MANUAL -> ManualPane(
+                    seed = manualSeed,
+                    onBottle = { b, place -> manualBottle = b; manualPlacement = place },
+                )
             }
         }
 
@@ -203,9 +239,27 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
         // or a manually filled form. No more hardcoded fallback.
         val ready: Bottle? = if (mode == AddMode.MANUAL) manualBottle
             else aiBottle?.let { it.copy(price = aiPrice?.amountEur ?: it.price) }
+        val buttonLabel = when {
+            ready != null -> if (mode == AddMode.MANUAL) "Ajouter à la cave" else "Confirmer l'ajout"
+            busy -> "Analyse en cours…"
+            mode == AddMode.IDENTIFY -> "Photo ou code-barres requis"
+            mode == AddMode.VOICE -> "Dictez une bouteille"
+            else -> "Confirmer l'ajout"
+        }
         Button(
-            onClick = { ready?.let { Cellar.addBottle(it); onClose() } },
-            enabled = ready != null,
+            onClick = {
+                ready?.let { b ->
+                    Cellar.addBottle(b)
+                    // Place into the chosen empty rack cell, if any.
+                    if (mode == AddMode.MANUAL) manualPlacement?.let { (ri, ci) ->
+                        Racks.all.getOrNull(ri)?.let { r ->
+                            Racks.update(ri, r.replaceCell(ci, RackCell(rowLabel(ci / r.cols), true, b.color, b.category, b.vintage, b.price)))
+                        }
+                    }
+                    onClose()
+                }
+            },
+            enabled = ready != null && !busy,
             modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(
@@ -215,24 +269,23 @@ fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
                 disabledContentColor = VincentColors.Faint,
             ),
         ) {
-            Text(
-                if (mode == AddMode.MANUAL) "Ajouter à la cave" else "Confirmer l'ajout",
-                fontWeight = FontWeight.W700,
-            )
+            Text(buttonLabel, fontWeight = FontWeight.W700)
         }
     }
 }
 
-/** Values pushed into the manual form, e.g. from a barcode lookup. */
+/** Values pushed into the manual form, e.g. from a barcode lookup or cellar suggestion. */
 private data class ManualSeed(
     val domain: String = "",
     val appellation: String = "",
     val color: WineColor = WineColor.RED,
     val category: WineCategory = WineCategory.BORDEAUX,
+    val vintage: String = "",
+    val price: String = "",
     val spot: String = "",
 )
 
-/** Manual entry — a real form; emits a Bottle (or null while the name is empty). */
+/** Manual entry — search cellar + form; emits a Bottle (or null while the name is empty). */
 @Composable
 private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
     var domain by remember { mutableStateOf("") }
@@ -243,11 +296,34 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
     var price by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("1") }
     var spot by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var debouncedQuery by remember { mutableStateOf("") }
 
-    // Apply a prefill (barcode lookup, or an empty-cell tap that sets the rack spot).
+    LaunchedEffect(searchQuery) {
+        delay(300)
+        debouncedQuery = searchQuery
+    }
+
+    // Reading bottles.size keeps suggestions in sync when the cellar changes.
+    val cellarSize = Cellar.bottles.size
+    val suggestions = remember(debouncedQuery, cellarSize) { Cellar.search(debouncedQuery) }
+
+    fun applyFromCellar(b: Bottle) {
+        domain = b.domain
+        appellation = b.appellation
+        color = b.color
+        category = b.category
+        vintage = if (b.vintage == "NM") "" else b.vintage
+        price = if (b.price > 0) b.price.toString() else ""
+        searchQuery = ""
+        debouncedQuery = ""
+    }
+
+    // Apply a prefill (barcode lookup, cellar suggestion, or an empty-cell tap).
     LaunchedEffect(seed) {
         seed?.let {
             domain = it.domain; appellation = it.appellation; color = it.color; category = it.category
+            vintage = it.vintage; price = it.price
             if (it.spot.isNotBlank()) spot = it.spot
         }
     }
@@ -280,6 +356,47 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        Text(
+            "Rechercher dans la cave",
+            fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
+            modifier = Modifier.padding(start = 2.dp),
+        )
+        SearchField(
+            placeholder = "Domaine, appellation…",
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+        )
+        if (debouncedQuery.length >= 2) {
+            if (suggestions.isEmpty()) {
+                Text(
+                    "Aucune bouteille en cave — saisissez un nouveau vin ci-dessous.",
+                    fontSize = 11.5.sp, color = VincentColors.Muted,
+                    modifier = Modifier.padding(start = 2.dp),
+                )
+            } else {
+                suggestions.forEach { b ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(VincentColors.Surface)
+                            .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
+                            .clickable { applyFromCellar(b) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        WineBottle(b.color, Modifier.size(width = 16.dp, height = 32.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(b.domain, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                            Text("${b.appellation} · ${b.vintage}", fontSize = 11.sp, color = VincentColors.Muted)
+                        }
+                        Text("Réutiliser", fontSize = 10.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                    }
+                }
+            }
+        }
+
         Field("Domaine / nom", domain) { domain = it }
         Field("Appellation", appellation) { appellation = it }
         ChipRow("Couleur", WineColor.entries, color, { it.label }) { color = it }
@@ -358,6 +475,7 @@ private fun ScanPane(
     priceLabel: String?,
     busy: Boolean,
     hasResult: Boolean,
+    errorMsg: String? = null,
     onIdentify: () -> Unit,
     onScanBarcode: (() -> Unit)? = null,
 ) {
@@ -419,11 +537,19 @@ private fun ScanPane(
                 }
             }
         } else if (!busy) {
-            Text(
-                "Choisissez une méthode d'identification ci-dessous.",
-                fontSize = 12.5.sp, color = VincentColors.Muted,
-                modifier = Modifier.padding(vertical = 14.dp),
-            )
+            if (errorMsg != null) {
+                Text(
+                    errorMsg,
+                    fontSize = 12.5.sp, color = VincentColors.Red, lineHeight = 17.sp,
+                    modifier = Modifier.padding(vertical = 14.dp),
+                )
+            } else {
+                Text(
+                    "Choisissez une méthode d'identification ci-dessous.",
+                    fontSize = 12.5.sp, color = VincentColors.Muted,
+                    modifier = Modifier.padding(vertical = 14.dp),
+                )
+            }
         }
 
         // Two clearly-separated actions: barcode (secondary) vs label→AI (primary).
@@ -462,6 +588,8 @@ private fun VoicePane(
     level: Float,
     parsed: Bottle?,
     priceLabel: String?,
+    errorMsg: String? = null,
+    busy: Boolean = false,
     onMic: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -501,6 +629,15 @@ private fun VoicePane(
         ) { Icon(Icons.Filled.Mic, contentDescription = "Parler", tint = if (listening) Color.White else VincentColors.Accent, modifier = Modifier.size(28.dp)) }
 
         Spacer(Modifier.height(14.dp))
+        if (busy) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(color = VincentColors.Accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Analyse de la dictée…", fontSize = 12.sp, color = VincentColors.Muted)
+            }
+        } else if (errorMsg != null && parsed == null) {
+            Text(errorMsg, fontSize = 12.sp, color = VincentColors.Red, lineHeight = 17.sp, modifier = Modifier.fillMaxWidth())
+        }
         if (parsed != null) {
             ParsedField("Domaine", parsed.domain)
             ParsedField("Millésime", parsed.vintage, mono = true)

@@ -33,23 +33,27 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         (0 until arr.length()).mapNotNull { i -> arr.optString(i).trim().takeIf { it.isNotEmpty() } }
     }
 
-    override suspend fun fromText(title: String): Bottle? = withContext(Dispatchers.IO) {
+    override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
         val json = generate(
             "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category}. " +
                 "color parmi rouge/blanc/rosé/pétillant. Titre: \"$title\"",
             imageB64 = null,
-        )
-        json?.let { toBottle(it, "ia-${title.hashCode()}") }
+        ) ?: return@withContext RecognizeOutcome(error = lastError)
+        val bottle = toBottle(json, "ia-${title.hashCode()}")
+        if (bottle == null) RecognizeOutcome(error = "Impossible d'extraire les infos du texte.")
+        else RecognizeOutcome(bottle = bottle)
     }
 
-    override suspend fun fromImage(jpeg: ByteArray): Bottle? = withContext(Dispatchers.IO) {
+    override suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome = withContext(Dispatchers.IO) {
         val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
         val json = generate(
             "Lis l'étiquette de cette bouteille et renvoie JSON " +
                 "{domain, appellation, color, region, vintage, category}.",
             imageB64 = b64,
-        )
-        json?.let { toBottle(it, "ia-img-${jpeg.size}") }
+        ) ?: return@withContext RecognizeOutcome(error = lastError)
+        val bottle = toBottle(json, "ia-img-${jpeg.size}")
+        if (bottle == null) RecognizeOutcome(error = "Aucun domaine détecté sur l'étiquette.")
+        else RecognizeOutcome(bottle = bottle)
     }
 
     override suspend fun estimate(bottle: Bottle): PriceEstimate? = withContext(Dispatchers.IO) {
@@ -64,10 +68,18 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         else PriceEstimate(price, json.optString("source", "estimation"), "estimation IA")
     }
 
+    private var lastError: String? = null
+
+    private fun fail(msg: String): JSONObject? {
+        lastError = msg
+        Log.e(TAG, msg)
+        return null
+    }
+
     private fun generate(prompt: String, imageB64: String?): JSONObject? {
+        lastError = null
         if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-            Log.e(TAG, "GEMINI_API_KEY is blank — set it in local.properties (AI Studio key).")
-            return null
+            return fail("Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.")
         }
         return try {
             val parts = JSONArray().put(JSONObject().put("text", prompt))
@@ -95,9 +107,13 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             val code = conn.responseCode
             if (code !in 200..299) {
                 val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                // 400 = bad request, 403 = key invalid / API not enabled, 429 = quota.
                 Log.e(TAG, "Gemini HTTP $code: ${err?.take(400)}")
-                return null
+                return when (code) {
+                    403 -> fail("Clé API invalide ou API non activée.")
+                    429 -> fail("Quota Gemini dépassé — réessayez plus tard.")
+                    in 400..499 -> fail("Requête refusée par l'IA ($code).")
+                    else -> fail("Identification impossible (erreur réseau $code).")
+                }
             }
             val resp = conn.inputStream.bufferedReader().use { it.readText() }
             val text = JSONObject(resp)
@@ -107,7 +123,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             JSONObject(text)
         } catch (e: Exception) {
             Log.e(TAG, "Gemini call failed: ${e.javaClass.simpleName}: ${e.message}", e)
-            null
+            fail("Identification impossible — réessayez ou passez en manuel.")
         }
     }
 

@@ -71,6 +71,21 @@ object Cellar {
     fun matching(color: WineColor?): List<Bottle> =
         if (color == null) bottles else bottles.filter { it.color == color }
 
+    /** Text search across domain, appellation and category — for add-form suggestions and lists. */
+    fun search(query: String, limit: Int = 8): List<Bottle> {
+        val q = query.trim().lowercase()
+        if (q.length < 2) return emptyList()
+        return bottles
+            .filter { b ->
+                b.domain.lowercase().contains(q) ||
+                    b.appellation.lowercase().contains(q) ||
+                    b.category.label.lowercase().contains(q) ||
+                    b.vintage.lowercase().contains(q)
+            }
+            .distinctBy { "${it.domain}|${it.appellation}|${it.vintage}" }
+            .take(limit)
+    }
+
     // --- mutations (update snapshot state immediately, persist asynchronously) ---
 
     fun addBottle(b: Bottle) {

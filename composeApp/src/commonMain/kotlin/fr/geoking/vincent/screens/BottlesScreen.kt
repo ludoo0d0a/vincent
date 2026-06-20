@@ -19,18 +19,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,15 +62,23 @@ fun BottlesScreen(
     onOpenBottle: (Bottle) -> Unit,
 ) {
     var selected by remember { mutableIntStateOf(0) }
+    var query by remember { mutableStateOf("") }
     val f = filters[selected]
     val list = Cellar.bottles.filter {
         (f.color == null || it.color == f.color) && (!f.favOnly || it.favorite)
+    }.filter { b ->
+        val q = query.trim().lowercase()
+        q.isBlank() ||
+            b.domain.lowercase().contains(q) ||
+            b.appellation.lowercase().contains(q) ||
+            b.category.label.lowercase().contains(q) ||
+            b.vintage.lowercase().contains(q)
     }
 
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-        ScreenHeader("Mes bouteilles", "${Cellar.totalBottles()} bouteilles · ${list.size} affichées")
+        ScreenHeader("Mes bouteilles", "${Cellar.totalBottles()} bouteilles · ${list.size} affichée${if (list.size > 1) "s" else ""}")
         Column(Modifier.padding(horizontal = 16.dp)) {
-            SearchField("Domaine, cépage, région…")
+            SearchField("Domaine, cépage, région…", value = query, onValueChange = { query = it })
             Spacer(Modifier.height(11.dp))
             FilterChips(selected) { selected = it }
             Spacer(Modifier.height(11.dp))
@@ -78,7 +90,11 @@ fun BottlesScreen(
                 Spacer(Modifier.height(11.dp))
             }
             if (list.isEmpty()) {
-                Text("Aucune bouteille pour ce filtre.", fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp))
+                Text(
+                    if (query.isNotBlank()) "Aucun résultat pour « $query »."
+                    else "Aucune bouteille pour ce filtre.",
+                    fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
+                )
             }
             Spacer(Modifier.height(70.dp))
         }
@@ -86,7 +102,11 @@ fun BottlesScreen(
 }
 
 @Composable
-fun SearchField(placeholder: String) {
+fun SearchField(
+    placeholder: String,
+    value: String = "",
+    onValueChange: (String) -> Unit = {},
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -98,7 +118,20 @@ fun SearchField(placeholder: String) {
     ) {
         Icon(Icons.Filled.Search, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(16.dp))
         Spacer(Modifier.size(9.dp))
-        Text(placeholder, color = VincentColors.Faint, fontSize = 13.sp)
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 13.sp, color = VincentColors.Fg),
+            cursorBrush = SolidColor(VincentColors.Accent),
+            modifier = Modifier.weight(1f),
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(placeholder, color = VincentColors.Faint, fontSize = 13.sp)
+                }
+                inner()
+            },
+        )
     }
 }
 
