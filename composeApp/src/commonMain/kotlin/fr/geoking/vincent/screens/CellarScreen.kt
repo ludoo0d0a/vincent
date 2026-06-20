@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -211,6 +212,12 @@ fun CellarScreen(
     }
 }
 
+/** Short tab label (cellar screen only): drop the redundant "Cave " prefix, truncate. */
+private fun shortRackLabel(name: String): String {
+    val base = name.trim().removePrefix("Cave ").trim().ifBlank { name.trim() }
+    return if (base.length > 12) base.take(11).trimEnd() + "…" else base
+}
+
 @Composable
 private fun CellarTabs(
     names: List<String>,
@@ -234,7 +241,12 @@ private fun CellarTabs(
                         .clickable { onSelect(i) }
                         .padding(horizontal = 12.dp, vertical = 7.dp),
                 ) {
-                    Text(t, fontSize = 12.sp, fontWeight = FontWeight.W600, color = if (on) Color.White else VincentColors.Muted)
+                    Text(
+                        shortRackLabel(t),
+                        fontSize = 12.sp, fontWeight = FontWeight.W600,
+                        color = if (on) Color.White else VincentColors.Muted,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
