@@ -589,6 +589,10 @@ private fun <T> ChipRow(
     }
 }
 
+// Inside "Identifier": two distinct capture methods, toggled — barcode (Open Food
+// Facts, auto-detect) vs label photo (AI). Mirrors the two scan screens in the mockup.
+private enum class IdentifyMethod(val label: String) { BARCODE("Code-barres"), LABEL("Étiquette") }
+
 @Composable
 private fun ScanPane(
     color: WineColor,
@@ -601,19 +605,37 @@ private fun ScanPane(
     onIdentify: () -> Unit,
     onScanBarcode: (() -> Unit)? = null,
 ) {
+    var method by remember { mutableStateOf(IdentifyMethod.BARCODE) }
+    val label = method == IdentifyMethod.LABEL
     Column(Modifier.fillMaxSize()) {
-        // Viewfinder + loading animation overlay.
+        // Viewfinder + loading animation overlay. Frame adapts to the chosen method.
         Box(
             Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(18.dp))
                 .background(Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF15151B)))),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.size(width = 170.dp, height = 240.dp), contentAlignment = Alignment.Center) {
-                WineBottle(if (hasResult) color else WineColor.RED, Modifier.size(width = 72.dp, height = 165.dp))
-                listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd).forEach { a ->
-                    Box(Modifier.align(a).size(28.dp).border(3.dp, Color.White, RoundedCornerShape(8.dp)))
+            if (label) {
+                // Portrait frame around the bottle/label.
+                Box(Modifier.size(width = 170.dp, height = 240.dp), contentAlignment = Alignment.Center) {
+                    WineBottle(if (hasResult) color else WineColor.RED, Modifier.size(width = 72.dp, height = 165.dp))
+                    listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd).forEach { a ->
+                        Box(Modifier.align(a).size(28.dp).border(3.dp, Color.White, RoundedCornerShape(8.dp)))
+                    }
+                    Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(Color(0xFF7BE6A8)))
                 }
-                Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(Color(0xFF7BE6A8)))
+            } else {
+                // Landscape frame with a barcode glyph.
+                Box(Modifier.size(width = 232.dp, height = 132.dp), contentAlignment = Alignment.Center) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        listOf(3, 2, 4, 2, 3, 2, 2, 4, 3, 2, 4, 2, 3, 2, 2, 3, 2, 4).forEach { w ->
+                            Box(Modifier.width(w.dp).height(56.dp).background(Color.White.copy(alpha = 0.92f)))
+                        }
+                    }
+                    listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd).forEach { a ->
+                        Box(Modifier.align(a).size(28.dp).border(3.dp, Color.White, RoundedCornerShape(8.dp)))
+                    }
+                    Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(Color(0xFF7BE6A8)))
+                }
             }
             if (busy) {
                 Box(
@@ -623,12 +645,15 @@ private fun ScanPane(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(42.dp))
                         Spacer(Modifier.height(12.dp))
-                        Text("Analyse de l'étiquette…", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.W700)
+                        Text(
+                            if (label) "Analyse de l'étiquette…" else "Recherche Open Food Facts…",
+                            color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.W700,
+                        )
                     }
                 }
             } else {
                 Text(
-                    "Scannez le code-barres ou cadrez l'étiquette",
+                    if (label) "Cadrez l'étiquette de la bouteille" else "Alignez le code-barres — détection automatique",
                     color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.W600,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
                 )
@@ -658,47 +683,50 @@ private fun ScanPane(
                     }
                 }
             }
-        } else if (!busy) {
-            if (errorMsg != null) {
-                Text(
-                    errorMsg,
-                    fontSize = 12.5.sp, color = VincentColors.Red, lineHeight = 17.sp,
-                    modifier = Modifier.padding(vertical = 14.dp),
-                )
-            } else {
-                Text(
-                    "Choisissez une méthode d'identification ci-dessous.",
-                    fontSize = 12.5.sp, color = VincentColors.Muted,
-                    modifier = Modifier.padding(vertical = 14.dp),
-                )
+        } else if (!busy && errorMsg != null) {
+            Text(
+                errorMsg,
+                fontSize = 12.5.sp, color = VincentColors.Red, lineHeight = 17.sp,
+                modifier = Modifier.padding(vertical = 14.dp),
+            )
+        }
+
+        // Method toggle (Code-barres | Étiquette) — clearly separates the two flows.
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp)).background(VincentColors.Surface2)
+                .border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp)).padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            IdentifyMethod.entries.forEach { m ->
+                val on = m == method
+                Box(
+                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (on) VincentColors.Surface else Color.Transparent)
+                        .clickable(enabled = !busy) { method = m }.padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text(m.label, fontSize = 12.sp, fontWeight = FontWeight.W700, color = if (on) VincentColors.Accent else VincentColors.Muted) }
             }
         }
 
-        // Two clearly-separated actions: barcode (secondary) vs label→AI (primary).
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (onScanBarcode != null) {
-                Row(
-                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(14.dp))
-                        .background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp))
-                        .clickable(enabled = !busy, onClick = onScanBarcode),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
-                ) {
-                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Code-barres", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                }
-            }
-            Row(
-                Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(14.dp))
-                    .background(if (busy) VincentColors.AccentSoft else VincentColors.Accent)
-                    .clickable(enabled = !busy, onClick = onIdentify),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
-            ) {
-                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = if (busy) VincentColors.Accent else Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Étiquette · IA", fontSize = 13.sp, fontWeight = FontWeight.W700, color = if (busy) VincentColors.Accent else Color.White)
-            }
+        // Single action, scoped to the active method.
+        Spacer(Modifier.height(10.dp))
+        val onAction = if (label) onIdentify else (onScanBarcode ?: onIdentify)
+        Row(
+            Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp))
+                .background(if (busy) VincentColors.AccentSoft else VincentColors.Accent)
+                .clickable(enabled = !busy, onClick = onAction),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                if (label) Icons.Filled.AutoAwesome else Icons.Filled.QrCodeScanner,
+                contentDescription = null,
+                tint = if (busy) VincentColors.Accent else Color.White, modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (label) "Photographier l'étiquette" else "Scanner le code-barres",
+                fontSize = 13.sp, fontWeight = FontWeight.W700, color = if (busy) VincentColors.Accent else Color.White,
+            )
         }
     }
 }
