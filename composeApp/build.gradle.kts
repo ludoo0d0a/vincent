@@ -46,6 +46,7 @@ kotlin {
             implementation(libs.google.identity.googleid)
             implementation(libs.google.code.scanner)
             implementation(libs.google.app.update.ktx)
+            implementation(libs.coil.compose)
         }
     }
 }

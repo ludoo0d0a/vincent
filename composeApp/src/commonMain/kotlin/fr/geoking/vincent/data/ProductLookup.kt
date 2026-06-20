@@ -6,6 +6,8 @@ data class ProductInfo(
     val brand: String,
     val country: String,
     val category: String,
+    /** Front label photo from Open Food Facts, when contributors uploaded one. */
+    val imageUrl: String? = null,
 )
 
 /**

@@ -10,7 +10,7 @@ import java.net.URL
 /**
  * Open Food Facts lookup by barcode (free, open, no key). Coverage for wine is
  * partial and noisy, and it never carries vintage/price — so this only prefills
- * name/brand; the label photo (AI) and manual form complete the rest.
+ * name/brand; the label photo (when available) and manual form complete the rest.
  */
 private object OpenFoodFacts : BarcodeLookup {
     override suspend fun byBarcode(code: String): ProductInfo? = withContext(Dispatchers.IO) {
@@ -19,7 +19,8 @@ private object OpenFoodFacts : BarcodeLookup {
         try {
             val urlStr =
                 "https://world.openfoodfacts.org/api/v2/product/$ean.json" +
-                    "?fields=product_name,brands,categories,countries"
+                    "?fields=product_name,brands,categories,countries," +
+                    "image_front_url,image_front_small_url,selected_images"
             val started = System.currentTimeMillis()
             val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
@@ -61,6 +62,7 @@ private object OpenFoodFacts : BarcodeLookup {
                 brand = brand,
                 country = p.optString("countries").trim(),
                 category = p.optString("categories").trim(),
+                imageUrl = p.frontImageUrl(),
             )
         } catch (e: Exception) {
             HttpDebug.log(
@@ -72,6 +74,25 @@ private object OpenFoodFacts : BarcodeLookup {
             null
         }
     }
+}
+
+/** Picks the best front-of-pack image URL from an OFF product payload. */
+private fun JSONObject.frontImageUrl(): String? {
+    listOf("image_front_url", "image_front_small_url").forEach { key ->
+        optString(key).trim().takeIf { it.isNotEmpty() }?.let { return it }
+    }
+    val front = optJSONObject("selected_images")?.optJSONObject("front") ?: return null
+    listOf("display", "small", "thumb").forEach { size ->
+        val byLang = front.optJSONObject(size) ?: return@forEach
+        listOf("fr", "en").forEach { lang ->
+            byLang.optString(lang).trim().takeIf { it.isNotEmpty() }?.let { return it }
+        }
+        byLang.keys().asSequence()
+            .mapNotNull { byLang.optString(it).trim().takeIf { url -> url.isNotEmpty() } }
+            .firstOrNull()
+            ?.let { return it }
+    }
+    return null
 }
 
 actual fun barcodeLookup(): BarcodeLookup = OpenFoodFacts

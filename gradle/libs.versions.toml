@@ -10,6 +10,7 @@ credentials = "1.6.0"
 googleid = "1.2.0"
 codeScanner = "16.1.0"
 appUpdate = "2.1.0"
+coil = "2.7.0"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
@@ -26,6 +27,7 @@ androidx-credentials-play-services = { module = "androidx.credentials:credential
 google-identity-googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 google-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "codeScanner" }
 google-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdate" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

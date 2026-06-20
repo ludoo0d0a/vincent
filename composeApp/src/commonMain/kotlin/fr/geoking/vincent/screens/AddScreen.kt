@@ -69,6 +69,7 @@ import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ColorTag
+import fr.geoking.vincent.ui.RemoteImage
 import fr.geoking.vincent.ui.WineBottle
 
 // One "Identifier" screen handles BOTH barcode and label; plus voice and manual.
@@ -109,10 +110,15 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
                 val info = lookup.byBarcode(code)
                 busy = false
                 manualSeed = if (info != null) {
-                    scanMsg = "Prérempli depuis Open Food Facts — complétez millésime et prix."
+                    scanMsg = if (info.imageUrl != null) {
+                        "Prérempli depuis Open Food Facts — photo d'étiquette disponible."
+                    } else {
+                        "Prérempli depuis Open Food Facts — complétez millésime et prix."
+                    }
                     ManualSeed(
                         domain = info.brand.ifBlank { info.name },
                         appellation = if (info.brand.isNotBlank()) info.name else "",
+                        imageUrl = info.imageUrl,
                     )
                 } else {
                     scanMsg = "Code-barres $code introuvable — complétez à la main ou utilisez la photo."
@@ -295,6 +301,7 @@ private data class ManualSeed(
     val spot: String = "",
     val placeRack: Int? = null,
     val placeCell: Int? = null,
+    val imageUrl: String? = null,
 )
 
 /** Manual entry — search cellar + form; emits a Bottle (or null while the name is empty). */
@@ -311,6 +318,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     // Placement chosen via the wizard (rack, empty cell). Null = not placed.
     var placeRack by remember(seed) { mutableStateOf(seed?.placeRack) }
     var placeCell by remember(seed) { mutableStateOf(seed?.placeCell) }
+    var imageUrl by remember(seed) { mutableStateOf(seed?.imageUrl) }
     var searchQuery by remember { mutableStateOf("") }
     var debouncedQuery by remember { mutableStateOf("") }
 
@@ -338,7 +346,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     LaunchedEffect(seed) {
         seed?.let {
             domain = it.domain; appellation = it.appellation; color = it.color; category = it.category
-            vintage = it.vintage; price = it.price
+            vintage = it.vintage; price = it.price; imageUrl = it.imageUrl
             if (it.spot.isNotBlank()) spot = it.spot
             if (it.placeRack != null && it.placeCell != null) {
                 placeRack = it.placeRack
@@ -377,6 +385,18 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (!imageUrl.isNullOrBlank()) {
+            RemoteImage(
+                url = imageUrl,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(VincentColors.Surface2)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp)),
+                contentDescription = "Étiquette Open Food Facts",
+            )
+        }
         Text(
             "Rechercher dans la cave",
             fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
