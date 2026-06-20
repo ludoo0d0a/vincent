@@ -39,7 +39,10 @@ done
 ADB="$(command -v adb 2>/dev/null || true)"
 [ -n "$ADB" ] || die "adb introuvable. Installe Android SDK platform-tools ou ouvre Android Studio."
 
-mapfile -t DEVICES < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
+DEVICES=()
+while IFS= read -r d; do
+  [ -n "$d" ] && DEVICES+=("$d")
+done < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
 if [ "${#DEVICES[@]}" -eq 0 ]; then
   die "Aucun appareil connecté. Branche un téléphone (USB debugging) ou lance un émulateur."
 fi
@@ -87,7 +90,7 @@ ok "Gradle : ${GRADLE[*]}"
 
 # ---- build + install -------------------------------------------------------
 echo
-echo "${c_dim}→ build et installation debug sur $DEVICE…${c_off}"
+echo "${c_dim}→ build et installation debug sur ${DEVICE}…${c_off}"
 "${GRADLE[@]}" :composeApp:installDebug --no-daemon --stacktrace
 
 APK="$ROOT/composeApp/build/outputs/apk/debug/composeApp-debug.apk"
@@ -101,4 +104,4 @@ if [ "$LAUNCH" -eq 1 ]; then
 fi
 
 echo
-ok "Déployé sur ${c_bold}$DEVICE${c_off}."
+ok "Déployé sur ${c_bold}${DEVICE}${c_off}."
