@@ -23,6 +23,20 @@ data class Rack(
         }
         return copy(cols = newCols, rows = newRows, staggered = newStaggered, cells = out)
     }
+
+    /** Replace one cell (e.g. empty it after consuming the bottle). */
+    fun replaceCell(index: Int, cell: RackCell): Rack =
+        if (index !in cells.indices) this
+        else copy(cells = cells.toMutableList().also { it[index] = cell })
+
+    /** Move the bottle from [from] to an empty [to]; [from] becomes empty. */
+    fun moveCell(from: Int, to: Int): Rack {
+        if (from !in cells.indices || to !in cells.indices || from == to) return this
+        val list = cells.toMutableList()
+        list[to] = list[from].copy(selected = false)
+        list[from] = RackCell(rowLabel(from / cols), false)
+        return copy(cells = list)
+    }
 }
 
 /** An all-empty rack of the given size. */

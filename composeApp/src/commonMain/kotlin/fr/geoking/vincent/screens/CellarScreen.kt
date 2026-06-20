@@ -22,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocalBar
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -129,6 +131,25 @@ fun CellarScreen(
                 ?: rack.cells.indexOfFirst { it.occupied }.coerceAtLeast(0),
         )
     }
+    // Index of the bottle being moved (null when not in move mode).
+    var moving by remember(rackIdx) { mutableStateOf<Int?>(null) }
+
+    fun spotOf(i: Int) = "${rowLabel(i / rack.cols)}${i % rack.cols + 1}"
+    val onCellTap: (Int) -> Unit = { i ->
+        val c = rack.cells.getOrNull(i)
+        val mv = moving
+        when {
+            mv != null -> {
+                if (c != null && !c.occupied) {
+                    Racks.update(rackIdx, rack.moveCell(mv, i))
+                    selectedIdx = i
+                }
+                moving = null
+            }
+            c != null && c.occupied -> selectedIdx = i
+            else -> onAddToCell(spotOf(i))
+        }
+    }
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -150,9 +171,17 @@ fun CellarScreen(
                 Spacer(Modifier.height(10.dp))
                 FilterChips(filterIdx) { filterIdx = if (filterIdx == it) -1 else it }
                 Spacer(Modifier.height(11.dp))
-                RackGrid(rack, mode, filter, selectedIdx, onAddToCell) { selectedIdx = it }
+                RackGrid(rack, mode, filter, selectedIdx, moving, onCellTap)
                 Spacer(Modifier.height(11.dp))
-                PeekCard(rack, selectedIdx, onOpenBottle)
+                PeekCard(
+                    rack, selectedIdx, moving == selectedIdx, onOpenBottle,
+                    onMove = { moving = if (moving == selectedIdx) null else selectedIdx },
+                    onConsume = {
+                        Racks.update(rackIdx, rack.replaceCell(selectedIdx, RackCell(rowLabel(selectedIdx / rack.cols), false)))
+                        moving = null
+                        selectedIdx = Racks.all[rackIdx].cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
+                    },
+                )
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -280,7 +309,8 @@ private fun FilterChips(selectedIdx: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
-private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedIdx: Int, onAddToCell: (String) -> Unit, onSelect: (Int) -> Unit) {
+private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedIdx: Int, moving: Int?, onCellTap: (Int) -> Unit) {
+    val moveActive = moving != null
     val matching = rack.cells.count { it.occupied && (filter?.test?.invoke(it) ?: true) }
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -299,10 +329,9 @@ private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedId
                         Cell(
                             cell, mode, filter,
                             selected = gi == selectedIdx,
-                            onClick = {
-                                if (cell.occupied) onSelect(gi)
-                                else onAddToCell("${rowLabel(rowIndex)}${colIndex + 1}")
-                            },
+                            moving = gi == moving,
+                            dropTarget = moveActive && !cell.occupied,
+                            onClick = { onCellTap(gi) },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -312,9 +341,12 @@ private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedId
             Spacer(Modifier.height(2.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    if (filter == null) "Touchez une case pour la sélectionner"
-                    else "$matching bouteille${if (matching > 1) "s" else ""} dans ce filtre",
-                    fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W500,
+                    when {
+                        moveActive -> "Déplacement — touchez une case vide"
+                        filter == null -> "Touchez une case pour la sélectionner"
+                        else -> "$matching bouteille${if (matching > 1) "s" else ""} dans ce filtre"
+                    },
+                    fontSize = 11.sp, color = if (moveActive) VincentColors.Accent else VincentColors.Muted, fontWeight = FontWeight.W500,
                 )
                 Text(
                     "${(rack.occupiedCount * 100 / rack.capacity.coerceAtLeast(1))}%",
@@ -331,21 +363,28 @@ private fun Cell(
     mode: RackMode,
     filter: RackFilter?,
     selected: Boolean,
+    moving: Boolean,
+    dropTarget: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (!cell.occupied) {
-        // Empty slot: tap to add a bottle into this exact spot.
+        // Empty slot: tap to add a bottle here — or, during a move, a drop target.
         Box(
             modifier
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(7.dp))
-                .background(VincentColors.Surface2)
-                .border(1.dp, VincentColors.Border, RoundedCornerShape(7.dp))
+                .background(if (dropTarget) VincentColors.AccentSoft else VincentColors.Surface2)
+                .border(1.dp, if (dropTarget) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(7.dp))
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Filled.Add, contentDescription = "Ajouter ici", tint = VincentColors.Faint, modifier = Modifier.size(16.dp))
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = if (dropTarget) "Déplacer ici" else "Ajouter ici",
+                tint = if (dropTarget) VincentColors.Accent else VincentColors.Faint,
+                modifier = Modifier.size(16.dp),
+            )
         }
         return
     }
@@ -362,15 +401,15 @@ private fun Cell(
     Box(
         modifier
             .aspectRatio(1f)
-            .alpha(if (matches) 1f else 0.32f)
+            .alpha(if (moving) 0.5f else if (matches) 1f else 0.32f)
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
             .background(tint)
-            .border(if (selected) 4.dp else 3.dp, wineBorder, RoundedCornerShape(8.dp)),
+            .border(if (selected || moving) 4.dp else 3.dp, wineBorder, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        // Selection cue: inset accent ring (keeps the wine-colour border intact).
-        if (selected) {
+        // Selection / move cue: inset accent ring (keeps the wine-colour border intact).
+        if (selected || moving) {
             Box(
                 Modifier.matchParentSize().padding(3.dp)
                     .border(1.5.dp, VincentColors.Accent, RoundedCornerShape(5.dp)),
@@ -397,12 +436,19 @@ private fun Cell(
 }
 
 @Composable
-private fun PeekCard(rack: Rack, selectedIdx: Int, onOpenBottle: (Bottle) -> Unit) {
+private fun PeekCard(
+    rack: Rack,
+    selectedIdx: Int,
+    moving: Boolean,
+    onOpenBottle: (Bottle) -> Unit,
+    onMove: () -> Unit,
+    onConsume: () -> Unit,
+) {
     val cell = rack.cells.getOrNull(selectedIdx)
     if (cell == null || !cell.occupied) {
         VCard(Modifier.fillMaxWidth()) {
             Row(Modifier.padding(14.dp)) {
-                Text("Touchez une case occupée pour voir la bouteille", fontSize = 12.5.sp, color = VincentColors.Muted)
+                Text("Touchez une case occupée pour la sélectionner", fontSize = 12.5.sp, color = VincentColors.Muted)
             }
         }
         return
@@ -412,24 +458,69 @@ private fun PeekCard(rack: Rack, selectedIdx: Int, onOpenBottle: (Bottle) -> Uni
     val match = Cellar.bottles.firstOrNull {
         it.color == cell.color && it.price == cell.price && it.vintage.takeLast(2) == cell.vintage?.takeLast(2)
     }
-    val cardModifier = Modifier.fillMaxWidth().let { if (match != null) it.clickable { onOpenBottle(match) } else it }
-    VCard(cardModifier) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            WineBottle(cell.color ?: WineColor.RED, Modifier.size(width = 30.dp, height = 46.dp))
-            Spacer(Modifier.width(11.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Emplacement $spot", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                Text(
-                    buildString {
-                        append(cell.vintage.orEmpty())
-                        append(" · ${cell.price} €")
-                        cell.category?.let { append(" · ${it.label}") }
-                    },
-                    fontSize = 11.sp, color = VincentColors.Muted,
-                )
+    VCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            val infoMod = if (match != null) Modifier.fillMaxWidth().clickable { onOpenBottle(match) } else Modifier.fillMaxWidth()
+            Row(infoMod, verticalAlignment = Alignment.CenterVertically) {
+                WineBottle(cell.color ?: WineColor.RED, Modifier.size(width = 30.dp, height = 46.dp))
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Emplacement $spot", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                    Text(
+                        buildString {
+                            append(cell.vintage.orEmpty())
+                            append(" · ${cell.price} €")
+                            cell.category?.let { append(" · ${it.label}") }
+                        },
+                        fontSize = 11.sp, color = VincentColors.Muted,
+                    )
+                }
+                cell.color?.let { ColorTag(it, label = cell.category?.label ?: it.label) }
             }
-            cell.color?.let { ColorTag(it, label = cell.category?.label ?: it.label) }
+
+            Spacer(Modifier.height(11.dp))
+            if (moving) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Touchez une case vide pour déplacer",
+                        fontSize = 12.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
+                        modifier = Modifier.weight(1f),
+                    )
+                    PeekAction("Annuler", null, onMove)
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PeekAction("Déplacer", Icons.Filled.SwapHoriz, onMove, Modifier.weight(1f))
+                    PeekAction("Consommer", Icons.Filled.LocalBar, onConsume, Modifier.weight(1f))
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun PeekAction(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(VincentColors.Surface2)
+            .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
     }
 }
 
