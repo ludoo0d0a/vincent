@@ -6,6 +6,7 @@
 #   ./scripts/deploy-device.sh              # prompts: debug/release, launch y/n
 #   ./scripts/deploy-device.sh -l           # skip launch prompt (yes)
 #   ./scripts/deploy-device.sh -s SERIAL    # pick a device (adb devices)
+#   ./scripts/deploy-device.sh -s IP:PORT   # wireless adb (auto-reconnect)
 #   ./scripts/deploy-device.sh -r           # skip build-type prompt (release)
 set -euo pipefail
 
@@ -18,6 +19,7 @@ LAUNCH_ACTIVITY="$APP_ID/.MainActivity"
 c_bold=$'\033[1m'; c_ok=$'\033[32m'; c_err=$'\033[31m'; c_dim=$'\033[2m'; c_off=$'\033[0m'
 die(){ printf '%s✗ %s%s\n' "$c_err" "$*" "$c_off" >&2; exit 1; }
 ok(){  printf '%s✓ %s%s\n' "$c_ok" "$*" "$c_off"; }
+warn(){ printf '%s⚠ %s%s\n' "$c_err" "$*" "$c_off" >&2; }
 
 prompt_default() {
   local prompt="$1" default="$2" reply
@@ -31,9 +33,10 @@ tolower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 LAUNCH=-1
 BUILD_TYPE=""
 DEVICE=""
+WIRELESS_TARGET=""
 
 usage() {
-  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
@@ -71,6 +74,22 @@ fi
 ADB="$(command -v adb 2>/dev/null || true)"
 [ -n "$ADB" ] || die "adb introuvable. Installe Android SDK platform-tools ou ouvre Android Studio."
 
+# shellcheck source=adb-wireless.sh
+source "$ROOT/scripts/adb-wireless.sh"
+
+WIRELESS_TARGET="$(adb_wireless_resolve_target "$DEVICE")"
+if [ -n "$WIRELESS_TARGET" ]; then
+  if [ -n "$DEVICE" ] && adb_wireless_looks_like_target "$DEVICE"; then
+    adb_wireless_save_target "$WIRELESS_TARGET"
+  fi
+  adb_wireless_ensure_connected "$WIRELESS_TARGET" || true
+fi
+
+cleanup() {
+  adb_wireless_stop_background
+}
+trap cleanup EXIT INT TERM
+
 list_devices() {
   DEVICES=()
   while IFS= read -r d; do
@@ -78,11 +97,23 @@ list_devices() {
   done < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
 }
 
+try_wireless_reconnect() {
+  [ -n "$WIRELESS_TARGET" ] || return 1
+  adb_wireless_is_connected "$WIRELESS_TARGET" && return 0
+  adb_wireless_ensure_connected "$WIRELESS_TARGET" || return 1
+  sleep 2
+}
+
 wait_for_device() {
   while true; do
+    try_wireless_reconnect || true
     list_devices
     if [ "${#DEVICES[@]}" -eq 0 ]; then
-      printf '%s⚠ Aucun appareil connecté.%s\n' "$c_err" "$c_off" >&2
+      if [ -n "$WIRELESS_TARGET" ]; then
+        sleep 3
+        continue
+      fi
+      warn "Aucun appareil connecté."
       echo "Branche un téléphone (USB debugging) ou lance un émulateur, puis appuie sur Entrée."
       read -r
       continue
@@ -91,11 +122,27 @@ wait_for_device() {
       for d in "${DEVICES[@]}"; do
         [ "$d" = "$DEVICE" ] && return 0
       done
-      printf '%s⚠ Appareil %s introuvable.%s\n' "$c_err" "$DEVICE" "$c_off" >&2
+      if [ -n "$WIRELESS_TARGET" ] && [ "$DEVICE" = "$WIRELESS_TARGET" ]; then
+        sleep 3
+        continue
+      fi
+      warn "Appareil $DEVICE introuvable."
       echo "Appareils visibles : ${DEVICES[*]}"
+      if [ -n "$WIRELESS_TARGET" ]; then
+        sleep 3
+        continue
+      fi
       echo "Connecte l'appareil, puis appuie sur Entrée."
       read -r
       continue
+    fi
+    if [ -n "$WIRELESS_TARGET" ]; then
+      for d in "${DEVICES[@]}"; do
+        if [ "$d" = "$WIRELESS_TARGET" ]; then
+          DEVICE="$d"
+          return 0
+        fi
+      done
     fi
     if [ "${#DEVICES[@]}" -gt 1 ]; then
       die "Plusieurs appareils (${DEVICES[*]}). Passe -s SERIAL."
@@ -108,6 +155,11 @@ wait_for_device() {
 wait_for_device
 export ANDROID_SERIAL="$DEVICE"
 ok "Appareil : $DEVICE"
+
+if [ -n "$WIRELESS_TARGET" ]; then
+  adb_wireless_start_background "$WIRELESS_TARGET"
+  ok "Reconnexion sans fil active pendant le déploiement ($WIRELESS_TARGET)"
+fi
 
 # ---- JDK 17 ----------------------------------------------------------------
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME:-}/bin/javac" ]; then
@@ -151,6 +203,7 @@ echo "${c_dim}→ build et installation ${BUILD_TYPE} sur ${DEVICE}…${c_off}"
 if [ "$LAUNCH" -eq 1 ]; then
   echo
   echo "${c_dim}→ lancement de Vincent…${c_off}"
+  adb_wireless_ensure_connected "$DEVICE" || true
   "$ADB" -s "$DEVICE" shell am start -n "$LAUNCH_ACTIVITY" >/dev/null
   ok "App lancée ($LAUNCH_ACTIVITY)"
 fi

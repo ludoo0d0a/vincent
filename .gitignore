@@ -12,6 +12,7 @@ captures/
 *.keystore
 *.jks
 scripts/.keystore-credentials
+scripts/.adb-wireless
 
 # Generated Play release notes (from playstore/whatsnew.xml)
 playstore/whatsnew/
