@@ -3,6 +3,7 @@ package fr.geoking.vincent.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -41,14 +45,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionInRoot
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.RackClipboard
+import fr.geoking.vincent.data.RackClipboardEntry
+import fr.geoking.vincent.data.RackClipboardMode
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.Rack
@@ -135,6 +148,36 @@ fun CellarScreen(
     }
     // Index of the bottle being moved (null when not in move mode).
     var moving by remember(rackIdx) { mutableStateOf<Int?>(null) }
+    var dragFrom by remember(rackIdx) { mutableStateOf<Int?>(null) }
+    var dragHover by remember(rackIdx) { mutableStateOf<Int?>(null) }
+    var cellBounds by remember(rackIdx) { mutableStateOf<Map<Int, Rect>>(emptyMap()) }
+    val clipboard = RackClipboard.entry
+
+    fun findCellAt(offset: Offset): Int? =
+        cellBounds.entries.firstOrNull { (_, bounds) -> bounds.contains(offset) }?.key
+
+    fun finishDrag(from: Int?, to: Int?) {
+        if (from != null && to != null && from != to) {
+            val target = rack.cells.getOrNull(to)
+            if (target != null && !target.occupied) {
+                Racks.moveBetween(rackIdx, from, rackIdx, to)
+                selectedIdx = to
+            }
+        }
+        dragFrom = null
+        dragHover = null
+    }
+
+    fun pasteAt(cellIdx: Int) {
+        val clip = RackClipboard.entry ?: return
+        val target = rack.cells.getOrNull(cellIdx) ?: return
+        if (target.occupied) return
+        val cutSource = if (clip.mode == RackClipboardMode.CUT) clip.rackIndex to clip.cellIndex else null
+        if (Racks.pasteCell(rackIdx, cellIdx, clip.cell, cutSource)) {
+            selectedIdx = cellIdx
+            if (clip.mode == RackClipboardMode.CUT) RackClipboard.clear()
+        }
+    }
 
     val onCellTap: (Int) -> Unit = { i ->
         val c = rack.cells.getOrNull(i)
@@ -142,12 +185,16 @@ fun CellarScreen(
         when {
             mv != null -> {
                 if (c != null && !c.occupied) {
-                    Racks.update(rackIdx, rack.moveCell(mv, i))
+                    Racks.moveBetween(rackIdx, mv, rackIdx, i)
                     selectedIdx = i
                 }
                 moving = null
             }
             c != null && c.occupied -> selectedIdx = i
+            clipboard != null -> {
+                selectedIdx = i
+                pasteAt(i)
+            }
             else -> {
                 selectedIdx = i
                 onAddToCell(RackPlacement(rackIdx, i))
@@ -175,12 +222,38 @@ fun CellarScreen(
                 Spacer(Modifier.height(10.dp))
                 FilterChips(filterIdx) { filterIdx = if (filterIdx == it) -1 else it }
                 Spacer(Modifier.height(11.dp))
-                RackGrid(rack, mode, filter, selectedIdx, moving, onCellTap)
+                RackGrid(
+                    rack, rackIdx, mode, filter, selectedIdx, moving, dragFrom, dragHover, clipboard,
+                    onCellTap,
+                    onCellBounds = { idx, bounds ->
+                        cellBounds = cellBounds.toMutableMap().also { it[idx] = bounds }
+                    },
+                    onDragStart = { idx ->
+                        moving = null
+                        dragFrom = idx
+                        dragHover = null
+                    },
+                    onDragMove = { offset -> dragHover = findCellAt(offset) },
+                    onDragEnd = { finishDrag(dragFrom, dragHover) },
+                    onDragCancel = {
+                        dragFrom = null
+                        dragHover = null
+                    },
+                )
                 Spacer(Modifier.height(11.dp))
                 PeekCard(
-                    rack, rackIdx, selectedIdx, moving == selectedIdx, onOpenBottle,
+                    rack, rackIdx, selectedIdx, moving == selectedIdx, clipboard, onOpenBottle,
                     onAddBottle = { onAddToCell(RackPlacement(rackIdx, selectedIdx)) },
                     onMove = { moving = if (moving == selectedIdx) null else selectedIdx },
+                    onCut = {
+                        val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
+                        if (cell.occupied) RackClipboard.cut(rackIdx, selectedIdx, cell)
+                    },
+                    onCopy = {
+                        val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
+                        if (cell.occupied) RackClipboard.copy(rackIdx, selectedIdx, cell)
+                    },
+                    onPaste = { pasteAt(selectedIdx) },
                     onConsume = {
                         Racks.update(rackIdx, rack.replaceCell(selectedIdx, RackCell(rowLabel(selectedIdx / rack.cols), false)))
                         moving = null
@@ -325,8 +398,25 @@ private fun FilterChips(selectedIdx: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
-private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedIdx: Int, moving: Int?, onCellTap: (Int) -> Unit) {
+private fun RackGrid(
+    rack: Rack,
+    rackIdx: Int,
+    mode: RackMode,
+    filter: RackFilter?,
+    selectedIdx: Int,
+    moving: Int?,
+    dragFrom: Int?,
+    dragHover: Int?,
+    clipboard: RackClipboardEntry?,
+    onCellTap: (Int) -> Unit,
+    onCellBounds: (Int, Rect) -> Unit,
+    onDragStart: (Int) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+) {
     val moveActive = moving != null
+    val dragActive = dragFrom != null
     val matching = rack.cells.count { it.occupied && (filter?.test?.invoke(it) ?: true) }
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -342,12 +432,25 @@ private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedId
                     if (shiftRight) Spacer(Modifier.weight(0.5f))
                     rowCells.forEachIndexed { colIndex, cell ->
                         val gi = rowIndex * rack.cols + colIndex
+                        val cutSource = clipboard?.takeIf { it.mode == RackClipboardMode.CUT }
                         Cell(
                             cell, mode, filter,
                             selected = gi == selectedIdx,
                             moving = gi == moving,
-                            dropTarget = moveActive && !cell.occupied,
+                            dragging = gi == dragFrom,
+                            cutMarked = cutSource?.rackIndex == rackIdx && cutSource.cellIndex == gi,
+                            dropTarget = when {
+                                dragActive -> !cell.occupied && gi == dragHover
+                                moveActive -> !cell.occupied
+                                else -> false
+                            },
+                            pasteTarget = clipboard != null && !cell.occupied && !moveActive && !dragActive,
                             onClick = { onCellTap(gi) },
+                            onBoundsChanged = { onCellBounds(gi, it) },
+                            onDragStart = { onDragStart(gi) },
+                            onDragMove = onDragMove,
+                            onDragEnd = onDragEnd,
+                            onDragCancel = onDragCancel,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -358,11 +461,15 @@ private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedId
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
                     when {
+                        dragActive -> "Déposez sur une case vide"
                         moveActive -> "Déplacement — touchez une case vide"
-                        filter == null -> "Touchez une case pour la sélectionner"
+                        clipboard != null -> "Presse-papiers actif — touchez une case vide pour coller"
+                        filter == null -> "Maintenez pour glisser · touchez pour sélectionner"
                         else -> "$matching bouteille${if (matching > 1) "s" else ""} dans ce filtre"
                     },
-                    fontSize = 11.sp, color = if (moveActive) VincentColors.Accent else VincentColors.Muted, fontWeight = FontWeight.W500,
+                    fontSize = 11.sp,
+                    color = if (dragActive || moveActive || clipboard != null) VincentColors.Accent else VincentColors.Muted,
+                    fontWeight = FontWeight.W500,
                 )
                 Text(
                     "${(rack.occupiedCount * 100 / rack.capacity.coerceAtLeast(1))}%",
@@ -380,26 +487,55 @@ private fun Cell(
     filter: RackFilter?,
     selected: Boolean,
     moving: Boolean,
+    dragging: Boolean,
+    cutMarked: Boolean,
     dropTarget: Boolean,
+    pasteTarget: Boolean,
     onClick: () -> Unit,
+    onBoundsChanged: (Rect) -> Unit,
+    onDragStart: () -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val boundsMod = modifier
+        .onGloballyPositioned { onBoundsChanged(it.boundsInRoot()) }
+
     if (!cell.occupied) {
         // Empty slot: tap to add a bottle here — or, during a move, a drop target.
         Box(
-            modifier
+            boundsMod
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(7.dp))
-                .background(if (dropTarget) VincentColors.AccentSoft else VincentColors.Surface2)
-                .border(1.dp, if (dropTarget) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(7.dp))
+                .background(
+                    when {
+                        dropTarget -> VincentColors.AccentSoft
+                        pasteTarget -> VincentColors.AccentSoft.copy(alpha = 0.45f)
+                        else -> VincentColors.Surface2
+                    },
+                )
+                .border(
+                    1.dp,
+                    when {
+                        dropTarget -> VincentColors.Accent
+                        pasteTarget -> VincentColors.Accent.copy(alpha = 0.55f)
+                        else -> VincentColors.Border
+                    },
+                    RoundedCornerShape(7.dp),
+                )
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Filled.Add,
-                contentDescription = if (dropTarget) "Déplacer ici" else "Ajouter ici",
-                tint = if (dropTarget) VincentColors.Accent else VincentColors.Faint,
-                modifier = Modifier.size(16.dp),
+                if (pasteTarget && !dropTarget) Icons.Filled.ContentPaste else Icons.Filled.Add,
+                contentDescription = when {
+                    dropTarget -> "Déplacer ici"
+                    pasteTarget -> "Coller ici"
+                    else -> "Ajouter ici"
+                },
+                tint = if (dropTarget || pasteTarget) VincentColors.Accent else VincentColors.Faint,
+                modifier = Modifier.size(if (pasteTarget && !dropTarget) 14.dp else 16.dp),
             )
         }
         return
@@ -415,17 +551,32 @@ private fun Cell(
         RackMode.CATEGORY -> cell.category?.short.orEmpty()
     }
     Box(
-        modifier
+        boundsMod
             .aspectRatio(1f)
-            .alpha(if (moving) 0.5f else if (matches) 1f else 0.32f)
+            .alpha(if (dragging || moving) 0.5f else if (matches) 1f else 0.32f)
             .clip(RoundedCornerShape(8.dp))
+            .pointerInput(cell.occupied) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { onDragStart() },
+                    onDrag = { change, _ -> onDragMove(change.positionInRoot()) },
+                    onDragEnd = { onDragEnd() },
+                    onDragCancel = { onDragCancel() },
+                )
+            }
             .clickable(onClick = onClick)
             .background(tint)
-            .border(if (selected || moving) 4.dp else 3.dp, wineBorder, RoundedCornerShape(8.dp)),
+            .border(
+                if (selected || moving || dragging || cutMarked) 4.dp else 3.dp,
+                when {
+                    cutMarked -> VincentColors.Accent
+                    else -> wineBorder
+                },
+                RoundedCornerShape(8.dp),
+            ),
         contentAlignment = Alignment.Center,
     ) {
         // Selection / move cue: inset accent ring (keeps the wine-colour border intact).
-        if (selected || moving) {
+        if (selected || moving || dragging) {
             Box(
                 Modifier.matchParentSize().padding(3.dp)
                     .border(1.5.dp, VincentColors.Accent, RoundedCornerShape(5.dp)),
@@ -457,9 +608,13 @@ private fun PeekCard(
     rackIdx: Int,
     selectedIdx: Int,
     moving: Boolean,
+    clipboard: RackClipboardEntry?,
     onOpenBottle: (Bottle) -> Unit,
     onAddBottle: () -> Unit,
     onMove: () -> Unit,
+    onCut: () -> Unit,
+    onCopy: () -> Unit,
+    onPaste: () -> Unit,
     onConsume: () -> Unit,
 ) {
     val cell = rack.cells.getOrNull(selectedIdx)
@@ -468,9 +623,20 @@ private fun PeekCard(
         VCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
                 Text("Emplacement $spot", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                Text("Case libre — ajoutez une bouteille ici.", fontSize = 11.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp))
+                Text(
+                    if (clipboard != null) "Case libre — collez ou ajoutez une bouteille."
+                    else "Case libre — ajoutez une bouteille ici.",
+                    fontSize = 11.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp),
+                )
                 Spacer(Modifier.height(11.dp))
-                PeekAction("Ajouter bouteille", Icons.Filled.Add, onAddBottle, Modifier.fillMaxWidth())
+                if (clipboard != null) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        PeekAction("Coller", Icons.Filled.ContentPaste, onPaste, Modifier.weight(1f))
+                        PeekAction("Ajouter", Icons.Filled.Add, onAddBottle, Modifier.weight(1f))
+                    }
+                } else {
+                    PeekAction("Ajouter bouteille", Icons.Filled.Add, onAddBottle, Modifier.fillMaxWidth())
+                }
             }
         }
         return
@@ -511,9 +677,22 @@ private fun PeekCard(
                     PeekAction("Annuler", null, onMove)
                 }
             } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PeekAction("Couper", Icons.Filled.ContentCut, onCut, Modifier.weight(1f))
+                    PeekAction("Copier", Icons.Filled.ContentCopy, onCopy, Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PeekAction("Déplacer", Icons.Filled.SwapHoriz, onMove, Modifier.weight(1f))
                     PeekAction("Consommer", Icons.Filled.LocalBar, onConsume, Modifier.weight(1f))
+                }
+                if (clipboard != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (clipboard.mode == RackClipboardMode.CUT) "Coupe en attente — choisissez une case libre"
+                        else "Copie en attente — choisissez une case libre",
+                        fontSize = 11.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
+                    )
                 }
             }
         }
