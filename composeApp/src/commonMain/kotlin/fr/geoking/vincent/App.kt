@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FormatListBulleted
@@ -22,6 +23,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackPlacement
@@ -42,6 +45,8 @@ import fr.geoking.vincent.screens.ImportExportScreen
 import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SearchScreen
+import fr.geoking.vincent.debug.HttpDebugBar
+import fr.geoking.vincent.debug.initHttpDebug
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.theme.VincentTheme
 
@@ -64,6 +69,7 @@ private sealed interface Dest {
 
 @Composable
 fun App() = VincentTheme {
+    SideEffect { initHttpDebug() }
     var guest by remember { mutableStateOf(false) }
     val loggedIn = Auth.account != null || guest
     var tab by remember { mutableStateOf(Tab.HOME) }
@@ -112,6 +118,11 @@ fun App() = VincentTheme {
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                 )
             }
+            HttpDebugBar(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 8.dp, top = 8.dp),
+            )
         }
     }
 }

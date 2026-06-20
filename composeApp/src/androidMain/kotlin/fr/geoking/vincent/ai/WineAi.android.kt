@@ -3,6 +3,7 @@ package fr.geoking.vincent.ai
 import android.util.Base64
 import android.util.Log
 import fr.geoking.vincent.BuildConfig
+import fr.geoking.vincent.debug.HttpDebug
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineCategory
@@ -81,6 +82,15 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         if (BuildConfig.GEMINI_API_KEY.isBlank()) {
             return fail("Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.")
         }
+        if (!BuildConfig.GEMINI_API_KEY.startsWith("AIza")) {
+            return fail(
+                "Clé API au mauvais format (attendu AIzaSy… depuis aistudio.google.com/apikey).",
+            )
+        }
+        val started = System.currentTimeMillis()
+        val endpoint =
+            "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent" +
+                "?key=${BuildConfig.GEMINI_API_KEY}"
         return try {
             val parts = JSONArray().put(JSONObject().put("text", prompt))
             if (imageB64 != null) {
@@ -94,36 +104,86 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             val body = JSONObject()
                 .put("contents", JSONArray().put(JSONObject().put("parts", parts)))
                 .put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
+            val bodyText = body.toString()
+            val logBody = if (imageB64 != null) {
+                bodyText.replace(imageB64, "<image ${imageB64.length} chars>")
+            } else {
+                bodyText
+            }
 
-            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=${BuildConfig.GEMINI_API_KEY}")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
+            val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true
                 connectTimeout = 15000
                 readTimeout = 25000
                 setRequestProperty("Content-Type", "application/json")
             }
-            conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
+            conn.outputStream.use { it.write(bodyText.encodeToByteArray()) }
             val code = conn.responseCode
+            val elapsed = System.currentTimeMillis() - started
             if (code !in 200..299) {
                 val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
                 Log.e(TAG, "Gemini HTTP $code: ${err?.take(400)}")
-                return when (code) {
-                    403 -> fail("Clé API invalide ou API non activée.")
-                    429 -> fail("Quota Gemini dépassé — réessayez plus tard.")
-                    in 400..499 -> fail("Requête refusée par l'IA ($code).")
-                    else -> fail("Identification impossible (erreur réseau $code).")
-                }
+                HttpDebug.log(
+                    label = "Gemini $MODEL",
+                    method = "POST",
+                    url = endpoint,
+                    requestBody = logBody,
+                    statusCode = code,
+                    responseBody = err,
+                    durationMs = elapsed,
+                    error = geminiErrorDetail(err),
+                )
+                return fail(httpFailMessage(code, err))
             }
             val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            HttpDebug.log(
+                label = "Gemini $MODEL",
+                method = "POST",
+                url = endpoint,
+                requestBody = logBody,
+                statusCode = code,
+                responseBody = resp,
+                durationMs = elapsed,
+            )
             val text = JSONObject(resp)
                 .getJSONArray("candidates").getJSONObject(0)
                 .getJSONObject("content").getJSONArray("parts").getJSONObject(0)
                 .getString("text")
             JSONObject(text)
         } catch (e: Exception) {
+            val elapsed = System.currentTimeMillis() - started
             Log.e(TAG, "Gemini call failed: ${e.javaClass.simpleName}: ${e.message}", e)
+            HttpDebug.log(
+                label = "Gemini $MODEL",
+                method = "POST",
+                url = endpoint,
+                durationMs = elapsed,
+                error = "${e.javaClass.simpleName}: ${e.message}",
+            )
             fail("Identification impossible — réessayez ou passez en manuel.")
+        }
+    }
+
+    private fun geminiErrorDetail(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        return try {
+            val err = JSONObject(raw).optJSONObject("error")
+            err?.optString("message")?.takeIf { it.isNotBlank() }
+                ?: err?.optString("status")?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            raw.take(240)
+        }
+    }
+
+    private fun httpFailMessage(code: Int, raw: String?): String {
+        val detail = geminiErrorDetail(raw)?.let { " — $it" }.orEmpty()
+        return when (code) {
+            403 -> "Clé API invalide ou API non activée.$detail"
+            404 -> "Modèle ou URL introuvable ($code). Vérifiez le modèle « $MODEL ».$detail"
+            429 -> "Quota Gemini dépassé — réessayez plus tard."
+            in 400..499 -> "Requête refusée par l'IA ($code)$detail"
+            else -> "Identification impossible (erreur réseau $code)$detail"
         }
     }
 

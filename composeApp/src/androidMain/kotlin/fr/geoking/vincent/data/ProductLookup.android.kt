@@ -1,5 +1,6 @@
 package fr.geoking.vincent.data
 
+import fr.geoking.vincent.debug.HttpDebug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -16,18 +17,39 @@ private object OpenFoodFacts : BarcodeLookup {
         val ean = code.filter { it.isDigit() }
         if (ean.length < 6) return@withContext null
         try {
-            val url = URL(
+            val urlStr =
                 "https://world.openfoodfacts.org/api/v2/product/$ean.json" +
-                    "?fields=product_name,brands,categories,countries",
-            )
-            val conn = (url.openConnection() as HttpURLConnection).apply {
+                    "?fields=product_name,brands,categories,countries"
+            val started = System.currentTimeMillis()
+            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 10000
                 readTimeout = 12000
                 setRequestProperty("User-Agent", "Vincent/1.0 (cave a vin; Android)")
             }
-            if (conn.responseCode !in 200..299) return@withContext null
+            val code = conn.responseCode
+            val elapsed = System.currentTimeMillis() - started
+            if (code !in 200..299) {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+                HttpDebug.log(
+                    label = "OpenFoodFacts",
+                    method = "GET",
+                    url = urlStr,
+                    statusCode = code,
+                    responseBody = err,
+                    durationMs = elapsed,
+                )
+                return@withContext null
+            }
             val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            HttpDebug.log(
+                label = "OpenFoodFacts",
+                method = "GET",
+                url = urlStr,
+                statusCode = code,
+                responseBody = resp,
+                durationMs = elapsed,
+            )
             val root = JSONObject(resp)
             if (root.optInt("status") != 1) return@withContext null
             val p = root.optJSONObject("product") ?: return@withContext null
@@ -41,6 +63,12 @@ private object OpenFoodFacts : BarcodeLookup {
                 category = p.optString("categories").trim(),
             )
         } catch (e: Exception) {
+            HttpDebug.log(
+                label = "OpenFoodFacts",
+                method = "GET",
+                url = "https://world.openfoodfacts.org/api/v2/product/$ean.json",
+                error = "${e.javaClass.simpleName}: ${e.message}",
+            )
             null
         }
     }
