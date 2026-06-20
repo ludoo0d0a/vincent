@@ -45,6 +45,9 @@ import fr.geoking.vincent.ai.rememberBarcodeScanner
 import fr.geoking.vincent.ai.rememberDictation
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.ai.wineRecognizer
+import fr.geoking.vincent.model.BottlePhotoKind
+import fr.geoking.vincent.model.photo
+import fr.geoking.vincent.model.thumbnailUri
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -59,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.barcodeLookup
+import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackCell
@@ -68,8 +72,9 @@ import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.BottlePhotosRow
+import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
-import fr.geoking.vincent.ui.RemoteImage
 import fr.geoking.vincent.ui.WineBottle
 
 // One "Identifier" screen handles BOTH barcode and label; plus voice and manual.
@@ -103,6 +108,8 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
     // Barcode → Open Food Facts lookup → prefill the manual form (vintage/price stay
     // for the user to complete, since EANs rarely encode them).
     val lookup = remember { barcodeLookup() }
+    val labelSaver = rememberLabelImageSaver()
+    var capturedLabelUri by remember { mutableStateOf<String?>(null) }
     val scanBarcode = rememberBarcodeScanner { code ->
         if (code != null) {
             busy = true
@@ -134,8 +141,15 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
         busy = true
         aiError = null
         scope.launch {
+            val bottleId = "new-${Cellar.references()}-${System.currentTimeMillis()}"
+            val imagePath = labelSaver.save(bytes, bottleId, BottlePhotoKind.LABEL)
+            capturedLabelUri = imagePath
             val outcome = recognizer.fromImage(bytes)
-            aiBottle = outcome.bottle
+            aiBottle = outcome.bottle?.copy(
+                id = bottleId,
+                photoLabel = imagePath,
+                source = AddSource.SCAN,
+            )
             aiPrice = aiBottle?.let { estimator.estimate(it) }
             aiError = outcome.error
             busy = false
@@ -225,6 +239,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
             when (mode) {
                 AddMode.IDENTIFY -> ScanPane(
                     color = aiBottle?.color ?: WineColor.RED,
+                    bottle = aiBottle,
                     title = aiBottle?.let { "${it.domain} ${it.vintage}" }.orEmpty(),
                     subtitle = aiBottle?.let { "${it.appellation} · ${it.color.label}" }.orEmpty(),
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
@@ -254,7 +269,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
         // Only enabled once we have a real bottle: AI-recognised (scan/photo/voice)
         // or a manually filled form. No more hardcoded fallback.
         val ready: Bottle? = if (mode == AddMode.MANUAL) manualBottle
-            else aiBottle?.let { it.copy(price = aiPrice?.amountEur ?: it.price) }
+            else aiBottle?.let { it.copy(price = aiPrice?.amountEur ?: it.price, photoLabel = capturedLabelUri ?: it.photoLabel) }
         val buttonLabel = when {
             ready != null -> if (mode == AddMode.MANUAL) "Ajouter à la cave" else "Confirmer l'ajout"
             busy -> "Analyse en cours…"
@@ -315,19 +330,29 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     var price by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("1") }
     var spot by remember(seed) { mutableStateOf(seed?.spot.orEmpty()) }
-    // Placement chosen via the wizard (rack, empty cell). Null = not placed.
     var placeRack by remember(seed) { mutableStateOf(seed?.placeRack) }
     var placeCell by remember(seed) { mutableStateOf(seed?.placeCell) }
-    var imageUrl by remember(seed) { mutableStateOf(seed?.imageUrl) }
+    var photos by remember { mutableStateOf<Map<BottlePhotoKind, String?>>(emptyMap()) }
     var searchQuery by remember { mutableStateOf("") }
     var debouncedQuery by remember { mutableStateOf("") }
+    val draftId = remember { "new-${Cellar.references()}-${System.currentTimeMillis()}" }
+    val labelSaver = rememberLabelImageSaver()
+    val scope = rememberCoroutineScope()
+    var pendingKind by remember { mutableStateOf<BottlePhotoKind?>(null) }
+    val capture = rememberPhotoCapture { bytes ->
+        val kind = pendingKind ?: return@rememberPhotoCapture
+        scope.launch {
+            val path = labelSaver.save(bytes, draftId, kind)
+            photos = photos + (kind to path)
+            pendingKind = null
+        }
+    }
 
     LaunchedEffect(searchQuery) {
         delay(300)
         debouncedQuery = searchQuery
     }
 
-    // Reading bottles.size keeps suggestions in sync when the cellar changes.
     val cellarSize = Cellar.bottles.size
     val suggestions = remember(debouncedQuery, cellarSize) { Cellar.search(debouncedQuery) }
 
@@ -338,15 +363,16 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         category = b.category
         vintage = if (b.vintage == "NM") "" else b.vintage
         price = if (b.price > 0) b.price.toString() else ""
+        photos = BottlePhotoKind.entries.associateWith { b.photo(it) }
         searchQuery = ""
         debouncedQuery = ""
     }
 
-    // Apply a prefill (barcode lookup, cellar suggestion, or an empty-cell tap).
     LaunchedEffect(seed) {
         seed?.let {
             domain = it.domain; appellation = it.appellation; color = it.color; category = it.category
-            vintage = it.vintage; price = it.price; imageUrl = it.imageUrl
+            vintage = it.vintage; price = it.price
+            if (it.imageUrl != null) photos = photos + (BottlePhotoKind.LABEL to it.imageUrl)
             if (it.spot.isNotBlank()) spot = it.spot
             if (it.placeRack != null && it.placeCell != null) {
                 placeRack = it.placeRack
@@ -355,12 +381,11 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         }
     }
 
-    // All fields optional — a bottle can be saved with no name/colour/vintage/spot.
-    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell) {
+    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos) {
         val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
         onBottle(
             Bottle(
-                id = "new-${Cellar.references()}",
+                id = draftId,
                 domain = domain.trim().ifBlank { "Bouteille" },
                 appellation = appellation.trim().ifBlank { category.label },
                 color = color,
@@ -376,6 +401,9 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
                 occasion = "",
                 source = AddSource.MANUAL,
                 addedLabel = "à l'instant",
+                photoBottle = photos[BottlePhotoKind.BOTTLE],
+                photoLabel = photos[BottlePhotoKind.LABEL],
+                photoBack = photos[BottlePhotoKind.BACK],
             ),
             placement,
         )
@@ -385,18 +413,15 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (!imageUrl.isNullOrBlank()) {
-            RemoteImage(
-                url = imageUrl,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(VincentColors.Surface2)
-                    .border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp)),
-                contentDescription = "Étiquette Open Food Facts",
-            )
-        }
+        Text(
+            "Photos (optionnel)",
+            fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
+            modifier = Modifier.padding(start = 2.dp),
+        )
+        BottlePhotosRow(
+            photos = BottlePhotoKind.entries.associateWith { photos[it] },
+            onCapture = { kind -> pendingKind = kind; capture() },
+        )
         Text(
             "Rechercher dans la cave",
             fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
@@ -596,6 +621,7 @@ private enum class IdentifyMethod(val label: String) { BARCODE("Code-barres"), L
 @Composable
 private fun ScanPane(
     color: WineColor,
+    bottle: Bottle?,
     title: String,
     subtitle: String,
     priceLabel: String?,
@@ -668,7 +694,11 @@ private fun ScanPane(
                     .border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp)).padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                WineBottle(color, Modifier.size(width = 30.dp, height = 54.dp))
+                if (bottle != null && bottle.thumbnailUri() != null) {
+                    BottleThumb(bottle, Modifier.size(width = 30.dp, height = 54.dp))
+                } else {
+                    WineBottle(color, Modifier.size(width = 30.dp, height = 54.dp))
+                }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

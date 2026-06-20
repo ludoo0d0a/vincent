@@ -43,6 +43,7 @@ import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ScreenHeader
 import fr.geoking.vincent.ui.Stars
 
@@ -176,7 +177,7 @@ fun BottleCard(b: Bottle, modifier: Modifier = Modifier, onClick: () -> Unit) {
                 .background(lerp(Color.White, b.color.glass, 0.10f)),
             contentAlignment = Alignment.Center,
         ) {
-            fr.geoking.vincent.ui.WineBottle(b.color, Modifier.size(width = 30.dp, height = 78.dp))
+            BottleThumb(b, Modifier.size(width = 30.dp, height = 78.dp))
             if (b.favorite) {
                 Icon(
                     Icons.Filled.Favorite,

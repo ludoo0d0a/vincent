@@ -35,6 +35,10 @@ data class BottleEntity(
     val tastingNotes: String,
     val source: String,
     val addedLabel: String,
+    /** Legacy column name — stores the front-label photo path or URL. */
+    val imageUri: String = "",
+    val photoBottleUri: String = "",
+    val photoBackUri: String = "",
 )
 
 private const val SEP = "" // unit separator — won't appear in labels
@@ -62,6 +66,9 @@ fun BottleEntity.toBottle(): Bottle = Bottle(
     tastingNotes = tastingNotes,
     source = AddSource.valueOf(source),
     addedLabel = addedLabel,
+    photoBottle = photoBottleUri.takeIf { it.isNotBlank() },
+    photoLabel = imageUri.takeIf { it.isNotBlank() },
+    photoBack = photoBackUri.takeIf { it.isNotBlank() },
 )
 
 fun Bottle.toEntity(): BottleEntity = BottleEntity(
@@ -87,4 +94,7 @@ fun Bottle.toEntity(): BottleEntity = BottleEntity(
     tastingNotes = tastingNotes,
     source = source.name,
     addedLabel = addedLabel,
+    imageUri = photoLabel.orEmpty(),
+    photoBottleUri = photoBottle.orEmpty(),
+    photoBackUri = photoBack.orEmpty(),
 )

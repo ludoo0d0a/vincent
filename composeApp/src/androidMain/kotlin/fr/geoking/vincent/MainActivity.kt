@@ -8,6 +8,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.appupdate.AppUpdateOptions
@@ -20,6 +22,19 @@ import fr.geoking.vincent.db.RoomCellarRepository
 import fr.geoking.vincent.db.VincentDatabase
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+
+private val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bottles ADD COLUMN imageUri TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+private val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bottles ADD COLUMN photoBottleUri TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE bottles ADD COLUMN photoBackUri TEXT NOT NULL DEFAULT ''")
+    }
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -53,7 +68,7 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             VincentDatabase::class.java,
             "vincent.db",
-        ).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
         val repository = RoomCellarRepository(db.bottleDao())
         MainScope().launch { Cellar.bootstrap(repository) }
 

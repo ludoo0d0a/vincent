@@ -34,6 +34,13 @@ enum class AddSource(val label: String) {
     MANUAL("Saisie manuelle");
 }
 
+/** Kind of photo attached to a bottle. */
+enum class BottlePhotoKind(val label: String, val suffix: String) {
+    BOTTLE("Bouteille", "bottle"),
+    LABEL("Étiquette", "label"),
+    BACK("Dos", "back"),
+}
+
 data class Bottle(
     val id: String,
     val domain: String,
@@ -57,7 +64,25 @@ data class Bottle(
     val tastingNotes: String = "",
     val source: AddSource = AddSource.MANUAL,
     val addedLabel: String = "",    // e.g. "09:32" or "Lun."
+    val photoBottle: String? = null,
+    val photoLabel: String? = null,
+    val photoBack: String? = null,
 )
+
+fun Bottle.photo(kind: BottlePhotoKind): String? = when (kind) {
+    BottlePhotoKind.BOTTLE -> photoBottle
+    BottlePhotoKind.LABEL -> photoLabel
+    BottlePhotoKind.BACK -> photoBack
+}
+
+fun Bottle.withPhoto(kind: BottlePhotoKind, uri: String?): Bottle = when (kind) {
+    BottlePhotoKind.BOTTLE -> copy(photoBottle = uri)
+    BottlePhotoKind.LABEL -> copy(photoLabel = uri)
+    BottlePhotoKind.BACK -> copy(photoBack = uri)
+}
+
+/** Best photo to show as a list thumbnail: étiquette → bouteille → dos. */
+fun Bottle.thumbnailUri(): String? = photoLabel ?: photoBottle ?: photoBack
 
 /** A single physical slot in a rack grid. */
 data class RackCell(

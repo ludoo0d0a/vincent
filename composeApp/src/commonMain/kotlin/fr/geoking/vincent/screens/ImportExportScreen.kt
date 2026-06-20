@@ -106,7 +106,7 @@ fun ImportExportScreen(onBack: () -> Unit) {
                         Text("Exporter ma cave", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
                     }
                     Text(
-                        "Génère un fichier CSV de vos ${Cellar.references()} références — réimportable dans Vincent ou lisible dans tout tableur.",
+                        "Génère un fichier CSV de vos ${Cellar.references()} références (sans les photos) — réimportable dans Vincent ou lisible dans tout tableur.",
                         fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp),
                     )
                     OutlinedButton(
@@ -127,7 +127,7 @@ fun ImportExportScreen(onBack: () -> Unit) {
             SectionHeader("Formats pris en charge")
             FormatRow("PLOC", "Export CSV (Réglages → Exporter)")
             FormatRow("Vivino", "Export CSV de la cave / liste")
-            FormatRow("Vincent", "CSV natif — round-trip complet")
+            FormatRow("Vincent", "CSV natif — métadonnées (photos exclues)")
             FormatRow("Tableur", "Tout CSV avec en-têtes lisibles")
             Spacer(Modifier.height(24.dp))
         }

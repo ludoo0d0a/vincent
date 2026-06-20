@@ -14,15 +14,39 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.thumbnailUri
+
+/** Bottle thumbnail: label photo when available, otherwise the vector bottle. */
+@Composable
+fun BottleThumb(
+    bottle: Bottle,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    val thumb = bottle.thumbnailUri()
+    if (!thumb.isNullOrBlank()) {
+        RemoteImage(
+            url = thumb,
+            modifier = modifier.clip(RoundedCornerShape(6.dp)),
+            contentDescription = "Étiquette ${bottle.domain}",
+            contentScale = contentScale,
+        )
+    } else {
+        WineBottle(bottle.color, modifier)
+    }
+}
 
 private fun Color.darken(amount: Float): Color = lerp(this, Color.Black, amount)
 private fun Color.lighten(amount: Float): Color = lerp(this, Color.White, amount)

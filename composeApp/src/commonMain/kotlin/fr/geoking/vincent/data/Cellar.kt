@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.BottlePhotoKind
 import fr.geoking.vincent.model.ColorBreakdown
 import fr.geoking.vincent.model.SampleData
 import fr.geoking.vincent.model.WineColor
@@ -109,6 +110,16 @@ object Cellar {
         if (i >= 0) {
             val updated = bottles[i].copy(favorite = !bottles[i].favorite)
             bottles[i] = updated
+            persist(updated)
+        }
+    }
+
+    fun updatePhoto(id: String, kind: BottlePhotoKind, uri: String?) {
+        val i = bottles.indexOfFirst { it.id == id }
+        if (i >= 0) {
+            val updated = bottles[i].withPhoto(kind, uri)
+            bottles[i] = updated
+            recent.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { recent[it] = updated }
             persist(updated)
         }
     }

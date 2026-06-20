@@ -47,11 +47,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.ai.foodPairer
+import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.BottlePhotoKind
+import fr.geoking.vincent.model.photo
+import fr.geoking.vincent.model.thumbnailUri
 import kotlinx.coroutines.launch
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.BottlePhotosRow
+import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
@@ -59,11 +66,21 @@ import fr.geoking.vincent.ui.WineBottle
 
 @Composable
 fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
-    val live = Cellar.bottle(bottle.id)
-    val qty = live?.quantity ?: bottle.quantity
-    val fav = live?.favorite ?: bottle.favorite
+    val live = Cellar.bottle(bottle.id) ?: bottle
+    val qty = live.quantity
+    val fav = live.favorite
     val pairer = foodPairer()
     val scope = rememberCoroutineScope()
+    val labelSaver = rememberLabelImageSaver()
+    var pendingKind by remember { mutableStateOf<BottlePhotoKind?>(null) }
+    val capture = rememberPhotoCapture { bytes ->
+        val kind = pendingKind ?: return@rememberPhotoCapture
+        scope.launch {
+            val path = labelSaver.save(bytes, live.id, kind)
+            Cellar.updatePhoto(live.id, kind, path)
+            pendingKind = null
+        }
+    }
     var suggested by remember { mutableStateOf<List<String>>(emptyList()) }
     var pairingBusy by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
@@ -75,7 +92,7 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
             IconChip(Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
             IconChip(
                 Icons.Filled.Favorite,
-                onClick = { Cellar.toggleFavorite(bottle.id) },
+                onClick = { Cellar.toggleFavorite(live.id) },
                 tint = if (fav) VincentColors.Accent else VincentColors.Muted,
                 bg = if (fav) VincentColors.AccentSoft else VincentColors.Surface2,
             )
@@ -90,32 +107,44 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
                 .padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 20.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            WineBottle(bottle.color, Modifier.size(width = 62.dp, height = 150.dp))
+            if (live.thumbnailUri() != null) {
+                BottleThumb(live, Modifier.size(width = 62.dp, height = 150.dp))
+            } else {
+                WineBottle(live.color, Modifier.size(width = 62.dp, height = 150.dp))
+            }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f).padding(bottom = 4.dp)) {
-                ColorTag(bottle.color, label = "${bottle.color.label} · ${bottle.category.label}")
+                ColorTag(live.color, label = "${live.color.label} · ${live.category.label}")
                 Spacer(Modifier.height(7.dp))
-                Text("${bottle.domain} ${bottle.vintage}", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("${bottle.appellation} · ${bottle.provenance}", fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                Text("${live.domain} ${live.vintage}", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text("${live.appellation} · ${live.provenance}", fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 9.dp)) {
-                    Stars(bottle.rating)
+                    Stars(live.rating)
                     Spacer(Modifier.width(7.dp))
-                    Text(bottle.rating.toString().replace('.', ','), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                    Text(live.rating.toString().replace('.', ','), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
                 }
             }
         }
 
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Section("Photos") {
+                BottlePhotosRow(
+                    photos = BottlePhotoKind.entries.associateWith { live.photo(it) },
+                    onCapture = { kind -> pendingKind = kind; capture() },
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+
             // Stats
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Stat("Quantité", "×$qty", Modifier.weight(1f))
-                Stat("Valeur", "${bottle.price * qty} €", Modifier.weight(1f))
-                Stat("Casier", bottle.cellarSpot, Modifier.weight(1f))
+                Stat("Valeur", "${live.price * qty} €", Modifier.weight(1f))
+                Stat("Casier", live.cellarSpot, Modifier.weight(1f))
             }
 
             // Pairings — Gemini can suggest more on demand.
             Section("Accords mets-vin") {
-                val all = (bottle.pairings + suggested).distinct()
+                val all = (live.pairings + suggested).distinct()
                 all.chunked(2).forEach { rowItems ->
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 7.dp)) {
                         rowItems.forEach { Pairing(it) }
@@ -125,7 +154,7 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
                     onClick = {
                         pairingBusy = true
                         scope.launch {
-                            val res = pairer.pairings(bottle)
+                            val res = pairer.pairings(live)
                             if (res.isNotEmpty()) suggested = res
                             pairingBusy = false
                         }
@@ -141,25 +170,25 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
             }
 
             // Drink window
-            if (bottle.drinkTo > 0) {
+            if (live.drinkTo > 0) {
                 Section("Apogée — à boire") {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                        Text("${bottle.drinkFrom}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+                        Text("${live.drinkFrom}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
                         Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                             Box(
                                 Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp))
                                     .background(Brush.horizontalGradient(listOf(VincentColors.Amber, VincentColors.Green, VincentColors.Amber))),
                             )
                             Row(Modifier.fillMaxWidth()) {
-                                Spacer(Modifier.weight(bottle.drinkNow.coerceIn(0.02f, 0.95f)))
+                                Spacer(Modifier.weight(live.drinkNow.coerceIn(0.02f, 0.95f)))
                                 Box(Modifier.size(13.dp).clip(RoundedCornerShape(50)).background(Color.White).border(3.dp, VincentColors.Green, RoundedCornerShape(50)))
-                                Spacer(Modifier.weight(1f - bottle.drinkNow.coerceIn(0.02f, 0.95f)))
+                                Spacer(Modifier.weight(1f - live.drinkNow.coerceIn(0.02f, 0.95f)))
                             }
                         }
-                        Text("${bottle.drinkTo}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+                        Text("${live.drinkTo}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
                     }
-                    if (bottle.tastingNotes.isNotEmpty()) {
-                        Text(bottle.tastingNotes, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
+                    if (live.tastingNotes.isNotEmpty()) {
+                        Text(live.tastingNotes, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
             }
@@ -168,10 +197,10 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
             Section("Provenance & achat") {
                 VCard(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     Column {
-                        InfoRow(Icons.Filled.Place, "Provenance", bottle.provenance, divider = true)
-                        InfoRow(Icons.Filled.Storefront, "Caviste", bottle.merchant, divider = true)
-                        InfoRow(Icons.Filled.CalendarMonth, "Acheté le", bottle.purchaseDate, divider = true)
-                        InfoRow(Icons.Filled.LocalBar, "Occasion", bottle.occasion, divider = false)
+                        InfoRow(Icons.Filled.Place, "Provenance", live.provenance, divider = true)
+                        InfoRow(Icons.Filled.Storefront, "Caviste", live.merchant, divider = true)
+                        InfoRow(Icons.Filled.CalendarMonth, "Acheté le", live.purchaseDate, divider = true)
+                        InfoRow(Icons.Filled.LocalBar, "Occasion", live.occasion, divider = false)
                     }
                 }
             }
@@ -184,15 +213,15 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
                 ) {
                     Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Cave A · Rangée ${bottle.cellarSpot.take(1)} · Case ${bottle.cellarSpot.drop(1)}", color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                    Text("Cave A · Rangée ${live.cellarSpot.take(1)} · Case ${live.cellarSpot.drop(1)}", color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
                 }
             }
 
             // CTA
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedButton(onClick = { Cellar.adjustQuantity(bottle.id, -1) }, modifier = Modifier.weight(1f)) { Text("Servir −1") }
+                OutlinedButton(onClick = { Cellar.adjustQuantity(live.id, -1) }, modifier = Modifier.weight(1f)) { Text("Servir −1") }
                 Button(
-                    onClick = { Cellar.adjustQuantity(bottle.id, +1) },
+                    onClick = { Cellar.adjustQuantity(live.id, +1) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
                 ) { Text("Ajouter +1") }

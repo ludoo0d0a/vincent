@@ -8,9 +8,10 @@ import fr.geoking.vincent.model.WineColor
 /**
  * CSV import/export for the cellar.
  *
- * Export uses Vincent's own column set (full round-trip). Import is tolerant: it
- * maps columns by header name across known aliases (FR/EN), so files exported from
- * Vincent, Vivino, PLOC and most spreadsheet exports load without manual mapping.
+ * Export uses Vincent's own column set (metadata only — photos stay on device).
+ * Import is tolerant: it maps columns by header name across known aliases (FR/EN),
+ * so files exported from Vincent, Vivino, PLOC and most spreadsheet exports load
+ * without manual mapping. Photo columns in legacy files are ignored.
  */
 object CsvFormat {
 

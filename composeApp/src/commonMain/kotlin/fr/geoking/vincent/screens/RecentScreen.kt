@@ -38,7 +38,7 @@ import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.WineBottle
+import fr.geoking.vincent.ui.BottleThumb
 
 @Composable
 fun RecentScreen(
@@ -82,7 +82,7 @@ private fun RecentRow(b: Bottle, onOpenBottle: (Bottle) -> Unit) {
         Modifier.fillMaxWidth().padding(bottom = 9.dp).clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable { onOpenBottle(b) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        WineBottle(b.color, Modifier.size(width = 26.dp, height = 54.dp))
+        BottleThumb(b, Modifier.size(width = 26.dp, height = 54.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text("${b.domain} ${b.vintage}", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
