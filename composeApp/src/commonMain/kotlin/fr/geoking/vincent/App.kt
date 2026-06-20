@@ -54,7 +54,8 @@ enum class Tab(val label: String, val icon: ImageVector) {
 /** A screen pushed above the tabbed home. Back pops the top of the stack. */
 private sealed interface Dest {
     data class Detail(val bottle: Bottle) : Dest
-    data object Add : Dest
+    /** [spot] pre-fills the rack location when adding from an empty cell. */
+    data class Add(val spot: String? = null) : Dest
     data object Account : Dest
     data object Recent : Dest
     data object Transfer : Dest
@@ -83,7 +84,8 @@ fun App() = VincentTheme {
                     tab = tab,
                     onTab = { tab = it },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
-                    onAdd = { stack.add(Dest.Add) },
+                    onAdd = { stack.add(Dest.Add()) },
+                    onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
                 )
 
@@ -92,7 +94,7 @@ fun App() = VincentTheme {
                     onBack = ::pop,
                 )
 
-                Dest.Add -> AddScreen(onClose = ::pop)
+                is Dest.Add -> AddScreen(onClose = ::pop, initialSpot = top.spot)
 
                 Dest.Account -> AccountScreen(
                     onBack = ::pop,
@@ -119,6 +121,7 @@ private fun MainScaffold(
     onTab: (Tab) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
     onAdd: () -> Unit,
+    onAddToCell: (String) -> Unit,
     onAccount: () -> Unit,
 ) {
     Scaffold(
@@ -160,7 +163,7 @@ private fun MainScaffold(
         val content = Modifier.padding(inner)
         when (tab) {
             Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onAccount = onAccount)
-            Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle)
+            Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle, onAddToCell = onAddToCell)
             Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle)
             Tab.SEARCH -> SearchScreen(content)
         }

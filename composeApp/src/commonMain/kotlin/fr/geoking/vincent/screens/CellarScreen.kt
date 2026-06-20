@@ -115,6 +115,7 @@ private fun interiorBase(cell: RackCell, mode: RackMode): Color = when (mode) {
 fun CellarScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (Bottle) -> Unit,
+    onAddToCell: (String) -> Unit = {},
 ) {
     var rackIdx by remember { mutableIntStateOf(0) }
     val rack = Racks.all[rackIdx.coerceIn(0, Racks.all.lastIndex)]
@@ -149,7 +150,7 @@ fun CellarScreen(
                 Spacer(Modifier.height(10.dp))
                 FilterChips(filterIdx) { filterIdx = if (filterIdx == it) -1 else it }
                 Spacer(Modifier.height(11.dp))
-                RackGrid(rack, mode, filter, selectedIdx) { selectedIdx = it }
+                RackGrid(rack, mode, filter, selectedIdx, onAddToCell) { selectedIdx = it }
                 Spacer(Modifier.height(11.dp))
                 PeekCard(rack, selectedIdx, onOpenBottle)
                 Spacer(Modifier.height(24.dp))
@@ -279,7 +280,7 @@ private fun FilterChips(selectedIdx: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
-private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedIdx: Int, onSelect: (Int) -> Unit) {
+private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedIdx: Int, onAddToCell: (String) -> Unit, onSelect: (Int) -> Unit) {
     val matching = rack.cells.count { it.occupied && (filter?.test?.invoke(it) ?: true) }
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -298,7 +299,10 @@ private fun RackGrid(rack: Rack, mode: RackMode, filter: RackFilter?, selectedId
                         Cell(
                             cell, mode, filter,
                             selected = gi == selectedIdx,
-                            onClick = { if (cell.occupied) onSelect(gi) },
+                            onClick = {
+                                if (cell.occupied) onSelect(gi)
+                                else onAddToCell("${rowLabel(rowIndex)}${colIndex + 1}")
+                            },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -331,13 +335,18 @@ private fun Cell(
     modifier: Modifier = Modifier,
 ) {
     if (!cell.occupied) {
+        // Empty slot: tap to add a bottle into this exact spot.
         Box(
             modifier
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(7.dp))
                 .background(VincentColors.Surface2)
-                .border(1.dp, VincentColors.Border, RoundedCornerShape(7.dp)),
-        )
+                .border(1.dp, VincentColors.Border, RoundedCornerShape(7.dp))
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "Ajouter ici", tint = VincentColors.Faint, modifier = Modifier.size(16.dp))
+        }
         return
     }
     val matches = filter?.test?.invoke(cell) ?: true

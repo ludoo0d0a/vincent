@@ -70,8 +70,9 @@ import fr.geoking.vincent.ui.WineBottle
 private enum class AddMode(val label: String) { IDENTIFY("Identifier"), VOICE("Voix"), MANUAL("Manuel") }
 
 @Composable
-fun AddScreen(onClose: () -> Unit) {
-    var mode by remember { mutableStateOf(AddMode.IDENTIFY) }
+fun AddScreen(onClose: () -> Unit, initialSpot: String? = null) {
+    // Opened from an empty rack cell → start on the manual form with the spot pre-filled.
+    var mode by remember { mutableStateOf(if (initialSpot != null) AddMode.MANUAL else AddMode.IDENTIFY) }
     val recognizer = wineRecognizer()
     val estimator = priceEstimator()
     val scope = rememberCoroutineScope()
@@ -79,7 +80,7 @@ fun AddScreen(onClose: () -> Unit) {
     var aiPrice by remember { mutableStateOf<PriceEstimate?>(null) }
     var busy by remember { mutableStateOf(false) }
     var manualBottle by remember { mutableStateOf<Bottle?>(null) }
-    var manualSeed by remember { mutableStateOf<ManualSeed?>(null) }
+    var manualSeed by remember { mutableStateOf(initialSpot?.let { ManualSeed(spot = it) }) }
     var scanMsg by remember { mutableStateOf<String?>(null) }
     // Barcode → Open Food Facts lookup → prefill the manual form (vintage/price stay
     // for the user to complete, since EANs rarely encode them).
@@ -228,6 +229,7 @@ private data class ManualSeed(
     val appellation: String = "",
     val color: WineColor = WineColor.RED,
     val category: WineCategory = WineCategory.BORDEAUX,
+    val spot: String = "",
 )
 
 /** Manual entry — a real form; emits a Bottle (or null while the name is empty). */
@@ -242,9 +244,12 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?) -> Unit) {
     var qty by remember { mutableStateOf("1") }
     var spot by remember { mutableStateOf("") }
 
-    // Apply a barcode prefill when one arrives (only overwrites the name fields).
+    // Apply a prefill (barcode lookup, or an empty-cell tap that sets the rack spot).
     LaunchedEffect(seed) {
-        seed?.let { domain = it.domain; appellation = it.appellation; color = it.color; category = it.category }
+        seed?.let {
+            domain = it.domain; appellation = it.appellation; color = it.color; category = it.category
+            if (it.spot.isNotBlank()) spot = it.spot
+        }
     }
 
     LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot) {
