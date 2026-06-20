@@ -166,6 +166,7 @@ body{padding:48px 32px 80px}
 .cells{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;flex:1}
 .cell{aspect-ratio:1;border-radius:8px;border:3px solid var(--border);position:relative;display:grid;place-items:center}
 .cell.empty{border-width:1px;border-color:var(--border);background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,transparent 4px,transparent 8px)}
+.cell.empty::after{content:"+";color:var(--faint);font-size:13px;font-weight:700;line-height:1}
 .cell .clab{font-family:var(--mono);font-size:11px;font-weight:800;background:rgba(255,255,255,.88);color:#2a1717;padding:2px 4px;border-radius:5px;line-height:1.05}
 .cell .clab:empty{display:none}
 .cell.dim{opacity:.3}
@@ -580,13 +581,23 @@ body{padding:48px 32px 80px}
             <div class="rack-foot"><span>Service frais · touchez une case</span><span class="mono">83%</span></div>
           </div>
 
-          <div class="card peek">
-            <div class="bot" style="--bcol:oklch(34% 0.11 24);width:30px;height:46px"><span class="neck"></span><span class="body"><span class="lbl"></span></span></div>
-            <div class="pi">
-              <b>Emplacement B3</b>
-              <span>Léoville-Barton 2016 · 68 €</span>
+          <div class="card peek" style="display:block">
+            <div style="display:flex;gap:11px;align-items:center">
+              <div class="bot" style="--bcol:oklch(34% 0.11 24);width:30px;height:46px"><span class="neck"></span><span class="body"><span class="lbl"></span></span></div>
+              <div class="pi">
+                <b>Emplacement B3</b>
+                <span>Léoville-Barton 2016 · 68 €</span>
+              </div>
+              <span class="tag tag-red"><i class="dot"></i>Bordeaux</span>
             </div>
-            <span class="tag tag-red"><i class="dot"></i>Bordeaux</span>
+            <div style="display:flex;gap:8px;margin-top:11px">
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:42px;border-radius:12px;border:1px solid var(--border);background:var(--surface-2);font-size:12.5px;font-weight:700;color:var(--fg)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>Déplacer
+              </div>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:42px;border-radius:12px;border:1px solid var(--border);background:var(--surface-2);font-size:12.5px;font-weight:700;color:var(--fg)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M8 3h8l-.7 7a3.3 3.3 0 0 1-6.6 0L8 3Z"/><path d="M12 17v4M9 21h6"/></svg>Consommer
+              </div>
+            </div>
           </div>
         </div>
         <div class="bnav">
@@ -597,7 +608,7 @@ body{padding:48px 32px 80px}
         </div>
       </div>
     </div></div>
-    <div class="frame-label"><div class="n">02</div><div class="t">Plan des casiers (block) · interactif</div><div class="d">Bord toujours à la couleur du vin ; le remplissage suit le mode (couleur, prix, millésime, catégorie). Touchez une case pour la sélectionner ; éditeur de casier (taille, quinconce).</div></div>
+    <div class="frame-label"><div class="n">02</div><div class="t">Plan des casiers (block) · interactif</div><div class="d">Bord toujours à la couleur du vin ; remplissage selon le mode. Touchez une bouteille pour la sélectionner (Déplacer / Consommer), ou une case vide pour y ajouter une bouteille. Éditeur de casier : taille, quinconce, dupliquer, supprimer.</div></div>
   </div>
 
   <!-- ============ 3. LISTE / GRILLE ============ -->
@@ -1166,6 +1177,7 @@ body{padding:48px 32px 80px}
             </div>
             <div class="ed-cap">Capacité : <span data-ed-cap>32</span> emplacements</div>
             <div class="ed-prev" data-ed-prev></div>
+            <div class="ed-actions"><button class="cancel">Dupliquer</button><button class="cancel" style="color:var(--red);border-color:color-mix(in oklch,var(--red) 35%,#fff)">Supprimer</button></div>
             <div class="ed-actions"><button class="cancel">Annuler</button><button class="save">Enregistrer</button></div>
           </div>
         </div>
