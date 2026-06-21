@@ -52,16 +52,16 @@ fun HttpDebugBar(modifier: Modifier = Modifier) {
         modifier = modifier
             .widthIn(max = 360.dp)
             .animateContentSize(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(if (expanded) 12.dp else 24.dp),
         color = VincentColors.Fg.copy(alpha = 0.92f),
         shadowElevation = 8.dp,
     ) {
         Column {
             Row(
                 Modifier
-                    .fillMaxWidth()
+                    .then(if (expanded) Modifier.fillMaxWidth() else Modifier)
                     .clickable { expanded = !expanded }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = if (expanded) 12.dp else 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -77,25 +77,27 @@ fun HttpDebugBar(modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                Text(
-                    if (expanded) "Debug réseau" else "${entries.size} req",
-                    color = VincentColors.Surface,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                last?.let {
+                if (expanded) {
                     Text(
-                        "${it.method} ${it.statusCode ?: "—"} · ${it.durationMs}ms",
-                        color = VincentColors.Surface.copy(alpha = 0.75f),
-                        fontSize = 11.sp,
-                        modifier = Modifier.weight(1f),
+                        "Debug réseau",
+                        color = VincentColors.Surface,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    last?.let {
+                        Text(
+                            "${it.method} ${it.statusCode ?: "—"} · ${it.durationMs}ms",
+                            color = VincentColors.Surface.copy(alpha = 0.75f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Text(
+                        if (expanded) "▾" else "▸",
+                        color = VincentColors.Surface.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
                     )
                 }
-                Text(
-                    if (expanded) "▾" else "▸",
-                    color = VincentColors.Surface.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                )
             }
 
             if (expanded) {

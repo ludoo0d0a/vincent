@@ -120,8 +120,8 @@ fun App() = VincentTheme {
             }
             HttpDebugBar(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 8.dp, top = 8.dp),
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 96.dp),
             )
         }
     }
