@@ -38,6 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.rememberCsvExport
@@ -53,11 +56,11 @@ fun ImportExportScreen(onBack: () -> Unit) {
     val importCsv = rememberCsvImport { text ->
         val result = CsvFormat.parse(text)
         val n = Cellar.importBottles(result.bottles)
-        status = if (n > 0) "Importé : $n bouteille${if (n > 1) "s" else ""} · source détectée « ${result.source} »"
-        else "Aucune bouteille reconnue dans ce fichier."
+        status = if (n > 0) pluralStringResource(Res.plurals.transfer_import_success, n, n, "", result.source)
+        else stringResource(Res.string.transfer_import_none)
     }
     val exportCsv = rememberCsvExport("vincent-cave.csv", { Cellar.exportCsv() }) { ok ->
-        status = if (ok) "Cave exportée en CSV." else "Export annulé."
+        status = if (ok) stringResource(Res.string.transfer_export_success) else stringResource(Res.string.transfer_export_canceled)
     }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
@@ -65,11 +68,11 @@ fun ImportExportScreen(onBack: () -> Unit) {
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Importer / Exporter", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("Transférez votre cave en CSV", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.transfer_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.transfer_subtitle), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
@@ -80,10 +83,10 @@ fun ImportExportScreen(onBack: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.FileUpload, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Importer une cave", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                        Text(stringResource(Res.string.transfer_import_title), fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
                     }
                     Text(
-                        "Chargez un export CSV de PLOC, Vivino ou d'un tableur. Les colonnes sont reconnues automatiquement (couleur, millésime, prix, région…).",
+                        stringResource(Res.string.transfer_import_desc),
                         fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp),
                     )
                     Button(
@@ -91,7 +94,7 @@ fun ImportExportScreen(onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(46.dp),
                         shape = RoundedCornerShape(13.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
-                    ) { Text("Choisir un fichier CSV", fontWeight = FontWeight.W700) }
+                    ) { Text(stringResource(Res.string.transfer_import_button), fontWeight = FontWeight.W700) }
                 }
             }
 
@@ -103,17 +106,17 @@ fun ImportExportScreen(onBack: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.FileDownload, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Exporter ma cave", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                        Text(stringResource(Res.string.transfer_export_title), fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
                     }
                     Text(
-                        "Génère un fichier CSV de vos ${Cellar.references()} références (sans les photos) — réimportable dans Vincent ou lisible dans tout tableur.",
+                        stringResource(Res.string.transfer_export_desc, Cellar.references()),
                         fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp),
                     )
                     OutlinedButton(
                         onClick = exportCsv,
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(46.dp),
                         shape = RoundedCornerShape(13.dp),
-                    ) { Text("Exporter en CSV", fontWeight = FontWeight.W700, color = VincentColors.Accent) }
+                    ) { Text(stringResource(Res.string.transfer_export_button), fontWeight = FontWeight.W700, color = VincentColors.Accent) }
                 }
             }
 
@@ -124,11 +127,11 @@ fun ImportExportScreen(onBack: () -> Unit) {
                 ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
             }
 
-            SectionHeader("Formats pris en charge")
-            FormatRow("PLOC", "Export CSV (Réglages → Exporter)")
-            FormatRow("Vivino", "Export CSV de la cave / liste")
-            FormatRow("Vincent", "CSV natif — métadonnées (photos exclues)")
-            FormatRow("Tableur", "Tout CSV avec en-têtes lisibles")
+            SectionHeader(stringResource(Res.string.transfer_formats_supported))
+            FormatRow("PLOC", stringResource(Res.string.format_ploc_desc))
+            FormatRow("Vivino", stringResource(Res.string.format_vivino_desc))
+            FormatRow("Vincent", stringResource(Res.string.format_vincent_desc))
+            FormatRow(stringResource(Res.string.format_spreadsheet_label), stringResource(Res.string.format_spreadsheet_desc))
             Spacer(Modifier.height(24.dp))
         }
     }

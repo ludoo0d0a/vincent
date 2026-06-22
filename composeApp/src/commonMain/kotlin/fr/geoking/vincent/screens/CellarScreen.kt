@@ -58,6 +58,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.RackClipboard
 import fr.geoking.vincent.data.RackClipboardEntry
@@ -204,7 +207,7 @@ fun CellarScreen(
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            ScreenHeader("Casiers", "${rack.capacity} emplacements · ${rack.occupiedCount} occupés")
+            ScreenHeader(stringResource(Res.string.cellar_title), stringResource(Res.string.cellar_subtitle_format, rack.capacity, rack.occupiedCount))
 
             Column(Modifier.padding(horizontal = 16.dp)) {
                 CellarTabs(
@@ -327,8 +330,8 @@ private fun CellarTabs(
                 }
             }
         }
-        IconButtonBox(Icons.Filled.Edit, "Éditer le casier", onEdit)
-        IconButtonBox(Icons.Filled.Add, "Ajouter un casier", onAdd)
+        IconButtonBox(Icons.Filled.Edit, stringResource(Res.string.cellar_edit_rack), onEdit)
+        IconButtonBox(Icons.Filled.Add, stringResource(Res.string.cellar_add_rack), onAdd)
     }
 }
 
@@ -368,7 +371,7 @@ private fun ModeSelector(mode: RackMode, onMode: (RackMode) -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    m.label,
+                        stringResource(m.label),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.W700,
                     color = if (on) VincentColors.Accent else VincentColors.Muted,
@@ -461,11 +464,11 @@ private fun RackGrid(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
                     when {
-                        dragActive -> "Déposez sur une case vide"
-                        moveActive -> "Déplacement — touchez une case vide"
-                        clipboard != null -> "Presse-papiers actif — touchez une case vide pour coller"
-                        filter == null -> "Maintenez pour glisser · touchez pour sélectionner"
-                        else -> "$matching bouteille${if (matching > 1) "s" else ""} dans ce filtre"
+                        dragActive -> stringResource(Res.string.cellar_drag_drop_hint)
+                        moveActive -> stringResource(Res.string.cellar_move_hint)
+                        clipboard != null -> stringResource(Res.string.cellar_paste_hint)
+                        filter == null -> stringResource(Res.string.cellar_drag_manual_hint)
+                        else -> pluralStringResource(Res.plurals.cellar_filter_matching_format, matching, matching)
                     },
                     fontSize = 11.sp,
                     color = if (dragActive || moveActive || clipboard != null) VincentColors.Accent else VincentColors.Muted,
@@ -534,9 +537,9 @@ private fun Cell(
             Icon(
                 if (pasteTarget && !dropTarget) Icons.Filled.ContentPaste else Icons.Filled.Add,
                 contentDescription = when {
-                    dropTarget -> "Déplacer ici"
-                    pasteTarget -> "Coller ici"
-                    else -> "Ajouter ici"
+                    dropTarget -> stringResource(Res.string.cellar_action_move)
+                    pasteTarget -> stringResource(Res.string.cellar_action_paste)
+                    else -> stringResource(Res.string.cellar_action_add)
                 },
                 tint = if (dropTarget || pasteTarget) VincentColors.Accent else VincentColors.Faint,
                 modifier = Modifier.size(if (pasteTarget && !dropTarget) 14.dp else 16.dp),
@@ -629,20 +632,20 @@ private fun PeekCard(
         val spot = RackPlacement(rackIdx, selectedIdx).spotLabel(rack.cols)
         VCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
-                Text("Emplacement $spot", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                Text(stringResource(Res.string.cellar_spot_label, spot), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
                 Text(
-                    if (clipboard != null) "Case libre — collez ou ajoutez une bouteille."
-                    else "Case libre — ajoutez une bouteille ici.",
+                    if (clipboard != null) stringResource(Res.string.cellar_free_spot_paste_desc)
+                    else stringResource(Res.string.cellar_free_spot_desc),
                     fontSize = 11.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp),
                 )
                 Spacer(Modifier.height(11.dp))
                 if (clipboard != null) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PeekAction("Coller", Icons.Filled.ContentPaste, onPaste, Modifier.weight(1f))
-                        PeekAction("Ajouter", Icons.Filled.Add, onAddBottle, Modifier.weight(1f))
+                        PeekAction(stringResource(Res.string.cellar_action_paste), Icons.Filled.ContentPaste, onPaste, Modifier.weight(1f))
+                        PeekAction(stringResource(Res.string.cellar_action_add), Icons.Filled.Add, onAddBottle, Modifier.weight(1f))
                     }
                 } else {
-                    PeekAction("Ajouter bouteille", Icons.Filled.Add, onAddBottle, Modifier.fillMaxWidth())
+                    PeekAction(stringResource(Res.string.cellar_action_add_bottle), Icons.Filled.Add, onAddBottle, Modifier.fillMaxWidth())
                 }
             }
         }
@@ -660,7 +663,7 @@ private fun PeekCard(
                 WineBottle(cell.color ?: WineColor.RED, Modifier.size(width = 30.dp, height = 46.dp))
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Emplacement $spot", fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                    Text(stringResource(Res.string.cellar_spot_label, spot), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
                     Text(
                         buildString {
                             append(cell.vintage.orEmpty())
@@ -670,34 +673,34 @@ private fun PeekCard(
                         fontSize = 11.sp, color = VincentColors.Muted,
                     )
                 }
-                cell.color?.let { ColorTag(it, label = cell.category?.label ?: it.label) }
+                cell.color?.let { ColorTag(it, label = cell.category?.label ?: stringResource(it.label)) }
             }
 
             Spacer(Modifier.height(11.dp))
             if (moving) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Touchez une case vide pour déplacer",
+                        stringResource(Res.string.cellar_move_target_hint),
                         fontSize = 12.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
                         modifier = Modifier.weight(1f),
                     )
-                    PeekAction("Annuler", null, onMove)
+                    PeekAction(stringResource(Res.string.cellar_action_cancel), null, onMove)
                 }
             } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PeekAction("Couper", Icons.Filled.ContentCut, onCut, Modifier.weight(1f))
-                    PeekAction("Copier", Icons.Filled.ContentCopy, onCopy, Modifier.weight(1f))
+                    PeekAction(stringResource(Res.string.cellar_action_cut), Icons.Filled.ContentCut, onCut, Modifier.weight(1f))
+                    PeekAction(stringResource(Res.string.cellar_action_copy), Icons.Filled.ContentCopy, onCopy, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PeekAction("Déplacer", Icons.Filled.SwapHoriz, onMove, Modifier.weight(1f))
-                    PeekAction("Consommer", Icons.Filled.LocalBar, onConsume, Modifier.weight(1f))
+                    PeekAction(stringResource(Res.string.cellar_action_move), Icons.Filled.SwapHoriz, onMove, Modifier.weight(1f))
+                    PeekAction(stringResource(Res.string.cellar_action_consume), Icons.Filled.LocalBar, onConsume, Modifier.weight(1f))
                 }
                 if (clipboard != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        if (clipboard.mode == RackClipboardMode.CUT) "Coupe en attente — choisissez une case libre"
-                        else "Copie en attente — choisissez une case libre",
+                        if (clipboard.mode == RackClipboardMode.CUT) stringResource(Res.string.cellar_cut_pending)
+                        else stringResource(Res.string.cellar_copy_pending),
                         fontSize = 11.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
                     )
                 }
@@ -759,38 +762,38 @@ private fun RackEditor(
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Éditer le casier", fontSize = 16.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+            Text(stringResource(Res.string.cellar_edit_title), fontSize = 16.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
             OutlinedTextField(
                 value = name, onValueChange = { name = it }, singleLine = true,
-                label = { Text("Nom", fontSize = 12.sp) }, modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(Res.string.cellar_edit_name), fontSize = 12.sp) }, modifier = Modifier.fillMaxWidth(),
             )
-            Stepper("Colonnes", cols, 1..10) { cols = it }
-            Stepper("Rangées", rows, 1..12) { rows = it }
+            Stepper(stringResource(Res.string.cellar_edit_cols), cols, 1..10) { cols = it }
+            Stepper(stringResource(Res.string.cellar_edit_rows), rows, 1..12) { rows = it }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Quinconce", fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-                    Text("Rangées décalées d'une demi-case", fontSize = 10.5.sp, color = VincentColors.Muted)
+                    Text(stringResource(Res.string.cellar_edit_staggered), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                    Text(stringResource(Res.string.cellar_edit_staggered_desc), fontSize = 10.5.sp, color = VincentColors.Muted)
                 }
                 Switch(checked = staggered, onCheckedChange = { staggered = it })
             }
-            Text("Capacité : ${cols * rows} emplacements", fontSize = 11.sp, color = VincentColors.Muted)
+            Text(stringResource(Res.string.cellar_edit_capacity, cols * rows), fontSize = 11.sp, color = VincentColors.Muted)
             // Manage: clone or delete this rack.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onDuplicate, modifier = Modifier.weight(1f)) { Text("Dupliquer") }
+                OutlinedButton(onClick = onDuplicate, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cellar_edit_duplicate)) }
                 OutlinedButton(
                     onClick = onDelete,
                     enabled = canDelete,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = VincentColors.Red),
-                ) { Text("Supprimer") }
+                ) { Text(stringResource(Res.string.cellar_edit_delete)) }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Annuler") }
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cellar_edit_cancel)) }
                 Button(
                     onClick = { onSave(name.ifBlank { initial.name }, cols, rows, staggered) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
-                ) { Text("Enregistrer") }
+                ) { Text(stringResource(Res.string.cellar_edit_save)) }
             }
         }
     }

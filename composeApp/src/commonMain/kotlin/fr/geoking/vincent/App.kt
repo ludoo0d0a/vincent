@@ -32,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackPlacement
@@ -50,11 +52,11 @@ import fr.geoking.vincent.debug.initHttpDebug
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.theme.VincentTheme
 
-enum class Tab(val label: String, val icon: ImageVector) {
-    HOME("Accueil", Icons.Filled.Home),
-    CELLAR("Casiers", Icons.Filled.GridView),
-    BOTTLES("Bouteilles", Icons.Filled.FormatListBulleted),
-    SEARCH("Recherche", Icons.Filled.Search),
+enum class Tab(val label: org.jetbrains.compose.resources.StringResource, val icon: ImageVector) {
+    HOME(Res.string.tab_home, Icons.Filled.Home),
+    CELLAR(Res.string.tab_cellar, Icons.Filled.GridView),
+    BOTTLES(Res.string.tab_bottles, Icons.Filled.FormatListBulleted),
+    SEARCH(Res.string.tab_search, Icons.Filled.Search),
 }
 
 /** A screen pushed above the tabbed home. Back pops the top of the stack. */
@@ -149,8 +151,8 @@ private fun MainScaffold(
                     NavigationBarItem(
                         selected = t == tab,
                         onClick = { onTab(t) },
-                        icon = { Icon(t.icon, contentDescription = t.label) },
-                        label = { Text(t.label) },
+                        icon = { Icon(t.icon, contentDescription = stringResource(t.label)) },
+                        label = { Text(stringResource(t.label)) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = VincentColors.Accent,
                             selectedTextColor = VincentColors.Accent,
@@ -168,7 +170,7 @@ private fun MainScaffold(
                     onClick = onAdd,
                     containerColor = VincentColors.Accent,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) { Icon(Icons.Filled.Add, contentDescription = "Ajouter une bouteille") }
+                ) { Icon(Icons.Filled.Add, contentDescription = stringResource(Res.string.add_bottle)) }
             }
         },
     ) { inner ->

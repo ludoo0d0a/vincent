@@ -38,6 +38,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
@@ -64,7 +67,14 @@ fun BottlesScreen(
 ) {
     var selected by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
-    val f = filters[selected]
+    val filterItems = listOf(
+        Filter(stringResource(Res.string.bottles_filter_all), null),
+        Filter(stringResource(WineColor.RED.label), WineColor.RED),
+        Filter(stringResource(WineColor.WHITE.label), WineColor.WHITE),
+        Filter(stringResource(WineColor.ROSE.label), WineColor.ROSE),
+        Filter(stringResource(Res.string.bottles_filter_favorites), null, favOnly = true),
+    )
+    val f = filterItems[selected]
     val list = Cellar.bottles.filter {
         (f.color == null || it.color == f.color) && (!f.favOnly || it.favorite)
     }.filter { b ->
@@ -77,11 +87,11 @@ fun BottlesScreen(
     }
 
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-        ScreenHeader("Mes bouteilles", "${Cellar.totalBottles()} bouteilles · ${list.size} affichée${if (list.size > 1) "s" else ""}")
+        ScreenHeader(stringResource(Res.string.bottles_title), pluralStringResource(Res.plurals.bottles_subtitle_format, list.size, Cellar.totalBottles(), list.size))
         Column(Modifier.padding(horizontal = 16.dp)) {
-            SearchField("Domaine, cépage, région…", value = query, onValueChange = { query = it })
+            SearchField(stringResource(Res.string.bottles_search_placeholder), value = query, onValueChange = { query = it })
             Spacer(Modifier.height(11.dp))
-            FilterChips(selected) { selected = it }
+            FilterChips(selected, filterItems) { selected = it }
             Spacer(Modifier.height(11.dp))
             list.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -92,8 +102,8 @@ fun BottlesScreen(
             }
             if (list.isEmpty()) {
                 Text(
-                    if (query.isNotBlank()) "Aucun résultat pour « $query »."
-                    else "Aucune bouteille pour ce filtre.",
+                    if (query.isNotBlank()) stringResource(Res.string.bottles_no_result, query)
+                    else stringResource(Res.string.bottles_no_result_filter),
                     fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
                 )
             }
@@ -139,9 +149,9 @@ fun SearchField(
 }
 
 @Composable
-private fun FilterChips(selected: Int, onSelect: (Int) -> Unit) {
+private fun FilterChips(selected: Int, filterItems: List<Filter>, onSelect: (Int) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        filters.forEachIndexed { i, filter ->
+        filterItems.forEachIndexed { i, filter ->
             val on = i == selected
             Row(
                 Modifier

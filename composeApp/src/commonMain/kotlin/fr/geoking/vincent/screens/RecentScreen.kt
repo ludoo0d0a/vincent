@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
@@ -53,18 +55,18 @@ fun RecentScreen(
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Dernières bouteilles", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("12 ajouts récents", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.recent_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.recent_subtitle), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
-            DayGroup("Aujourd'hui")
+            DayGroup(stringResource(Res.string.recent_today))
             today.forEach { RecentRow(it, onOpenBottle) }
-            DayGroup("Cette semaine")
+            DayGroup(stringResource(Res.string.recent_this_week))
             week.forEach { RecentRow(it, onOpenBottle) }
             Spacer(Modifier.height(24.dp))
         }
@@ -89,7 +91,7 @@ private fun RecentRow(b: Bottle, onOpenBottle: (Bottle) -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
                 Icon(sourceIcon(b.source), contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(5.dp))
-                Text("${b.source.label} · casier ${b.cellarSpot}", fontSize = 10.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.recent_source_rack_format, stringResource(b.source.label), b.cellarSpot), fontSize = 10.5.sp, color = VincentColors.Muted)
             }
         }
         Column(horizontalAlignment = Alignment.End) {

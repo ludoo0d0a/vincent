@@ -36,6 +36,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.MonoNumber
@@ -43,32 +46,32 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ScreenHeader
 
 /** A search dimension: its label, the full option list, and how many to show inline. */
-private enum class Crit(val label: String, val all: List<String>, val common: Int) {
+private enum class Crit(val label: org.jetbrains.compose.resources.StringResource, val all: List<String>, val common: Int) {
     TASTE(
-        "Goût / arômes",
+        Res.string.search_crit_taste,
         listOf("Fruité", "Sec", "Minéral", "Tannique", "Boisé", "Vif", "Rond", "Épicé",
             "Floral", "Léger", "Puissant", "Acidulé", "Doux", "Complexe", "Fumé", "Long en bouche"),
         6,
     ),
     GRAPE(
-        "Cépage",
+        Res.string.search_crit_grape,
         listOf("Cabernet Sauvignon", "Merlot", "Pinot Noir", "Syrah", "Grenache", "Chardonnay",
             "Sauvignon Blanc", "Chenin", "Riesling", "Gamay", "Cinsault", "Mourvèdre", "Viognier", "Sémillon"),
         5,
     ),
     REGION(
-        "Provenance",
+        Res.string.search_crit_region,
         listOf("Bordeaux", "Bourgogne", "Rhône", "Provence", "Loire", "Champagne",
             "Languedoc", "Alsace", "Beaujolais", "Sud-Ouest", "Italie", "Espagne", "Portugal"),
         6,
     ),
     MERCHANT(
-        "Caviste / magasin",
+        Res.string.search_crit_merchant,
         listOf("Lavinia", "Nicolas", "Caviste local", "En ligne", "Producteur", "Foire aux vins"),
         4,
     ),
     OCCASION(
-        "Occasion",
+        Res.string.search_crit_occasion,
         listOf("À offrir", "Cave de garde", "Tous les jours", "Fête", "Accord mets", "Découverte"),
         4,
     ),
@@ -91,19 +94,19 @@ fun SearchScreen(modifier: Modifier = Modifier) {
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            ScreenHeader("Filtrer", "Affinez votre recherche", trailing = {
-                Text("Réinitialiser", fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
+            ScreenHeader(stringResource(Res.string.search_title), stringResource(Res.string.search_subtitle), trailing = {
+                Text(stringResource(Res.string.search_reset), fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
                     modifier = Modifier.clickable { selections = emptyMap(); colorIdx = 0 })
             })
             Column(Modifier.padding(horizontal = 16.dp)) {
-                SearchField("Mot-clé, cépage…")
+                SearchField(stringResource(Res.string.search_keyword_placeholder))
                 Spacer(Modifier.height(15.dp))
 
-                GroupLabel("Couleur")
+                GroupLabel(stringResource(Res.string.search_color_label))
                 ColorPicker(colorIdx) { colorIdx = it }
                 Spacer(Modifier.height(15.dp))
 
-                GroupLabel("Prix")
+                GroupLabel(stringResource(Res.string.search_price_label))
                 PriceRange()
                 Spacer(Modifier.height(15.dp))
 
@@ -125,7 +128,7 @@ fun SearchScreen(modifier: Modifier = Modifier) {
                 ) {
                     Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Voir $count bouteille${if (count > 1) "s" else ""}", fontWeight = FontWeight.W700)
+                    Text(pluralStringResource(Res.plurals.see_bottles, count, count), fontWeight = FontWeight.W700)
                 }
                 Spacer(Modifier.height(70.dp))
             }
@@ -154,9 +157,9 @@ private fun CritSection(crit: Crit, selected: Set<String>, onToggle: (String) ->
     // Always surface selected items even if they live beyond the common subset.
     val shown = (common + selected.filter { it !in common }).distinct()
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        GroupLabel(crit.label)
+        GroupLabel(stringResource(crit.label))
         if (selected.isNotEmpty()) {
-            Text("${selected.size} sélectionné${if (selected.size > 1) "s" else ""}", fontSize = 10.5.sp, color = VincentColors.Accent, fontWeight = FontWeight.W600)
+            Text(pluralStringResource(Res.plurals.selected_count, selected.size, selected.size), fontSize = 10.5.sp, color = VincentColors.Accent, fontWeight = FontWeight.W600)
         }
     }
     (shown + "…").chunked(3).forEach { row ->
@@ -201,11 +204,11 @@ private fun CriteriaPicker(crit: Crit, selected: Set<String>, onToggle: (String)
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.size(12.dp))
             Column {
-                Text(crit.label, fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("${crit.all.size} critères · ${selected.size} sélectionné${if (selected.size > 1) "s" else ""}", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(crit.label), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(pluralStringResource(Res.plurals.criteria_count, crit.all.size, crit.all.size) + " · " + pluralStringResource(Res.plurals.selected_count, selected.size, selected.size), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
@@ -225,7 +228,7 @@ private fun CriteriaPicker(crit: Crit, selected: Set<String>, onToggle: (String)
             modifier = Modifier.fillMaxWidth().padding(16.dp).height(46.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
-        ) { Text("Appliquer", fontWeight = FontWeight.W700) }
+        ) { Text(stringResource(Res.string.search_apply), fontWeight = FontWeight.W700) }
     }
 }
 
@@ -259,7 +262,7 @@ private fun ColorPicker(selected: Int, onSelect: (Int) -> Unit) {
             ) {
                 Box(Modifier.size(22.dp).clip(RoundedCornerShape(50)).background(c.glass))
                 Spacer(Modifier.height(6.dp))
-                Text(c.label, fontSize = 10.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                Text(stringResource(c.label), fontSize = 10.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
             }
         }
     }

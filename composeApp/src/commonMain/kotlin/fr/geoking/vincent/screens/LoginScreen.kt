@@ -36,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.rememberGoogleSignIn
@@ -61,10 +63,10 @@ fun LoginScreen(onGuest: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Filled.LocalBar, contentDescription = null, tint = Color.White, modifier = Modifier.size(34.dp)) }
             Spacer(Modifier.height(18.dp))
-            Text("Vincent", fontSize = 30.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+            Text(stringResource(Res.string.app_name), fontSize = 30.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
             Text(
-                if (FeatureFlags.CLOUD_SYNC) "Votre cave dans la poche. Synchronisée, sauvegardée, partout avec vous."
-                else "Votre cave dans la poche. Simple, privée, toujours à portée de main.",
+                if (FeatureFlags.CLOUD_SYNC) stringResource(Res.string.login_sync_subtitle)
+                else stringResource(Res.string.login_private_subtitle),
                 fontSize = 13.sp, color = VincentColors.Muted, textAlign = TextAlign.Center, lineHeight = 19.sp,
                 modifier = Modifier.padding(top = 8.dp).width(240.dp),
             )
@@ -74,13 +76,13 @@ fun LoginScreen(onGuest: () -> Unit) {
         Column(Modifier.padding(horizontal = 22.dp).padding(bottom = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 14.dp)) {
                 if (FeatureFlags.CLOUD_SYNC) {
-                    Perk(Icons.Filled.CloudUpload, "Stockage cloud")
-                    Perk(Icons.Filled.Favorite, "Favoris")
-                    Perk(Icons.Filled.Devices, "Multi-appareils")
+                    Perk(Icons.Filled.CloudUpload, stringResource(Res.string.perk_cloud))
+                    Perk(Icons.Filled.Favorite, stringResource(Res.string.perk_favorites))
+                    Perk(Icons.Filled.Devices, stringResource(Res.string.perk_devices))
                 } else {
-                    Perk(Icons.Filled.PhotoCamera, "Ajout rapide")
-                    Perk(Icons.Filled.Favorite, "Favoris")
-                    Perk(Icons.Filled.Lock, "100% privé")
+                    Perk(Icons.Filled.PhotoCamera, stringResource(Res.string.perk_quick_add))
+                    Perk(Icons.Filled.Favorite, stringResource(Res.string.perk_favorites))
+                    Perk(Icons.Filled.Lock, stringResource(Res.string.perk_private))
                 }
             }
             // Google button
@@ -93,14 +95,14 @@ fun LoginScreen(onGuest: () -> Unit) {
             ) {
                 GoogleG()
                 Spacer(Modifier.width(11.dp))
-                Text("Continuer avec Google", fontSize = 14.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                Text(stringResource(Res.string.continue_google), fontSize = 14.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
             }
             Spacer(Modifier.height(11.dp))
             Box(Modifier.fillMaxWidth().height(46.dp).clickable(onClick = onGuest), contentAlignment = Alignment.Center) {
-                Text("Continuer sans compte", fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Muted)
+                Text(stringResource(Res.string.continue_guest), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Muted)
             }
             Text(
-                "En continuant, vous acceptez les conditions. Vos données restent privées et chiffrées.",
+                stringResource(Res.string.terms_notice),
                 fontSize = 10.sp, color = VincentColors.Faint, textAlign = TextAlign.Center, lineHeight = 15.sp, modifier = Modifier.padding(top = 6.dp),
             )
         }
