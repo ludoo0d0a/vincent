@@ -127,10 +127,12 @@ fun SearchField(
             cursorBrush = SolidColor(VincentColors.Accent),
             modifier = Modifier.weight(1f),
             decorationBox = { inner ->
-                if (value.isEmpty()) {
-                    Text(placeholder, color = VincentColors.Faint, fontSize = 13.sp)
+                Box(Modifier.fillMaxWidth()) {
+                    if (value.isEmpty()) {
+                        Text(placeholder, color = VincentColors.Faint, fontSize = 13.sp)
+                    }
+                    inner()
                 }
-                inner()
             },
         )
     }
