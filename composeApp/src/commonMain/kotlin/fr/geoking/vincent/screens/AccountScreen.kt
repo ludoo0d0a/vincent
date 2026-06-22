@@ -34,6 +34,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.Cellar
@@ -59,13 +62,13 @@ fun AccountScreen(
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Mon compte", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.my_account), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
                 Text(
-                    if (FeatureFlags.CLOUD_SYNC) "Synchronisé avec Google"
-                    else if (acc != null) "Connecté avec Google" else "Données sur cet appareil",
+                    if (FeatureFlags.CLOUD_SYNC) stringResource(Res.string.sync_google)
+                    else if (acc != null) stringResource(Res.string.connected_google) else stringResource(Res.string.local_data),
                     fontSize = 11.5.sp, color = VincentColors.Muted,
                 )
             }
@@ -83,8 +86,8 @@ fun AccountScreen(
                 }
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(acc?.name ?: "Invité", color = Color.White, fontWeight = FontWeight.W700, fontSize = 15.sp)
-                    Text(acc?.email ?: "Connecté sans compte", color = Color.White.copy(alpha = 0.85f), fontSize = 11.5.sp)
+                    Text(acc?.name ?: stringResource(Res.string.guest), color = Color.White, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                    Text(acc?.email ?: stringResource(Res.string.connected_no_account), color = Color.White.copy(alpha = 0.85f), fontSize = 11.5.sp)
                 }
                 GoogleG(22)
             }
@@ -97,15 +100,15 @@ fun AccountScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Green, modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text("Sauvegarde", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                                Text(stringResource(Res.string.backup), fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                             }
-                            Text("À jour", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                            Text("il y a 2 min", fontSize = 10.5.sp, color = VincentColors.Green, fontWeight = FontWeight.W700)
+                            Text(stringResource(Res.string.up_to_date), fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
+                            Text(stringResource(Res.string.two_min_ago), fontSize = 10.5.sp, color = VincentColors.Green, fontWeight = FontWeight.W700)
                         }
                     }
                     VCard(Modifier.weight(1f)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text("Stockage cloud", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text(stringResource(Res.string.cloud_storage), fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                             Text("${Cellar.totalBottles()} / 500", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
                             Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Border)) {
                                 Box(Modifier.fillMaxWidth((Cellar.totalBottles() / 500f).coerceIn(0.02f, 1f)).height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Accent))
@@ -118,16 +121,16 @@ fun AccountScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     VCard(Modifier.weight(1f)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text("Bouteilles", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text(stringResource(Res.string.bottles_label).replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                             Text("${Cellar.totalBottles()}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                            Text("sur cet appareil", fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text(stringResource(Res.string.local_data), fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                         }
                     }
                     VCard(Modifier.weight(1f)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text("Références", fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text(stringResource(Res.string.references), fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                             Text("${Cellar.references()}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                            Text("vins distincts", fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text(stringResource(Res.string.distinct_wines), fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                         }
                     }
                 }
@@ -139,7 +142,7 @@ fun AccountScreen(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenRecent).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Dernières bouteilles ajoutées", Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                Text(stringResource(Res.string.last_added), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
                 Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
             }
 
@@ -148,18 +151,18 @@ fun AccountScreen(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenTransfer).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Exporter ma cave (CSV)", Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                Text(stringResource(Res.string.export_csv_label), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
                 Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
             }
 
-            SectionHeader("Mes données PLOC")
+            SectionHeader(stringResource(Res.string.ploc_data_title))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AccountLink("Dégustations", onOpenTastings)
-                AccountLink("Producteurs", onOpenProducers)
-                AccountLink("Fournisseurs", onOpenSuppliers)
+                AccountLink(stringResource(Res.string.ploc_tastings), onOpenTastings)
+                AccountLink(stringResource(Res.string.ploc_producers), onOpenProducers)
+                AccountLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
             }
 
-            SectionHeader("Mes favoris", "${Cellar.favorites.size} vins")
+            SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))
             Cellar.favorites.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                     pair.forEach { b -> BottleCard(b, Modifier.weight(1f)) { onOpenBottle(b) } }
@@ -172,8 +175,19 @@ fun AccountScreen(
                 onClick = onSignOut,
                 modifier = Modifier.fillMaxWidth().height(46.dp),
                 shape = RoundedCornerShape(13.dp),
-            ) { Text(if (acc != null) "Se déconnecter" else "Se connecter", fontWeight = FontWeight.W700, color = VincentColors.Accent) }
+            ) { Text(if (acc != null) stringResource(Res.string.sign_out) else stringResource(Res.string.sign_in), fontWeight = FontWeight.W700, color = VincentColors.Accent) }
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun AccountLink(label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onClick).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+        Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
     }
 }

@@ -35,6 +35,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.Producers
 import fr.geoking.vincent.data.rememberCsvImport
@@ -42,17 +45,21 @@ import fr.geoking.vincent.model.Producer
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.VCard
 
+private sealed interface ProducerImportStatus {
+    data class Success(val count: Int) : ProducerImportStatus
+    data object WrongType : ProducerImportStatus
+}
+
 @Composable
 fun ProducersScreen(onBack: () -> Unit) {
-    var status by remember { mutableStateOf<String?>(null) }
+    var importStatus by remember { mutableStateOf<ProducerImportStatus?>(null) }
 
     val importCsv = rememberCsvImport { text ->
         val result = CsvFormat.parse(text)
-        if (result.type == CsvFormat.ImportType.PRODUCERS) {
-            val n = Producers.import(result.producers)
-            status = "Importé : $n producteur${if (n > 1) "s" else ""}"
+        importStatus = if (result.type == CsvFormat.ImportType.PRODUCERS) {
+            ProducerImportStatus.Success(Producers.import(result.producers))
         } else {
-            status = "Le fichier ne semble pas être un export de producteurs."
+            ProducerImportStatus.WrongType
         }
     }
 
@@ -61,11 +68,11 @@ fun ProducersScreen(onBack: () -> Unit) {
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Mes producteurs", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("${Producers.all.size} producteurs enregistrés", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.producers_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.producers_subtitle, Producers.all.size), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
@@ -78,13 +85,17 @@ fun ProducersScreen(onBack: () -> Unit) {
             ) {
                 Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Importer des producteurs", fontWeight = FontWeight.W700)
+                Text(stringResource(Res.string.producers_import_button), fontWeight = FontWeight.W700)
             }
 
-            if (status != null) {
-                Box(
+            when (val status = importStatus) {
+                is ProducerImportStatus.Success -> Box(
                     Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                ) { Text(pluralStringResource(Res.plurals.producers_import_success, status.count, status.count), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                ProducerImportStatus.WrongType -> Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                ) { Text(stringResource(Res.string.producers_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                null -> Unit
             }
 
             Producers.all.forEach { producer ->
@@ -93,7 +104,7 @@ fun ProducersScreen(onBack: () -> Unit) {
             }
 
             if (Producers.all.isEmpty()) {
-                Text("Aucun producteur. Importez un fichier CSV de PLOC pour commencer.", fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp))
+                Text(stringResource(Res.string.producers_empty), fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp))
             }
 
             Spacer(Modifier.height(24.dp))

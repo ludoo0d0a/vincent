@@ -39,10 +39,14 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
@@ -52,13 +56,11 @@ import fr.geoking.vincent.ui.Stars
 
 private data class Filter(val label: String, val color: WineColor?, val favOnly: Boolean = false)
 
-private val filters = listOf(
-    Filter("Tout", null),
-    Filter(WineColor.RED.label, WineColor.RED),
-    Filter(WineColor.WHITE.label, WineColor.WHITE),
-    Filter(WineColor.ROSE.label, WineColor.ROSE),
-    Filter("Favoris", null, favOnly = true),
-)
+private sealed interface BottleImportStatus {
+    data class Success(val count: Int, val source: String) : BottleImportStatus
+    data object None : BottleImportStatus
+    data object WrongType : BottleImportStatus
+}
 
 @Composable
 fun BottlesScreen(
@@ -67,7 +69,15 @@ fun BottlesScreen(
 ) {
     var selected by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
-    val f = filters[selected]
+    val filterItems = listOf(
+        Filter(stringResource(Res.string.bottles_filter_all), null),
+        Filter(stringResource(WineColor.RED.label), WineColor.RED),
+        Filter(stringResource(WineColor.WHITE.label), WineColor.WHITE),
+        Filter(stringResource(WineColor.ROSE.label), WineColor.ROSE),
+        Filter(stringResource(Res.string.bottles_filter_favorites), null, favOnly = true),
+    )
+    val f = filterItems[selected]
+    val categoryLabels = WineCategory.entries.associateWith { stringResource(it.label).lowercase() }
     val list = Cellar.bottles.filter {
         (f.color == null || it.color == f.color) && (!f.favOnly || it.favorite)
     }.filter { b ->
@@ -75,41 +85,48 @@ fun BottlesScreen(
         q.isBlank() ||
             b.domain.lowercase().contains(q) ||
             b.appellation.lowercase().contains(q) ||
-            b.category.label.lowercase().contains(q) ||
+            categoryLabels[b.category]?.contains(q) == true ||
             b.vintage.lowercase().contains(q)
     }
 
-    var status by remember { mutableStateOf<String?>(null) }
+    var importStatus by remember { mutableStateOf<BottleImportStatus?>(null) }
     val importCsv = rememberCsvImport { text ->
         val result = CsvFormat.parse(text)
-        if (result.type == CsvFormat.ImportType.BOTTLES) {
+        importStatus = if (result.type == CsvFormat.ImportType.BOTTLES) {
             val n = Cellar.importBottles(result.bottles)
-            status = "Importé : $n bouteille${if (n > 1) "s" else ""} · source détectée « ${result.source} »"
+            if (n > 0) BottleImportStatus.Success(n, result.source) else BottleImportStatus.None
         } else {
-            status = "Le fichier ne semble pas être un export de bouteilles."
+            BottleImportStatus.WrongType
         }
     }
 
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
         ScreenHeader(
-            "Mes bouteilles",
-            "${Cellar.totalBottles()} bouteilles · ${list.size} affichée${if (list.size > 1) "s" else ""}",
+            stringResource(Res.string.bottles_title),
+            pluralStringResource(Res.plurals.bottles_subtitle_format, list.size, Cellar.totalBottles(), list.size),
             trailing = {
                 Box(
                     Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.FileUpload, contentDescription = "Importer", modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
-            }
+                ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+            },
         )
         Column(Modifier.padding(horizontal = 16.dp)) {
-            if (status != null) {
-                Box(
+            when (val status = importStatus) {
+                is BottleImportStatus.Success -> Box(
                     Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                ) { Text(pluralStringResource(Res.plurals.transfer_import_success, status.count, status.count, "", status.source), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                BottleImportStatus.None -> Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                ) { Text(stringResource(Res.string.transfer_import_none), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                BottleImportStatus.WrongType -> Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                ) { Text(stringResource(Res.string.bottles_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                null -> Unit
             }
-            SearchField("Domaine, cépage, région…", value = query, onValueChange = { query = it })
+            SearchField(stringResource(Res.string.bottles_search_placeholder), value = query, onValueChange = { query = it })
             Spacer(Modifier.height(11.dp))
-            FilterChips(selected) { selected = it }
+            FilterChips(selected, filterItems) { selected = it }
             Spacer(Modifier.height(11.dp))
             list.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -120,8 +137,8 @@ fun BottlesScreen(
             }
             if (list.isEmpty()) {
                 Text(
-                    if (query.isNotBlank()) "Aucun résultat pour « $query »."
-                    else "Aucune bouteille pour ce filtre.",
+                    if (query.isNotBlank()) stringResource(Res.string.bottles_no_result, query)
+                    else stringResource(Res.string.bottles_no_result_filter),
                     fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
                 )
             }
@@ -167,9 +184,9 @@ fun SearchField(
 }
 
 @Composable
-private fun FilterChips(selected: Int, onSelect: (Int) -> Unit) {
+private fun FilterChips(selected: Int, filterItems: List<Filter>, onSelect: (Int) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        filters.forEachIndexed { i, filter ->
+        filterItems.forEachIndexed { i, filter ->
             val on = i == selected
             Row(
                 Modifier

@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.VincentColors
@@ -46,8 +48,8 @@ fun DashboardScreen(
 ) {
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
         ScreenHeader(
-            title = "Ma cave",
-            subtitle = "Cave de l'appartement · Paris",
+            title = stringResource(Res.string.my_cellar),
+            subtitle = stringResource(Res.string.cellar_subtitle),
             trailing = { Box(Modifier.clickable(onClick = onAccount)) { BrandAvatar("L") } },
         )
 
@@ -55,10 +57,10 @@ fun DashboardScreen(
             HeroStat()
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MiniStat("Prix moyen", "${Cellar.averagePrice()} €", Modifier.weight(1f))
-                MiniStat("Ce mois-ci", "+${Cellar.addedThisMonth}", Modifier.weight(1f), suffix = "ajouts")
+                MiniStat(stringResource(Res.string.avg_price), "${Cellar.averagePrice()} €", Modifier.weight(1f))
+                MiniStat(stringResource(Res.string.this_month), "+${Cellar.addedThisMonth}", Modifier.weight(1f), suffix = stringResource(Res.string.additions))
             }
-            SectionHeader("Répartition par couleur", "Détails")
+            SectionHeader(stringResource(Res.string.breakdown_by_color), stringResource(Res.string.details))
             BreakdownCard()
             Spacer(Modifier.height(80.dp))
         }
@@ -75,13 +77,13 @@ private fun HeroStat() {
             .padding(18.dp),
     ) {
         Column {
-            Text("VALEUR ESTIMÉE DE LA CAVE", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.W600)
+            Text(stringResource(Res.string.estimated_value_label), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.W600)
             Text("${Cellar.estimatedValue()} €", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.W800)
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                HeroFig("${Cellar.totalBottles()}", "bouteilles")
-                HeroFig("${Cellar.references()}", "références")
-                HeroFig("${Cellar.readyToDrink()}", "à boire")
+                HeroFig("${Cellar.totalBottles()}", stringResource(Res.string.bottles_label))
+                HeroFig("${Cellar.references()}", stringResource(Res.string.references_label))
+                HeroFig("${Cellar.readyToDrink()}", stringResource(Res.string.ready_to_drink))
             }
         }
     }
@@ -121,7 +123,7 @@ private fun BreakdownCard() {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.padding(end = 7.dp).size(11.dp).clip(CircleShape).background(b.color.glass))
-                            Text(b.color.label, fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                            Text(stringResource(b.color.label), fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
                         }
                         Text("${b.percent}%", fontSize = 11.5.sp, color = VincentColors.Muted)
                     }
@@ -154,7 +156,7 @@ private fun Donut(data: List<fr.geoking.vincent.model.ColorBreakdown>) {
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("${Cellar.totalBottles()}", fontSize = 17.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-            Text("btl", fontSize = 9.sp, color = VincentColors.Muted)
+            Text(stringResource(Res.string.btl), fontSize = 9.sp, color = VincentColors.Muted)
         }
     }
 }

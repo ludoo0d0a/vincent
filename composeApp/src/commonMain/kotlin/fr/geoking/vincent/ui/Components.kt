@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.model.thumbnailUri
@@ -122,7 +123,7 @@ fun WineBottle(
 
 /** Coloured wine-type pill: a dot + label, tinted by [WineColor]. */
 @Composable
-fun ColorTag(color: WineColor, modifier: Modifier = Modifier, label: String = color.label) {
+fun ColorTag(color: WineColor, modifier: Modifier = Modifier, label: String = stringResource(color.label)) {
     Surface(
         color = color.tagBg,
         contentColor = color.tagFg,

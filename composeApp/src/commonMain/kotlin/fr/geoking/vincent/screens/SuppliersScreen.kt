@@ -35,6 +35,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.Suppliers
 import fr.geoking.vincent.data.rememberCsvImport
@@ -42,17 +45,21 @@ import fr.geoking.vincent.model.Supplier
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.VCard
 
+private sealed interface SupplierImportStatus {
+    data class Success(val count: Int) : SupplierImportStatus
+    data object WrongType : SupplierImportStatus
+}
+
 @Composable
 fun SuppliersScreen(onBack: () -> Unit) {
-    var status by remember { mutableStateOf<String?>(null) }
+    var importStatus by remember { mutableStateOf<SupplierImportStatus?>(null) }
 
     val importCsv = rememberCsvImport { text ->
         val result = CsvFormat.parse(text)
-        if (result.type == CsvFormat.ImportType.SUPPLIERS) {
-            val n = Suppliers.import(result.suppliers)
-            status = "Importé : $n fournisseur${if (n > 1) "s" else ""}"
+        importStatus = if (result.type == CsvFormat.ImportType.SUPPLIERS) {
+            SupplierImportStatus.Success(Suppliers.import(result.suppliers))
         } else {
-            status = "Le fichier ne semble pas être un export de fournisseurs."
+            SupplierImportStatus.WrongType
         }
     }
 
@@ -61,11 +68,11 @@ fun SuppliersScreen(onBack: () -> Unit) {
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Mes fournisseurs", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("${Suppliers.all.size} fournisseurs enregistrés", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.suppliers_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.suppliers_subtitle, Suppliers.all.size), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
@@ -78,13 +85,17 @@ fun SuppliersScreen(onBack: () -> Unit) {
             ) {
                 Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Importer des fournisseurs", fontWeight = FontWeight.W700)
+                Text(stringResource(Res.string.suppliers_import_button), fontWeight = FontWeight.W700)
             }
 
-            if (status != null) {
-                Box(
+            when (val status = importStatus) {
+                is SupplierImportStatus.Success -> Box(
                     Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                ) { Text(pluralStringResource(Res.plurals.suppliers_import_success, status.count, status.count), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                SupplierImportStatus.WrongType -> Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                ) { Text(stringResource(Res.string.suppliers_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                null -> Unit
             }
 
             Suppliers.all.forEach { supplier ->
@@ -93,7 +104,7 @@ fun SuppliersScreen(onBack: () -> Unit) {
             }
 
             if (Suppliers.all.isEmpty()) {
-                Text("Aucun fournisseur. Importez un fichier CSV de PLOC pour commencer.", fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp))
+                Text(stringResource(Res.string.suppliers_empty), fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp))
             }
 
             Spacer(Modifier.height(24.dp))

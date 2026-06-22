@@ -33,6 +33,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.rememberCsvExport
 import fr.geoking.vincent.theme.VincentColors
@@ -40,10 +42,10 @@ import fr.geoking.vincent.ui.VCard
 
 @Composable
 fun ImportExportScreen(onBack: () -> Unit) {
-    var status by remember { mutableStateOf<String?>(null) }
+    var exportOk by remember { mutableStateOf<Boolean?>(null) }
 
     val exportCsv = rememberCsvExport("vincent-cave.csv", { Cellar.exportCsv() }) { ok ->
-        status = if (ok) "Cave exportée en CSV." else "Export annulé."
+        exportOk = ok
     }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
@@ -51,40 +53,46 @@ fun ImportExportScreen(onBack: () -> Unit) {
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Exporter ma cave", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("Transférez votre cave en CSV", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.transfer_export_screen_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.transfer_subtitle), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
-            // Export
             VCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.FileDownload, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Exporter ma cave", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                        Text(stringResource(Res.string.transfer_export_title), fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
                     }
                     Text(
-                        "Génère un fichier CSV de vos ${Cellar.references()} références (sans les photos) — réimportable dans Vincent ou lisible dans tout tableur.",
+                        stringResource(Res.string.transfer_export_desc, Cellar.references()),
                         fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp),
                     )
                     OutlinedButton(
                         onClick = exportCsv,
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(46.dp),
                         shape = RoundedCornerShape(13.dp),
-                    ) { Text("Exporter en CSV", fontWeight = FontWeight.W700, color = VincentColors.Accent) }
+                    ) { Text(stringResource(Res.string.transfer_export_button), fontWeight = FontWeight.W700, color = VincentColors.Accent) }
                 }
             }
 
-            if (status != null) {
+            exportOk?.let { ok ->
                 Spacer(Modifier.height(14.dp))
                 Box(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                ) {
+                    Text(
+                        stringResource(if (ok) Res.string.transfer_export_success else Res.string.transfer_export_canceled),
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.W600,
+                        color = VincentColors.AccentDeep,
+                    )
+                }
             }
 
             Spacer(Modifier.height(24.dp))

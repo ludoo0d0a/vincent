@@ -35,6 +35,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.Tastings
 import fr.geoking.vincent.data.rememberCsvImport
@@ -43,17 +46,21 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
 
+private sealed interface TastingImportStatus {
+    data class Success(val count: Int) : TastingImportStatus
+    data object WrongType : TastingImportStatus
+}
+
 @Composable
 fun TastingsScreen(onBack: () -> Unit) {
-    var status by remember { mutableStateOf<String?>(null) }
+    var importStatus by remember { mutableStateOf<TastingImportStatus?>(null) }
 
     val importCsv = rememberCsvImport { text ->
         val result = CsvFormat.parse(text)
-        if (result.type == CsvFormat.ImportType.TASTINGS) {
-            val n = Tastings.import(result.tastings)
-            status = "Importé : $n dégustation${if (n > 1) "s" else ""}"
+        importStatus = if (result.type == CsvFormat.ImportType.TASTINGS) {
+            TastingImportStatus.Success(Tastings.import(result.tastings))
         } else {
-            status = "Le fichier ne semble pas être un export de dégustations."
+            TastingImportStatus.WrongType
         }
     }
 
@@ -62,11 +69,11 @@ fun TastingsScreen(onBack: () -> Unit) {
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Mes dégustations", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("${Tastings.all.size} fiches enregistrées", fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.tastings_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(pluralStringResource(Res.plurals.tastings_subtitle, Tastings.all.size, Tastings.all.size), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
@@ -79,13 +86,17 @@ fun TastingsScreen(onBack: () -> Unit) {
             ) {
                 Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Importer des dégustations", fontWeight = FontWeight.W700)
+                Text(stringResource(Res.string.tastings_import_button), fontWeight = FontWeight.W700)
             }
 
-            if (status != null) {
-                Box(
+            when (val status = importStatus) {
+                is TastingImportStatus.Success -> Box(
                     Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                ) { Text(pluralStringResource(Res.plurals.tastings_import_success, status.count, status.count), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                TastingImportStatus.WrongType -> Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                ) { Text(stringResource(Res.string.tastings_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                null -> Unit
             }
 
             Tastings.all.forEach { tasting ->
@@ -94,7 +105,7 @@ fun TastingsScreen(onBack: () -> Unit) {
             }
 
             if (Tastings.all.isEmpty()) {
-                Text("Aucune dégustation. Importez un fichier CSV de PLOC pour commencer.", fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp))
+                Text(stringResource(Res.string.tastings_empty), fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp))
             }
 
             Spacer(Modifier.height(24.dp))

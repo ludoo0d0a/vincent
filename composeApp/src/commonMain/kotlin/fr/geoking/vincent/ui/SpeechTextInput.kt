@@ -31,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.ai.rememberDictation
 import fr.geoking.vincent.theme.VincentColors
 
@@ -56,9 +58,9 @@ fun SpeechTextInput(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Touchez le micro et parlez…",
-    statusIdle: String = "Dictée vocale",
-    statusListening: String = "● Écoute…",
+    placeholder: String = stringResource(Res.string.add_voice_placeholder),
+    statusIdle: String = stringResource(Res.string.ui_speech_idle),
+    statusListening: String = stringResource(Res.string.ui_speech_listening),
     title: String? = null,
     subtitle: String? = null,
     micPlacement: SpeechMicPlacement = SpeechMicPlacement.External,
@@ -211,7 +213,7 @@ private fun SpeechMicButton(
     ) {
         Icon(
             Icons.Filled.Mic,
-            contentDescription = "Parler",
+            contentDescription = stringResource(Res.string.ui_speech_speak),
             tint = if (listening) Color.White else VincentColors.Accent,
             modifier = Modifier.size(iconSize),
         )

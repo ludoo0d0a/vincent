@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.model.BottlePhotoKind
 import fr.geoking.vincent.theme.VincentColors
 
@@ -110,7 +112,7 @@ private fun BottlePhotoSlot(
                 ) {
                     Icon(
                         Icons.Filled.CameraAlt,
-                        contentDescription = "Reprendre la photo",
+                        contentDescription = stringResource(Res.string.ui_photo_retake),
                         tint = VincentColors.Surface,
                         modifier = Modifier.height(12.dp),
                     )
@@ -118,7 +120,7 @@ private fun BottlePhotoSlot(
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.AddAPhoto, contentDescription = null, tint = VincentColors.Muted, modifier = Modifier.height(22.dp))
-                    Text("Ajouter", fontSize = 10.sp, fontWeight = FontWeight.W600, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                    Text(stringResource(Res.string.ui_photo_add), fontSize = 10.sp, fontWeight = FontWeight.W600, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
@@ -169,7 +171,7 @@ private fun PhotoViewerDialog(
                 Text(label, fontSize = 14.sp, fontWeight = FontWeight.W700, color = Color.White)
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = "Fermer",
+                    contentDescription = stringResource(Res.string.back),
                     tint = Color.White,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
