@@ -104,3 +104,33 @@ enum class RackMode(val label: String) {
 }
 
 data class ColorBreakdown(val color: WineColor, val percent: Int)
+
+data class Tasting(
+    val id: String,
+    val bottleId: String? = null,
+    val wineName: String,
+    val date: String,
+    val rating: Double,
+    val notes: String,
+    val color: WineColor? = null,
+    val vintage: String? = null,
+)
+
+data class Producer(
+    val id: String,
+    val name: String,
+    val region: String = "",
+    val country: String = "",
+    val website: String = "",
+    val email: String = "",
+    val phone: String = "",
+)
+
+data class Supplier(
+    val id: String,
+    val name: String,
+    val type: String = "",
+    val website: String = "",
+    val email: String = "",
+    val phone: String = "",
+)

@@ -47,6 +47,9 @@ fun AccountScreen(
     onBack: () -> Unit,
     onOpenRecent: () -> Unit,
     onOpenTransfer: () -> Unit,
+    onOpenTastings: () -> Unit = {},
+    onOpenProducers: () -> Unit = {},
+    onOpenSuppliers: () -> Unit = {},
     onOpenBottle: (Bottle) -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -145,8 +148,15 @@ fun AccountScreen(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenTransfer).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Importer / Exporter (PLOC, Vivino…)", Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                Text("Exporter ma cave (CSV)", Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
                 Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
+            }
+
+            SectionHeader("Mes données PLOC")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AccountLink("Dégustations", onOpenTastings)
+                AccountLink("Producteurs", onOpenProducers)
+                AccountLink("Fournisseurs", onOpenSuppliers)
             }
 
             SectionHeader("Mes favoris", "${Cellar.favorites.size} vins")

@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
@@ -39,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.CsvFormat
+import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.MonoNumber
@@ -76,9 +79,34 @@ fun BottlesScreen(
             b.vintage.lowercase().contains(q)
     }
 
+    var status by remember { mutableStateOf<String?>(null) }
+    val importCsv = rememberCsvImport { text ->
+        val result = CsvFormat.parse(text)
+        if (result.type == CsvFormat.ImportType.BOTTLES) {
+            val n = Cellar.importBottles(result.bottles)
+            status = "Importé : $n bouteille${if (n > 1) "s" else ""} · source détectée « ${result.source} »"
+        } else {
+            status = "Le fichier ne semble pas être un export de bouteilles."
+        }
+    }
+
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-        ScreenHeader("Mes bouteilles", "${Cellar.totalBottles()} bouteilles · ${list.size} affichée${if (list.size > 1) "s" else ""}")
+        ScreenHeader(
+            "Mes bouteilles",
+            "${Cellar.totalBottles()} bouteilles · ${list.size} affichée${if (list.size > 1) "s" else ""}",
+            trailing = {
+                Box(
+                    Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.FileUpload, contentDescription = "Importer", modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+            }
+        )
         Column(Modifier.padding(horizontal = 16.dp)) {
+            if (status != null) {
+                Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+            }
             SearchField("Domaine, cépage, région…", value = query, onValueChange = { query = it })
             Spacer(Modifier.height(11.dp))
             FilterChips(selected) { selected = it }

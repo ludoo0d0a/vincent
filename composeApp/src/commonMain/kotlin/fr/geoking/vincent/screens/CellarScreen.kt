@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.ContentPaste
@@ -59,6 +60,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.CsvFormat
+import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.data.RackClipboard
 import fr.geoking.vincent.data.RackClipboardEntry
 import fr.geoking.vincent.data.RackClipboardMode
@@ -202,11 +205,36 @@ fun CellarScreen(
         }
     }
 
+    var status by remember { mutableStateOf<String?>(null) }
+    val importCsv = rememberCsvImport { text ->
+        val result = CsvFormat.parse(text)
+        if (result.type == CsvFormat.ImportType.RACKS) {
+            result.racks.forEach { Racks.add(it) }
+            status = "Importé : ${result.racks.size} casier${if (result.racks.size > 1) "s" else ""}"
+        } else {
+            status = "Le fichier ne semble pas être un export de casiers."
+        }
+    }
+
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            ScreenHeader("Casiers", "${rack.capacity} emplacements · ${rack.occupiedCount} occupés")
+            ScreenHeader(
+                "Casiers",
+                "${rack.capacity} emplacements · ${rack.occupiedCount} occupés",
+                trailing = {
+                    Box(
+                        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Filled.FileUpload, contentDescription = "Importer", modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                }
+            )
 
             Column(Modifier.padding(horizontal = 16.dp)) {
+                if (status != null) {
+                    Box(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                    ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                }
                 CellarTabs(
                     names = Racks.all.map { it.name },
                     selected = rackIdx,
