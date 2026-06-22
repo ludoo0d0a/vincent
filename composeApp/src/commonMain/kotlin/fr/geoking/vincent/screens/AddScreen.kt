@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,7 +42,6 @@ import androidx.compose.runtime.setValue
 import fr.geoking.vincent.ai.PriceEstimate
 import fr.geoking.vincent.ai.priceEstimator
 import fr.geoking.vincent.ai.rememberBarcodeScanner
-import fr.geoking.vincent.ai.rememberDictation
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.ai.wineRecognizer
 import fr.geoking.vincent.model.BottlePhotoKind
@@ -79,6 +77,7 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
+import fr.geoking.vincent.ui.SpeechTextInput
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
 
@@ -161,42 +160,31 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
         }
     }
     val identify: () -> Unit = { startCapture() }
-    // Voice dictation: real SpeechRecognizer → transcript → Gemini parsing on final result.
     var transcript by remember { mutableStateOf("") }
-    var listening by remember { mutableStateOf(false) }
-    var level by remember { mutableStateOf(0f) }
-    val startDictation = rememberDictation(
-        onText = { transcript = it },
-        onLevel = { level = it },
-        onListening = { l ->
-            listening = l
-            if (!l && transcript.isNotBlank()) {
-                busy = true
-                aiError = null
-                scope.launch {
-                    val outcome = recognizer.fromText(transcript)
-                    val b = outcome.bottle
-                    aiBottle = b
-                    aiError = outcome.error
-                    busy = false
-                    // Land on the editable review form, pre-filled from the dictation.
-                    if (b != null) {
-                        val est = estimator.estimate(b)
-                        aiPrice = est
-                        manualSeed = ManualSeed(
-                            domain = b.domain,
-                            appellation = b.appellation,
-                            color = b.color,
-                            category = b.category,
-                            vintage = if (b.vintage == "NM") "" else b.vintage,
-                            price = (est?.amountEur ?: b.price.takeIf { it > 0 })?.toString() ?: "",
-                        )
-                        mode = AddMode.MANUAL
-                    }
-                }
+    val onVoiceDictationEnd: (String) -> Unit = { text ->
+        busy = true
+        aiError = null
+        scope.launch {
+            val outcome = recognizer.fromText(text)
+            val b = outcome.bottle
+            aiBottle = b
+            aiError = outcome.error
+            busy = false
+            if (b != null) {
+                val est = estimator.estimate(b)
+                aiPrice = est
+                manualSeed = ManualSeed(
+                    domain = b.domain,
+                    appellation = b.appellation,
+                    color = b.color,
+                    category = b.category,
+                    vintage = if (b.vintage == "NM") "" else b.vintage,
+                    price = (est?.amountEur ?: b.price.takeIf { it > 0 })?.toString() ?: "",
+                )
+                mode = AddMode.MANUAL
             }
-        },
-    )
+        }
+    }
     Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 8.dp),
@@ -256,13 +244,12 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
                 )
                 AddMode.VOICE -> VoicePane(
                     transcript = transcript,
-                    listening = listening,
-                    level = level,
+                    onTranscriptChange = { transcript = it },
+                    onDictationEnd = onVoiceDictationEnd,
                     parsed = aiBottle,
                     priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
                     errorMsg = aiError,
                     busy = busy,
-                    onMic = startDictation,
                 )
                 AddMode.MANUAL -> ManualPane(
                     seed = manualSeed,
@@ -853,49 +840,22 @@ private fun ScanPane(
 @Composable
 private fun VoicePane(
     transcript: String,
-    listening: Boolean,
-    level: Float,
+    onTranscriptChange: (String) -> Unit,
+    onDictationEnd: (String) -> Unit,
     parsed: Bottle?,
     priceLabel: String?,
     errorMsg: String? = null,
     busy: Boolean = false,
-    onMic: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(if (listening) "● Écoute…" else "Dictée vocale", color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp, modifier = Modifier.align(Alignment.Start))
-        Spacer(Modifier.height(8.dp))
-        Text("Dictez votre bouteille", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-        Text("« domaine, millésime, couleur, quantité, casier »", fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp))
-
-        // live waveform — driven by the microphone level while listening
-        Row(
-            Modifier.height(80.dp).padding(vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            listOf(18, 40, 66, 30, 78, 48, 80, 34, 60, 22, 50, 74, 28, 44, 16).forEach { base ->
-                val h = (base * (0.35f + 0.65f * (if (listening) level else 0f))).coerceIn(6f, 80f)
-                Box(Modifier.width(5.dp).height(h.dp).clip(RoundedCornerShape(3.dp)).background(VincentColors.Accent.copy(alpha = if (listening) 0.9f else 0.4f)))
-            }
-        }
-
-        Box(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(16.dp)).padding(15.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                transcript.ifBlank { "Touchez le micro et dictez votre bouteille…" },
-                fontSize = 15.sp,
-                color = if (transcript.isBlank()) VincentColors.Faint else VincentColors.Fg,
-                lineHeight = 22.sp,
-            )
-        }
-
-        Box(
-            Modifier.padding(top = 14.dp).size(64.dp).clip(RoundedCornerShape(50))
-                .background(if (listening) VincentColors.Accent else VincentColors.AccentSoft).clickable(onClick = onMic),
-            contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Filled.Mic, contentDescription = "Parler", tint = if (listening) Color.White else VincentColors.Accent, modifier = Modifier.size(28.dp)) }
+        SpeechTextInput(
+            value = transcript,
+            onValueChange = onTranscriptChange,
+            onDictationEnd = onDictationEnd,
+            placeholder = "Touchez le micro et dictez votre bouteille…",
+            title = "Dictez votre bouteille",
+            subtitle = "« domaine, millésime, couleur, quantité, casier »",
+        )
 
         Spacer(Modifier.height(14.dp))
         if (busy) {
