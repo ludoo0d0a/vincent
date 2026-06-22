@@ -50,6 +50,9 @@ fun AccountScreen(
     onBack: () -> Unit,
     onOpenRecent: () -> Unit,
     onOpenTransfer: () -> Unit,
+    onOpenTastings: () -> Unit = {},
+    onOpenProducers: () -> Unit = {},
+    onOpenSuppliers: () -> Unit = {},
     onOpenBottle: (Bottle) -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -148,8 +151,15 @@ fun AccountScreen(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenTransfer).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(Res.string.import_export_label), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                Text(stringResource(Res.string.export_csv_label), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
                 Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
+            }
+
+            SectionHeader(stringResource(Res.string.ploc_data_title))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AccountLink(stringResource(Res.string.ploc_tastings), onOpenTastings)
+                AccountLink(stringResource(Res.string.ploc_producers), onOpenProducers)
+                AccountLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
             }
 
             SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))
@@ -168,5 +178,16 @@ fun AccountScreen(
             ) { Text(if (acc != null) stringResource(Res.string.sign_out) else stringResource(Res.string.sign_in), fontWeight = FontWeight.W700, color = VincentColors.Accent) }
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun AccountLink(label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onClick).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+        Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
     }
 }

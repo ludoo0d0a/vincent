@@ -81,7 +81,7 @@ object Cellar {
             .filter { b ->
                 b.domain.lowercase().contains(q) ||
                     b.appellation.lowercase().contains(q) ||
-                    b.category.label.lowercase().contains(q) ||
+                    b.category.short.lowercase().contains(q) ||
                     b.vintage.lowercase().contains(q)
             }
             .distinctBy { "${it.domain}|${it.appellation}|${it.vintage}" }

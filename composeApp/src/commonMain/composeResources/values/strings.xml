@@ -163,6 +163,11 @@
     <string name="cellar_edit_cancel">Annuler</string>
     <string name="cellar_edit_save">Enregistrer</string>
 
+    <string name="cellar_mode_color">Couleur</string>
+    <string name="cellar_mode_price">Prix</string>
+    <string name="cellar_mode_vintage">Millésime</string>
+    <string name="cellar_mode_category">Catégorie</string>
+
     <string name="add_new_bottle">Nouveau vin</string>
     <string name="add_subtitle">Ajoutez un flacon à votre collection</string>
     <string name="add_mode_manual">Manuel</string>
@@ -294,5 +299,52 @@
 
     <string name="ui_speech_idle">Dictée vocale</string>
     <string name="ui_speech_listening">● Écoute…</string>
-    <string name="ui_speech_speak">Parler</string>
+    <string name="ui_speech_speak">Speak</string>
+
+    <string name="export_csv_label">Exporter ma cave (CSV)</string>
+    <string name="ploc_data_title">Mes données PLOC</string>
+    <string name="ploc_tastings">Dégustations</string>
+    <string name="ploc_producers">Producteurs</string>
+    <string name="ploc_suppliers">Fournisseurs</string>
+    <string name="import_action">Importer</string>
+    <string name="transfer_export_screen_title">Exporter ma cave</string>
+    <string name="bottles_import_wrong_type">Le fichier ne semble pas être un export de bouteilles.</string>
+    <plurals name="cellar_import_success">
+        <item quantity="one">Importé : %d casier</item>
+        <item quantity="other">Importé : %d casiers</item>
+    </plurals>
+    <string name="cellar_import_wrong_type">Le fichier ne semble pas être un export de casiers.</string>
+
+    <string name="tastings_title">Mes dégustations</string>
+    <plurals name="tastings_subtitle">
+        <item quantity="one">%d fiche enregistrée</item>
+        <item quantity="other">%d fiches enregistrées</item>
+    </plurals>
+    <string name="tastings_import_button">Importer des dégustations</string>
+    <plurals name="tastings_import_success">
+        <item quantity="one">Importé : %d dégustation</item>
+        <item quantity="other">Importé : %d dégustations</item>
+    </plurals>
+    <string name="tastings_import_wrong_type">Le fichier ne semble pas être un export de dégustations.</string>
+    <string name="tastings_empty">Aucune dégustation. Importez un fichier CSV de PLOC pour commencer.</string>
+
+    <string name="producers_title">Mes producteurs</string>
+    <string name="producers_subtitle">%d producteurs enregistrés</string>
+    <string name="producers_import_button">Importer des producteurs</string>
+    <plurals name="producers_import_success">
+        <item quantity="one">Importé : %d producteur</item>
+        <item quantity="other">Importé : %d producteurs</item>
+    </plurals>
+    <string name="producers_import_wrong_type">Le fichier ne semble pas être un export de producteurs.</string>
+    <string name="producers_empty">Aucun producteur. Importez un fichier CSV de PLOC pour commencer.</string>
+
+    <string name="suppliers_title">Mes fournisseurs</string>
+    <string name="suppliers_subtitle">%d fournisseurs enregistrés</string>
+    <string name="suppliers_import_button">Importer des fournisseurs</string>
+    <plurals name="suppliers_import_success">
+        <item quantity="one">Importé : %d fournisseur</item>
+        <item quantity="other">Importé : %d fournisseurs</item>
+    </plurals>
+    <string name="suppliers_import_wrong_type">Le fichier ne semble pas être un export de fournisseurs.</string>
+    <string name="suppliers_empty">Aucun fournisseur. Importez un fichier CSV de PLOC pour commencer.</string>
 </resources>

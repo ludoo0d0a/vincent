@@ -47,6 +47,9 @@ import fr.geoking.vincent.screens.ImportExportScreen
 import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SearchScreen
+import fr.geoking.vincent.screens.TastingsScreen
+import fr.geoking.vincent.screens.ProducersScreen
+import fr.geoking.vincent.screens.SuppliersScreen
 import fr.geoking.vincent.debug.HttpDebugBar
 import fr.geoking.vincent.debug.initHttpDebug
 import fr.geoking.vincent.theme.VincentColors
@@ -67,6 +70,9 @@ private sealed interface Dest {
     data object Account : Dest
     data object Recent : Dest
     data object Transfer : Dest
+    data object Tastings : Dest
+    data object Producers : Dest
+    data object Suppliers : Dest
 }
 
 @Composable
@@ -109,11 +115,18 @@ fun App() = VincentTheme {
                     onBack = ::pop,
                     onOpenRecent = { stack.add(Dest.Recent) },
                     onOpenTransfer = { stack.add(Dest.Transfer) },
+                    onOpenTastings = { stack.add(Dest.Tastings) },
+                    onOpenProducers = { stack.add(Dest.Producers) },
+                    onOpenSuppliers = { stack.add(Dest.Suppliers) },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                     onSignOut = { Auth.signOut(); guest = false; stack.clear() },
                 )
 
                 Dest.Transfer -> ImportExportScreen(onBack = ::pop)
+
+                Dest.Tastings -> TastingsScreen(onBack = ::pop)
+                Dest.Producers -> ProducersScreen(onBack = ::pop)
+                Dest.Suppliers -> SuppliersScreen(onBack = ::pop)
 
                 Dest.Recent -> RecentScreen(
                     onBack = ::pop,

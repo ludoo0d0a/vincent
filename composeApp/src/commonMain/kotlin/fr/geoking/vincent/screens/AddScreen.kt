@@ -90,6 +90,12 @@ private enum class AddMode(val label: org.jetbrains.compose.resources.StringReso
     MANUAL(Res.string.add_mode_manual)
 }
 
+private sealed interface ScanMessage {
+    data object OffSuccessPhoto : ScanMessage
+    data object OffSuccess : ScanMessage
+    data class NotFound(val code: String) : ScanMessage
+}
+
 @Composable
 fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
     // Opened from an empty rack cell → start on the manual form with the spot pre-filled.
@@ -113,7 +119,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
             )
         })
     }
-    var scanMsg by remember { mutableStateOf<String?>(null) }
+    var scanMsg by remember { mutableStateOf<ScanMessage?>(null) }
     var aiError by remember { mutableStateOf<String?>(null) }
     // Barcode → Open Food Facts lookup → prefill the manual form (vintage/price stay
     // for the user to complete, since EANs rarely encode them).
@@ -127,18 +133,14 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
                 val info = lookup.byBarcode(code)
                 busy = false
                 manualSeed = if (info != null) {
-                    scanMsg = if (info.imageUrl != null) {
-                        stringResource(Res.string.add_scan_off_success_photo)
-                    } else {
-                        stringResource(Res.string.add_scan_off_success)
-                    }
+                    scanMsg = if (info.imageUrl != null) ScanMessage.OffSuccessPhoto else ScanMessage.OffSuccess
                     ManualSeed(
                         domain = info.brand.ifBlank { info.name },
                         appellation = if (info.brand.isNotBlank()) info.name else "",
                         imageUrl = info.imageUrl,
                     )
                 } else {
-                    scanMsg = stringResource(Res.string.add_scan_barcode_not_found, code)
+                    scanMsg = ScanMessage.NotFound(code)
                     ManualSeed()
                 }
                 mode = AddMode.MANUAL
@@ -225,9 +227,13 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
             }
         }
 
-        if (scanMsg != null) {
+        scanMsg?.let { msg ->
             Text(
-                scanMsg!!,
+                when (msg) {
+                    ScanMessage.OffSuccessPhoto -> stringResource(Res.string.add_scan_off_success_photo)
+                    ScanMessage.OffSuccess -> stringResource(Res.string.add_scan_off_success)
+                    is ScanMessage.NotFound -> stringResource(Res.string.add_scan_barcode_not_found, msg.code)
+                },
                 fontSize = 11.5.sp, color = VincentColors.Muted, lineHeight = 15.sp,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
@@ -379,13 +385,18 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         }
     }
 
-    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos) {
+    val defaultDomain = stringResource(Res.string.add_default_domain)
+    val todayLabel = stringResource(Res.string.add_today)
+    val justNowLabel = stringResource(Res.string.add_just_now)
+    val categoryFallback = stringResource(category.label)
+
+    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
         val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
         onBottle(
             Bottle(
                 id = draftId,
-                domain = domain.trim().ifBlank { stringResource(Res.string.add_default_domain) },
-                appellation = appellation.trim().ifBlank { stringResource(category.label) },
+                domain = domain.trim().ifBlank { defaultDomain },
+                appellation = appellation.trim().ifBlank { categoryFallback },
                 color = color,
                 category = category,
                 vintage = vintage.trim().ifBlank { "NM" },
@@ -395,10 +406,10 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
                 cellarSpot = spot.trim().uppercase().ifBlank { "—" },
                 provenance = "",
                 merchant = "—",
-                purchaseDate = stringResource(Res.string.add_today),
+                purchaseDate = todayLabel,
                 occasion = "",
                 source = AddSource.MANUAL,
-                addedLabel = stringResource(Res.string.add_just_now),
+                addedLabel = justNowLabel,
                 photoBottle = photos[BottlePhotoKind.BOTTLE],
                 photoLabel = photos[BottlePhotoKind.LABEL],
                 photoBack = photos[BottlePhotoKind.BACK],
@@ -464,7 +475,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         Field(stringResource(Res.string.add_field_domain_name), domain) { domain = it }
         Field(stringResource(Res.string.add_field_appellation_label), appellation) { appellation = it }
         ChipRow(stringResource(Res.string.add_field_color), WineColor.entries, color, { stringResource(it.label) }) { color = it }
-        ChipRow(stringResource(Res.string.add_field_category), WineCategory.entries, category, { it.label }) { category = it }
+        ChipRow(stringResource(Res.string.add_field_category), WineCategory.entries, category, { stringResource(it.label) }) { category = it }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Field(stringResource(Res.string.add_field_vintage_label), vintage, Modifier.weight(1f), numeric = true) { vintage = it }
             Field(stringResource(Res.string.add_field_price_label), price, Modifier.weight(1f), numeric = true) { price = it }
@@ -665,7 +676,7 @@ private fun <T> ChipRow(
     label: String,
     options: List<T>,
     selected: T,
-    labelOf: (T) -> String,
+    labelOf: @Composable (T) -> String,
     onSelect: (T) -> Unit,
 ) {
     Column {

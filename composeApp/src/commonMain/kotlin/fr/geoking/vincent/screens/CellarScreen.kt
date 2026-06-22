@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.ContentPaste
@@ -62,6 +63,8 @@ import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.CsvFormat
+import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.data.RackClipboard
 import fr.geoking.vincent.data.RackClipboardEntry
 import fr.geoking.vincent.data.RackClipboardMode
@@ -83,6 +86,11 @@ import fr.geoking.vincent.ui.WineBottle
 
 /** A range filter applied to the rack (dims non-matching cells). */
 private data class RackFilter(val label: String, val test: (RackCell) -> Boolean)
+
+private sealed interface RackImportStatus {
+    data class Success(val count: Int) : RackImportStatus
+    data object WrongType : RackImportStatus
+}
 
 private fun yearOf(cell: RackCell): Int? {
     val digits = cell.vintage?.filter { it.isDigit() }
@@ -205,11 +213,40 @@ fun CellarScreen(
         }
     }
 
+    var rackImportStatus by remember { mutableStateOf<RackImportStatus?>(null) }
+    val importCsv = rememberCsvImport { text ->
+        val result = CsvFormat.parse(text)
+        rackImportStatus = if (result.type == CsvFormat.ImportType.RACKS) {
+            result.racks.forEach { Racks.add(it) }
+            RackImportStatus.Success(result.racks.size)
+        } else {
+            RackImportStatus.WrongType
+        }
+    }
+
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            ScreenHeader(stringResource(Res.string.cellar_title), stringResource(Res.string.cellar_subtitle_format, rack.capacity, rack.occupiedCount))
+            ScreenHeader(
+                stringResource(Res.string.cellar_title),
+                stringResource(Res.string.cellar_subtitle_format, rack.capacity, rack.occupiedCount),
+                trailing = {
+                    Box(
+                        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                },
+            )
 
             Column(Modifier.padding(horizontal = 16.dp)) {
+                when (val status = rackImportStatus) {
+                    is RackImportStatus.Success -> Box(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                    ) { Text(pluralStringResource(Res.plurals.cellar_import_success, status.count, status.count), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                    RackImportStatus.WrongType -> Box(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                    ) { Text(stringResource(Res.string.cellar_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                    null -> Unit
+                }
                 CellarTabs(
                     names = Racks.all.map { it.name },
                     selected = rackIdx,
@@ -664,16 +701,17 @@ private fun PeekCard(
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(Res.string.cellar_spot_label, spot), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                    val categoryLabel = cell.category?.let { stringResource(it.label) }
                     Text(
                         buildString {
                             append(cell.vintage.orEmpty())
                             append(" · ${cell.price} €")
-                            cell.category?.let { append(" · ${it.label}") }
+                            if (categoryLabel != null) append(" · $categoryLabel")
                         },
                         fontSize = 11.sp, color = VincentColors.Muted,
                     )
                 }
-                cell.color?.let { ColorTag(it, label = cell.category?.label ?: stringResource(it.label)) }
+                cell.color?.let { ColorTag(it, label = cell.category?.let { cat -> stringResource(cat.label) } ?: stringResource(it.label)) }
             }
 
             Spacer(Modifier.height(11.dp))

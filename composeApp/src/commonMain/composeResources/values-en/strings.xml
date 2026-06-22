@@ -163,6 +163,11 @@
     <string name="cellar_edit_cancel">Cancel</string>
     <string name="cellar_edit_save">Save</string>
 
+    <string name="cellar_mode_color">Color</string>
+    <string name="cellar_mode_price">Price</string>
+    <string name="cellar_mode_vintage">Vintage</string>
+    <string name="cellar_mode_category">Category</string>
+
     <string name="add_new_bottle">New wine</string>
     <string name="add_subtitle">Add a bottle to your collection</string>
     <string name="add_mode_manual">Manual</string>
@@ -223,11 +228,11 @@
         <item quantity="one">See %d bottle</item>
         <item quantity="other">See %d bottles</item>
     </plurals>
-    <plurals name="selected_count">
+    <plurals name="search_selected_format">
         <item quantity="one">%d selected</item>
         <item quantity="other">%d selected</item>
     </plurals>
-    <plurals name="criteria_count">
+    <plurals name="search_criteria_count_format">
         <item quantity="one">%d criterion</item>
         <item quantity="other">%d criteria</item>
     </plurals>
@@ -264,7 +269,7 @@
     <string name="add_placement_optional">Location (optional)</string>
     <string name="add_placement_placeholder">No location — tap to place</string>
     <string name="add_placement_remove">Remove</string>
-    <string name="add_placement_none_free">No free spot here.</item>
+    <string name="add_placement_none_free">No free spot here.</string>
     <string name="add_placement_tap_free">Tap a free spot</string>
     <string name="add_mode_identify">Identify</string>
     <string name="add_voice_title">Dictate your bottle</string>
@@ -295,4 +300,51 @@
     <string name="ui_speech_idle">Voice dictation</string>
     <string name="ui_speech_listening">● Listening…</string>
     <string name="ui_speech_speak">Speak</string>
+
+    <string name="export_csv_label">Export my cellar (CSV)</string>
+    <string name="ploc_data_title">My PLOC data</string>
+    <string name="ploc_tastings">Tastings</string>
+    <string name="ploc_producers">Producers</string>
+    <string name="ploc_suppliers">Suppliers</string>
+    <string name="import_action">Import</string>
+    <string name="transfer_export_screen_title">Export my cellar</string>
+    <string name="bottles_import_wrong_type">This file does not look like a bottle export.</string>
+    <plurals name="cellar_import_success">
+        <item quantity="one">Imported: %d rack</item>
+        <item quantity="other">Imported: %d racks</item>
+    </plurals>
+    <string name="cellar_import_wrong_type">This file does not look like a rack export.</string>
+
+    <string name="tastings_title">My tastings</string>
+    <plurals name="tastings_subtitle">
+        <item quantity="one">%d record</item>
+        <item quantity="other">%d records</item>
+    </plurals>
+    <string name="tastings_import_button">Import tastings</string>
+    <plurals name="tastings_import_success">
+        <item quantity="one">Imported: %d tasting</item>
+        <item quantity="other">Imported: %d tastings</item>
+    </plurals>
+    <string name="tastings_import_wrong_type">This file does not look like a tasting export.</string>
+    <string name="tastings_empty">No tastings yet. Import a PLOC CSV file to get started.</string>
+
+    <string name="producers_title">My producers</string>
+    <string name="producers_subtitle">%d producers registered</string>
+    <string name="producers_import_button">Import producers</string>
+    <plurals name="producers_import_success">
+        <item quantity="one">Imported: %d producer</item>
+        <item quantity="other">Imported: %d producers</item>
+    </plurals>
+    <string name="producers_import_wrong_type">This file does not look like a producer export.</string>
+    <string name="producers_empty">No producers yet. Import a PLOC CSV file to get started.</string>
+
+    <string name="suppliers_title">My suppliers</string>
+    <string name="suppliers_subtitle">%d suppliers registered</string>
+    <string name="suppliers_import_button">Import suppliers</string>
+    <plurals name="suppliers_import_success">
+        <item quantity="one">Imported: %d supplier</item>
+        <item quantity="other">Imported: %d suppliers</item>
+    </plurals>
+    <string name="suppliers_import_wrong_type">This file does not look like a supplier export.</string>
+    <string name="suppliers_empty">No suppliers yet. Import a PLOC CSV file to get started.</string>
 </resources>
