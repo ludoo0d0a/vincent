@@ -3,7 +3,6 @@ package fr.geoking.vincent.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,9 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -34,28 +30,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
-import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.rememberCsvExport
-import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.SectionHeader
 import fr.geoking.vincent.ui.VCard
 
 @Composable
 fun ImportExportScreen(onBack: () -> Unit) {
     var status by remember { mutableStateOf<String?>(null) }
 
-    val importCsv = rememberCsvImport { text ->
-        val result = CsvFormat.parse(text)
-        val n = Cellar.importBottles(result.bottles)
-        status = if (n > 0) "Importé : $n bouteille${if (n > 1) "s" else ""} · source détectée « ${result.source} »"
-        else "Aucune bouteille reconnue dans ce fichier."
-    }
     val exportCsv = rememberCsvExport("vincent-cave.csv", { Cellar.exportCsv() }) { ok ->
         status = if (ok) "Cave exportée en CSV." else "Export annulé."
     }
@@ -68,35 +54,12 @@ fun ImportExportScreen(onBack: () -> Unit) {
             ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Importer / Exporter", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text("Exporter ma cave", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
                 Text("Transférez votre cave en CSV", fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
-            // Import
-            VCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.FileUpload, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Importer une cave", fontSize = 15.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                    }
-                    Text(
-                        "Chargez un export CSV de PLOC, Vivino ou d'un tableur. Les colonnes sont reconnues automatiquement (couleur, millésime, prix, région…).",
-                        fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp),
-                    )
-                    Button(
-                        onClick = importCsv,
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(46.dp),
-                        shape = RoundedCornerShape(13.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
-                    ) { Text("Choisir un fichier CSV", fontWeight = FontWeight.W700) }
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
             // Export
             VCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
@@ -124,24 +87,7 @@ fun ImportExportScreen(onBack: () -> Unit) {
                 ) { Text(status!!, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
             }
 
-            SectionHeader("Formats pris en charge")
-            FormatRow("PLOC", "Export CSV (Réglages → Exporter)")
-            FormatRow("Vivino", "Export CSV de la cave / liste")
-            FormatRow("Vincent", "CSV natif — métadonnées (photos exclues)")
-            FormatRow("Tableur", "Tout CSV avec en-têtes lisibles")
             Spacer(Modifier.height(24.dp))
         }
-    }
-}
-
-@Composable
-private fun FormatRow(name: String, detail: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 5.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(name, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-        Text(detail, fontSize = 11.5.sp, color = VincentColors.Muted)
     }
 }
