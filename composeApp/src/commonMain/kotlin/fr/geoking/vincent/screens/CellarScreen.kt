@@ -50,7 +50,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionInRoot
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
@@ -499,8 +499,12 @@ private fun Cell(
     onDragCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var cellCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val boundsMod = modifier
-        .onGloballyPositioned { onBoundsChanged(it.boundsInRoot()) }
+        .onGloballyPositioned {
+            cellCoords = it
+            onBoundsChanged(it.boundsInRoot())
+        }
 
     if (!cell.occupied) {
         // Empty slot: tap to add a bottle here — or, during a move, a drop target.
@@ -558,7 +562,10 @@ private fun Cell(
             .pointerInput(cell.occupied) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { onDragStart() },
-                    onDrag = { change, _ -> onDragMove(change.positionInRoot()) },
+                    onDrag = { change, _ ->
+                        val root = cellCoords?.localToRoot(change.position) ?: change.position
+                        onDragMove(root)
+                    },
                     onDragEnd = { onDragEnd() },
                     onDragCancel = { onDragCancel() },
                 )

@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
+import fr.geoking.vincent.model.withPhoto
 import fr.geoking.vincent.model.ColorBreakdown
 import fr.geoking.vincent.model.SampleData
 import fr.geoking.vincent.model.WineColor
