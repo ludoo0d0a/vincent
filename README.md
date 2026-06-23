@@ -14,7 +14,7 @@ iOS/desktop later; only the **Android** target is wired for now.
 | Language | Kotlin 2.3.21 (KSP 2.3.9) |
 | UI | Compose Multiplatform 1.11.1 (Material 3) |
 | Build | AGP 8.13.2 · Gradle 8.13 |
-| Toolchain | JDK 17 (build via `jvmToolchain(17)` + daemon via `gradle/gradle-daemon-jvm.properties`, auto-provisioned by foojay) |
+| Toolchain | JDK 21 (build via `jvmToolchain(21)` + daemon via `gradle/gradle-daemon-jvm.properties`, auto-provisioned by foojay) |
 | SDK | min 24 · compile/target 36 |
 
 ## Run
@@ -161,7 +161,7 @@ Play app `4975982411132001122`.
 ## CI/CD (GitHub Actions)
 
 Workflows in `.github/workflows/` are thin callers to reusable workflows in
-**[geoking-ci](https://github.com/ludoo0d0a/geoking-ci)** (JDK 17 + Gradle 8.13,
+**[geoking-ci](https://github.com/ludoo0d0a/geoking-ci)** (JDK 21 + Gradle 8.13,
 pinned because the binary wrapper is not committed → call `gradle …`):
 
 - **`android-ci.yml`** — on push / PR to `main`: `assembleDebug` + APK artifact.
