@@ -9,4 +9,4 @@ Standalone HTML design mockups of the Vincent app screens (open in a browser).
 - **`caveau-android-screens.html`** — earlier/simpler mockup, kept for reference.
 
 These mirror the Compose UI in `composeApp/`. The deployed marketing site lives in
-`website/` (Netlify), not here.
+`website/` (Cloudflare Pages), not here.

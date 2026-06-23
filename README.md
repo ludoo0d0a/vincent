@@ -246,7 +246,23 @@ local release build stays unsigned (debug works with nothing configured).
 
 ## Landing page
 
-A static marketing site lives in `website/` and is published by Netlify
-(`netlify.toml`, `publish = "website"`, no build step). It reuses the app's
-lie-de-vin palette and renders live phone-frame "screenshots". Connect the repo in
-Netlify (or drag-and-drop the `website/` folder) — pushes to `main` redeploy it.
+A static marketing site lives in `website/` and is published on
+[Cloudflare Pages](https://pages.cloudflare.com/) (`wrangler.toml`,
+`pages_build_output_dir = "website"`, no build step). It reuses the app's
+lie-de-vin palette and renders live phone-frame "screenshots". Pushes to `main`
+that touch `website/` trigger `.github/workflows/cloudflare-pages.yml`.
+
+**One-time setup**
+
+1. [Cloudflare dashboard](https://dash.cloudflare.com) → Account ID (sidebar).
+2. My Profile → API Tokens → Create token → **Edit Cloudflare Workers** template
+   (includes Pages deploy).
+3. GitHub repo → Settings → Secrets → Actions:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+4. After the first deploy, Workers & Pages → **vincent** → Custom domains → add
+   `vincent.geoking.fr` and point DNS to Cloudflare (CNAME to
+   `vincent.pages.dev` if the zone is already on Cloudflare).
+
+Local preview: `npx wrangler pages dev website`. Manual deploy:
+`npx wrangler pages deploy website --project-name=vincent`.
