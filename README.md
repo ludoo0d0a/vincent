@@ -162,7 +162,10 @@ Play app `4975982411132001122`.
 
 Workflows in `.github/workflows/` are thin callers to reusable workflows in
 **[geoking-ci](https://github.com/ludoo0d0a/geoking-ci)** (JDK 21 + Gradle 8.13,
-pinned because the binary wrapper is not committed → call `gradle …`):
+pinned because the binary wrapper is not committed → call `gradle …`).
+
+> `geoking-ci` is private — reusable workflows must be shared once:
+> `gh api repos/ludoo0d0a/geoking-ci/actions/permissions/access -X PUT -f access_level=user`
 
 - **`android-ci.yml`** — on push / PR to `main`: `assembleDebug` + APK artifact.
 - **`release-play.yml`** — **on every push to `main`** (track **internal**), plus on
