@@ -271,6 +271,8 @@
     <string name="add_placement_remove">Remove</string>
     <string name="add_placement_none_free">No free spot here.</string>
     <string name="add_placement_tap_free">Tap a free spot</string>
+    <string name="add_placement_chosen_format">Selected: %1$s · %2$s — or leave « no location ».</string>
+    <string name="add_placement_current">Current</string>
     <string name="add_mode_identify">Identify</string>
     <string name="add_voice_title">Dictate your bottle</string>
     <string name="add_voice_subtitle">“domain, vintage, color, quantity, rack”</string>

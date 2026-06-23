@@ -5,7 +5,22 @@ fun rowLabel(rowIndex: Int): String = ('A' + rowIndex).toString()
 
 /** A chosen empty cell in a rack (used when adding from the cellar grid). */
 data class RackPlacement(val rackIndex: Int, val cellIndex: Int) {
-    fun spotLabel(cols: Int): String = "${rowLabel(cellIndex / cols)}${cellIndex % cols + 1}"
+    fun spotLabel(cols: Int): String = cellSpotLabel(cellIndex, cols)
+}
+
+/** Spot label for a cell index, e.g. 0-based cell 10 in 6 cols → "B5". */
+fun cellSpotLabel(cellIndex: Int, cols: Int): String =
+    "${rowLabel(cellIndex / cols)}${cellIndex % cols + 1}"
+
+/** Parse a spot label (e.g. "B3") into a cell index for the given rack width. */
+fun cellIndexFromSpot(spot: String, cols: Int): Int? {
+    val s = spot.trim().uppercase()
+    if (s.isBlank() || s == "—") return null
+    val row = s.firstOrNull()?.minus('A') ?: return null
+    if (row < 0) return null
+    val col = s.drop(1).toIntOrNull()?.minus(1) ?: return null
+    if (col < 0) return null
+    return row * cols + col
 }
 
 /** A named rack: a [cols]×[rows] grid of [RackCell], optionally staggered (quinconce). */

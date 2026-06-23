@@ -271,6 +271,8 @@
     <string name="add_placement_remove">Retirer</string>
     <string name="add_placement_none_free">Aucun emplacement libre ici.</string>
     <string name="add_placement_tap_free">Touchez une case libre</string>
+    <string name="add_placement_chosen_format">Choisi : %1$s · %2$s — ou laissez « sans emplacement ».</string>
+    <string name="add_placement_current">Actuel</string>
     <string name="add_mode_identify">Identifier</string>
     <string name="add_voice_title">Dictez votre bouteille</string>
     <string name="add_voice_subtitle">« domaine, millésime, couleur, quantité, casier »</string>

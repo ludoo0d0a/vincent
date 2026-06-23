@@ -73,6 +73,8 @@ import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.cellIndexFromSpot
+import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
@@ -390,6 +392,29 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     val justNowLabel = stringResource(Res.string.add_just_now)
     val categoryFallback = stringResource(category.label)
 
+    // When the spot label matches an occupied cell, treat it as the bottle's current rack position.
+    val currentPlacement = remember(spot, placeRack, placeCell) {
+        val fromSelection = placeRack?.let { r -> placeCell?.let { c -> r to c } }
+        if (fromSelection != null) {
+            val rack = Racks.all.getOrNull(fromSelection.first)
+            if (rack != null && rack.cells.getOrNull(fromSelection.second)?.occupied == true) fromSelection else null
+        } else {
+            val label = spot.trim()
+            if (label.isBlank()) null
+            else {
+                var found: Pair<Int, Int>? = null
+                for ((ri, rack) in Racks.all.withIndex()) {
+                    val ci = cellIndexFromSpot(label, rack.cols) ?: continue
+                    if (ci in rack.cells.indices && rack.cells[ci].occupied) {
+                        found = ri to ci
+                        break
+                    }
+                }
+                found
+            }
+        }
+    }
+
     LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
         val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
         onBottle(
@@ -484,6 +509,8 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         PlacementSection(
             placeRack = placeRack,
             placeCell = placeCell,
+            currentRack = currentPlacement?.first,
+            currentCell = currentPlacement?.second,
             initialOpen = placeRack != null && placeCell != null,
             onClear = { placeRack = null; placeCell = null; spot = "" },
             onPick = { ri, ci, label -> placeRack = ri; placeCell = ci; spot = label },
@@ -497,6 +524,8 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
 private fun PlacementSection(
     placeRack: Int?,
     placeCell: Int?,
+    currentRack: Int? = null,
+    currentCell: Int? = null,
     initialOpen: Boolean = false,
     onClear: () -> Unit,
     onPick: (Int, Int, String) -> Unit,
@@ -506,7 +535,10 @@ private fun PlacementSection(
     val placed = placeRack != null && placeCell != null
     val placedLabel = if (placed) {
         val r = Racks.all.getOrNull(placeRack!!)
-        if (r != null) "${r.name} · ${rowLabel(placeCell!! / r.cols)}${placeCell!! % r.cols + 1}" else "—"
+        if (r != null) "${r.name} · ${cellSpotLabel(placeCell!!, r.cols)}" else "—"
+    } else null
+    val placedSpot = if (placed) {
+        Racks.all.getOrNull(placeRack!!)?.let { cellSpotLabel(placeCell!!, it.cols) }
     } else null
 
     Column {
@@ -523,7 +555,7 @@ private fun PlacementSection(
             Text(
                 placedLabel ?: stringResource(Res.string.add_placement_placeholder),
                 fontSize = 13.sp, fontWeight = FontWeight.W600,
-                color = if (placed) VincentColors.Fg else VincentColors.Muted,
+                color = if (placed) VincentColors.Accent else VincentColors.Muted,
                 modifier = Modifier.weight(1f),
             )
             if (placed) {
@@ -533,7 +565,6 @@ private fun PlacementSection(
         }
         if (open) {
             Spacer(Modifier.height(8.dp))
-            // 1) choose a rack
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Racks.all.forEachIndexed { i, r ->
                     val on = i == browse
@@ -546,24 +577,76 @@ private fun PlacementSection(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            // 2) pick an empty spot on the rack grid
             val rack = Racks.all.getOrNull(browse)
-            val hasEmpty = rack?.cells?.any { !it.occupied } == true
+            val freeCells = rack?.cells?.mapIndexed { i, c -> i to c }?.filter { !it.second.occupied }.orEmpty()
+            val hasEmpty = freeCells.isNotEmpty()
             if (rack == null || !hasEmpty) {
                 Text(stringResource(Res.string.add_placement_none_free), fontSize = 11.5.sp, color = VincentColors.Muted, modifier = Modifier.padding(start = 2.dp))
             } else {
+                freeCells.chunked(6).forEach { row ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        row.forEach { (ci, _) ->
+                            val label = cellSpotLabel(ci, rack.cols)
+                            val selected = browse == placeRack && ci == placeCell
+                            PlacementSpotChip(
+                                label = label,
+                                selected = selected,
+                                onClick = { onPick(browse, ci, label) },
+                            )
+                        }
+                    }
+                }
                 PlacementRackGrid(
                     rack = rack,
                     selectedCell = if (browse == placeRack) placeCell else null,
+                    currentCell = if (browse == currentRack) currentCell else null,
                     onPick = { ci ->
-                        val label = "${rowLabel(ci / rack.cols)}${ci % rack.cols + 1}"
+                        val label = cellSpotLabel(ci, rack.cols)
                         onPick(browse, ci, label)
-                        open = false
                     },
                 )
+                if (placed && placedSpot != null) {
+                    val rackName = Racks.all.getOrNull(placeRack!!)?.name.orEmpty()
+                    Text(
+                        stringResource(Res.string.add_placement_chosen_format, rackName, placedSpot),
+                        fontSize = 10.5.sp,
+                        color = VincentColors.Faint,
+                        modifier = Modifier.padding(top = 4.dp, start = 2.dp),
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun PlacementSpotChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(if (selected) VincentColors.Accent else VincentColors.AccentSoft)
+            .border(1.dp, VincentColors.Accent, RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            label,
+            style = MonoNumber,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.W700,
+            color = if (selected) Color.White else VincentColors.Accent,
+        )
+    }
+}
+
+private enum class PlacementCellHighlight {
+    Occupied,
+    Available,
+    Selected,
+    Current,
 }
 
 /** Visual rack grid for manual placement — tap an empty cell to select it. */
@@ -571,6 +654,7 @@ private fun PlacementSection(
 private fun PlacementRackGrid(
     rack: Rack,
     selectedCell: Int?,
+    currentCell: Int?,
     onPick: (Int) -> Unit,
 ) {
     VCard(Modifier.fillMaxWidth()) {
@@ -590,9 +674,16 @@ private fun PlacementRackGrid(
                     if (shiftRight) Spacer(Modifier.weight(0.5f))
                     rowCells.forEachIndexed { colIndex, cell ->
                         val gi = rowIndex * rack.cols + colIndex
+                        val highlight = when {
+                            gi == selectedCell && !cell.occupied -> PlacementCellHighlight.Selected
+                            gi == currentCell && cell.occupied -> PlacementCellHighlight.Current
+                            !cell.occupied -> PlacementCellHighlight.Available
+                            else -> PlacementCellHighlight.Occupied
+                        }
                         PlacementGridCell(
                             cell = cell,
-                            selected = gi == selectedCell,
+                            spotLabel = cellSpotLabel(gi, rack.cols),
+                            highlight = highlight,
                             onClick = { if (!cell.occupied) onPick(gi) },
                             modifier = Modifier.weight(1f),
                         )
@@ -614,43 +705,91 @@ private fun PlacementRackGrid(
 @Composable
 private fun PlacementGridCell(
     cell: RackCell,
-    selected: Boolean,
+    spotLabel: String,
+    highlight: PlacementCellHighlight,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (!cell.occupied) {
-        Box(
-            modifier
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(7.dp))
-                .background(if (selected) VincentColors.AccentSoft else VincentColors.Surface2)
-                .border(
-                    1.dp,
-                    if (selected) VincentColors.Accent else VincentColors.Border,
-                    RoundedCornerShape(7.dp),
+    when (highlight) {
+        PlacementCellHighlight.Available,
+        PlacementCellHighlight.Selected,
+        -> {
+            val selected = highlight == PlacementCellHighlight.Selected
+            Box(
+                modifier
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (selected) VincentColors.Accent else VincentColors.AccentSoft)
+                    .border(
+                        width = if (selected) 2.dp else 1.dp,
+                        color = VincentColors.Accent,
+                        shape = RoundedCornerShape(7.dp),
+                    )
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                } else {
+                    Text(
+                        spotLabel,
+                        style = MonoNumber,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.W700,
+                        color = VincentColors.Accent,
+                    )
+                }
+            }
+        }
+        PlacementCellHighlight.Current -> {
+            val wineBorder = cell.color?.glass ?: VincentColors.Accent
+            val tint = lerp(Color.White, cell.color?.glass ?: VincentColors.Accent, 0.22f)
+            Box(
+                modifier
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(tint)
+                    .border(3.dp, wineBorder, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .padding(2.dp)
+                        .border(2.dp, VincentColors.Accent, RoundedCornerShape(6.dp)),
                 )
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.Add,
-                contentDescription = "Sélectionner",
-                tint = if (selected) VincentColors.Accent else VincentColors.Faint,
-                modifier = Modifier.size(16.dp),
+                Text(
+                    stringResource(Res.string.add_placement_current),
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.W800,
+                    color = VincentColors.Accent,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 2.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(VincentColors.AccentSoft)
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                )
+            }
+        }
+        PlacementCellHighlight.Occupied -> {
+            val wineBorder = cell.color?.glass ?: VincentColors.Border
+            val tint = lerp(Color.White, cell.color?.glass ?: VincentColors.Accent, 0.22f)
+            Box(
+                modifier
+                    .aspectRatio(1f)
+                    .alpha(0.35f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(tint)
+                    .border(2.dp, wineBorder, RoundedCornerShape(8.dp)),
             )
         }
-        return
     }
-    val wineBorder = cell.color?.glass ?: VincentColors.Border
-    val tint = lerp(Color.White, cell.color?.glass ?: VincentColors.Accent, 0.22f)
-    Box(
-        modifier
-            .aspectRatio(1f)
-            .alpha(0.45f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(tint)
-            .border(3.dp, wineBorder, RoundedCornerShape(8.dp)),
-    )
 }
 
 @Composable
