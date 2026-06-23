@@ -1,22 +1,54 @@
 #!/usr/bin/env python3
-"""Thin wrapper — delegates to geoking-tools/bin/whatsnew.py."""
+"""Generate Play Store release-note files from playstore/whatsnew.xml.
+
+Writes playstore/whatsnew/whatsnew-<locale> (plain text, <=500 chars) which the
+release workflow passes to r0adkll/upload-google-play (whatsNewDirectory).
+
+Usage: whatsnew.py [versionCode]
+  - with a versionCode: emit that release's notes
+  - without (or no match): emit the latest (first) <release>'s notes
+"""
 import os
-import runpy
 import sys
+import xml.etree.ElementTree as ET
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.environ.setdefault("GK_PROJECT_ROOT", ROOT)
 
-for candidate in (
-    os.environ.get("GK_TOOLS"),
-    os.path.join(ROOT, "..", "geoking-tools"),
-    os.path.expanduser("~/dev/android/geoking-tools"),
-):
-    if candidate and os.path.isdir(candidate):
-        script = os.path.join(candidate, "bin", "whatsnew.py")
-        if os.path.isfile(script):
-            sys.argv[0] = script
-            runpy.run_path(script, run_name="__main__")
-            raise SystemExit(0)
+def project_root() -> str:
+    root = os.environ.get("GK_PROJECT_ROOT")
+    if root:
+        return root
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-sys.exit("geoking-tools introuvable — clone ../geoking-tools ou exporte GK_TOOLS")
+
+def main() -> None:
+    root = project_root()
+    src = os.path.join(root, "playstore", "whatsnew.xml")
+    out = os.path.join(root, "playstore", "whatsnew")
+
+    want = sys.argv[1] if len(sys.argv) > 1 else None
+    releases = ET.parse(src).getroot().findall("release")
+    if not releases:
+        sys.exit("whatsnew.xml: no <release> found")
+
+    rel = None
+    if want:
+        rel = next((r for r in releases if r.get("versionCode") == str(want)), None)
+    if rel is None:
+        rel = releases[0]
+
+    os.makedirs(out, exist_ok=True)
+    for loc in rel.findall("locale"):
+        code = loc.get("code")
+        text = (loc.text or "").strip()
+        if len(text) > 500:
+            print(f"WARN: {code} notes are {len(text)} chars (>500) — truncating.", file=sys.stderr)
+            text = text[:500]
+        path = os.path.join(out, f"whatsnew-{code}")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+        print(f"wrote {os.path.relpath(path, root)} ({len(text)} chars) "
+              f"for v{rel.get('versionName')} ({rel.get('versionCode')})")
+
+
+if __name__ == "__main__":
+    main()
