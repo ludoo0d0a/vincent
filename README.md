@@ -179,7 +179,7 @@ local release build stays unsigned (debug works with nothing configured).
 > wizard that generates the keystore, opens each Google console page, and registers
 > every secret via `gh`. Run a single step with
 > `./scripts/setup-release.sh keystore|play|firebase|oauth|gemini|secrets|verify`.
-> Scripts partagés : clone `geoking-tools` next to this repo (or set `GEOKING_TOOLS`).
+> Scripts partagés : clone `geoking-tools` next to this repo (or set `GK_TOOLS`).
 
 ### Repository secrets to create (Settings → Secrets and variables → Actions)
 
