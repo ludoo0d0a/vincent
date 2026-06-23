@@ -260,9 +260,11 @@ that touch `website/` trigger `.github/workflows/cloudflare-pages.yml`.
 3. GitHub repo → Settings → Secrets → Actions:
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
-4. After the first deploy, Workers & Pages → **vincent** → Custom domains → add
+4. Push to `main` (or run the workflow manually): CI creates the **vin-cent**
+   Pages project on first deploy if it does not exist yet.
+5. After the first deploy, Workers & Pages → **vin-cent** → Custom domains → add
    `vincent.geoking.fr` and point DNS to Cloudflare (CNAME to
-   `vincent.pages.dev` if the zone is already on Cloudflare).
+   `vin-cent.pages.dev` if the zone is already on Cloudflare).
 
 Local preview: `npx wrangler pages dev website`. Manual deploy:
-`npx wrangler pages deploy website --project-name=vincent`.
+`npx wrangler pages deploy website --project-name=vin-cent`.
