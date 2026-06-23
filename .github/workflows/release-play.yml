@@ -30,10 +30,28 @@ jobs:
       - name: Setup Gradle
         uses: ./.github/actions/setup-gradle
 
+      - name: Decode google-services.json (Firebase)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" | base64 --decode > composeApp/google-services.json
+
       - name: Decode signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
+      # Upload-key SHA-1 — register in Google Cloud OAuth Android client (package
+      # fr.geoking.vincent). Play-distributed builds also need the *app signing*
+      # key SHA-1 from Play Console → App integrity.
+      - name: Print upload-key SHA-1 (OAuth Android client)
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          SHA1="$(keytool -list -v -keystore "$KEYSTORE_FILE" -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASSWORD" \
+            | awk -F'SHA1: ' '/SHA1:/{print $2; exit}')"
+          echo "Upload-key SHA-1 (add to OAuth Android client if missing): $SHA1"
 
       - name: Build signed AAB
         env:
@@ -41,6 +59,8 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          WEB_CLIENT_ID: ${{ secrets.WEB_CLIENT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # Play requires an ever-increasing versionCode; tie it to the run number.
           VERSION_CODE: ${{ github.run_number }}
           # Tag pushes use the tag as versionName; otherwise blank → build reads

@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 // Secrets read from local.properties (or CI env), surfaced via BuildConfig — never hardcoded.
@@ -45,6 +46,9 @@ kotlin {
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.play.services)
             implementation(libs.google.identity.googleid)
+            implementation(platform(libs.firebase.bom))
+            implementation(libs.firebase.auth)
+            implementation(libs.kotlinx.coroutines.play.services)
             implementation(libs.google.code.scanner)
             implementation(libs.google.app.update.ktx)
             implementation(libs.coil.compose)

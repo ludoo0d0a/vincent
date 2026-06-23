@@ -4,10 +4,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-/** A signed-in Google user (the fields Vincent actually displays). */
+/** A signed-in Google / Firebase user (the fields Vincent actually displays). */
 data class GoogleAccount(
     val name: String,
     val email: String,
+    val uid: String = "",
 ) {
     val initial: String get() = name.trim().firstOrNull()?.uppercase() ?: "?"
 }
@@ -17,6 +18,7 @@ object Auth {
     var account by mutableStateOf<GoogleAccount?>(null)
 
     fun signOut() {
+        platformSignOut()
         account = null
     }
 }

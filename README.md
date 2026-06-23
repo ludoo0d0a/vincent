@@ -80,14 +80,15 @@ composeApp/src/
   stored bottles replace the seed, and every add / serve / favourite is written
   through. Room runs on the Android target via KSP (`kspAndroid`); enums are stored
   by name, so no `TypeConverter`.
-- **Google sign-in (wired).** Modern **Credential Manager** + *Sign in with Google*.
-  The trigger is a `@Composable expect fun rememberGoogleSignIn(...)` (commonMain)
-  whose Android `actual` (`data/GoogleSignIn.android.kt`) opens the account picker;
-  the result feeds `data/Auth.kt` (observable state), the login screen switches into
-  the app, and the Account screen shows the real name/email + sign out.
-  ⚠️ **To set**: `WEB_CLIENT_ID` (OAuth **Web** client ID) in `local.properties`
-  (gitignored) — surfaced to the code via `BuildConfig`. Without it the flow fails
-  at runtime (the code still compiles). `./scripts/setup-release.sh oauth` does it.
+- **Google sign-in (Firebase Auth).** **Credential Manager** → Google ID token →
+  **Firebase Authentication** (users in Firebase Console). Android `actual`
+  (`data/GoogleSignIn.android.kt`); session via `data/Auth.android.kt` listener;
+  `bootstrapAuth()` in `MainActivity`. Account screen shows name/email + sign out.
+  ⚠️ **Required**: `composeApp/google-services.json` from Firebase (project
+  `vincent-499318`, package `fr.geoking.vincent`) + **Google** provider enabled in
+  Firebase Authentication. `./scripts/setup-release.sh firebase` sets it up; CI
+  reads secret `GOOGLE_SERVICES_JSON`. `WEB_CLIENT_ID` in `local.properties` is
+  a fallback if `default_web_client_id` is missing from the JSON.
 - **CSV import / export (wired).** `data/CsvFormat.kt` serialises the cellar
   (Vincent format, round-trip) and parses an incoming CSV with **tolerant column
   mapping**: detects Vincent / Vivino / PLOC / spreadsheet via headers (FR/EN) and
@@ -139,6 +140,25 @@ composeApp/src/
   `WindowInsets.systemBars` padding (and the Scaffold/NavigationBar add none), so the
   top back button and bottom navigation are never hidden under the status/nav bars.
 
+## Consoles & project manifest
+
+IDs and console URLs live in **`scripts/project.manifest.json`** (loaded by
+`scripts/project.manifest.sh` for setup/verify scripts). Edit the JSON once;
+scripts and docs stay in sync.
+
+| Console | Lien |
+|---------|------|
+| **Firebase** (`vincent-499318`) | [console.firebase.google.com/project/vincent-499318/](https://console.firebase.google.com/project/vincent-499318/) |
+| **Google Cloud** (`vincent-499318`) | [console.cloud.google.com/welcome?project=vincent-499318](https://console.cloud.google.com/welcome?project=vincent-499318) |
+| **Play Console** — Vincent (dashboard) | [app-dashboard](https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/app-dashboard) |
+| Play — Intégrité / SHA-1 app signing | [keymanagement](https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/keymanagement) |
+| Firebase Auth → Google | [authentication/providers](https://console.firebase.google.com/project/vincent-499318/authentication/providers) |
+| Firebase Auth → Users | [authentication/users](https://console.firebase.google.com/project/vincent-499318/authentication/users) |
+| GCP OAuth credentials | [apis/credentials](https://console.cloud.google.com/apis/credentials?project=vincent-499318) |
+
+Package Android : `fr.geoking.vincent` · Play developer `8648842673731499425` ·
+Play app `4975982411132001122`.
+
 ## CI/CD (GitHub Actions)
 
 Workflows in `.github/workflows/` use a shared composite action
@@ -157,7 +177,9 @@ local release build stays unsigned (debug works with nothing configured).
 
 > **Fastest path:** run `./scripts/setup-release.sh` — a guided, re-runnable
 > wizard that generates the keystore, opens each Google console page, and registers
-> every secret via `gh`. Run a single step with `./scripts/setup-release.sh keystore|play|oauth|gemini`.
+> every secret via `gh`. Run a single step with
+> `./scripts/setup-release.sh keystore|play|firebase|oauth|gemini|secrets|verify`.
+> Logique partagée : `scripts/release-lib.sh` + `scripts/project.manifest.json`.
 
 ### Repository secrets to create (Settings → Secrets and variables → Actions)
 

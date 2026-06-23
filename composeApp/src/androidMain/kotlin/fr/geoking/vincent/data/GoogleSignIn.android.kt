@@ -1,5 +1,6 @@
 package fr.geoking.vincent.data
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -7,17 +8,67 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
-import fr.geoking.vincent.BuildConfig
+import androidx.credentials.exceptions.NoCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import fr.geoking.vincent.BuildConfig
+import fr.geoking.vincent.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 private const val TAG = "VincentSignIn"
 
-// WEB_CLIENT_ID (OAuth 2.0 *Web application* client, NOT the Android one) comes from
-// local.properties (or CI env) via BuildConfig. Sign-in also needs an Android OAuth
-// client in the SAME project, registered with this app's package + signing SHA-1.
+// Credential Manager → Google ID token → Firebase Auth (users appear in Firebase Console).
+// Needs composeApp/google-services.json + Google provider enabled in Firebase Authentication.
+// WEB_CLIENT_ID (local.properties / CI) is a fallback when default_web_client_id is absent.
+
+private fun resolveWebClientId(context: Context): String {
+    val fromFirebase = runCatching { context.getString(R.string.default_web_client_id) }.getOrDefault("")
+    return fromFirebase.takeIf { it.isNotBlank() } ?: BuildConfig.WEB_CLIENT_ID
+}
+
+private suspend fun firebaseAuthWithGoogle(idToken: String): GoogleAccount? {
+    val auth = FirebaseAuth.getInstance()
+    val credential = GoogleAuthProvider.getCredential(idToken, null)
+    auth.signInWithCredential(credential).await()
+    return auth.currentUser?.let { user ->
+        GoogleAccount(
+            name = user.displayName ?: user.email?.substringBefore('@') ?: user.uid,
+            email = user.email.orEmpty(),
+            uid = user.uid,
+        )
+    }
+}
+
+private suspend fun requestGoogleIdToken(
+    context: Context,
+    credentialManager: CredentialManager,
+    webClientId: String,
+    oneTap: Boolean,
+): String? {
+    val option = if (oneTap) {
+        GetGoogleIdOption.Builder()
+            .setServerClientId(webClientId)
+            .setFilterByAuthorizedAccounts(true)
+            .build()
+    } else {
+        GetSignInWithGoogleOption.Builder(webClientId).build()
+    }
+    val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+    val response = credentialManager.getCredential(context, request)
+    val credential = response.credential
+    if (credential is CustomCredential &&
+        credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+    ) {
+        return GoogleIdTokenCredential.createFrom(credential.data).idToken
+    }
+    Log.w(TAG, "Unexpected credential type: ${credential.type}")
+    return null
+}
 
 @Composable
 actual fun rememberGoogleSignIn(onResult: (GoogleAccount?) -> Unit): () -> Unit {
@@ -25,37 +76,24 @@ actual fun rememberGoogleSignIn(onResult: (GoogleAccount?) -> Unit): () -> Unit 
     val scope = rememberCoroutineScope()
     return {
         scope.launch {
-            if (BuildConfig.WEB_CLIENT_ID.isBlank()) {
-                Log.e(TAG, "WEB_CLIENT_ID is blank — set it in local.properties (OAuth Web client ID).")
+            val webClientId = resolveWebClientId(context)
+            if (webClientId.isBlank()) {
+                Log.e(TAG, "Web client ID missing — add google-services.json or WEB_CLIENT_ID in local.properties.")
                 onResult(null)
                 return@launch
             }
             val account = try {
                 val credentialManager = CredentialManager.create(context)
-                val option = GetSignInWithGoogleOption.Builder(BuildConfig.WEB_CLIENT_ID).build()
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(option)
-                    .build()
-                val response = credentialManager.getCredential(context, request)
-                val credential = response.credential
-                if (credential is CustomCredential &&
-                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                ) {
-                    val token = GoogleIdTokenCredential.createFrom(credential.data)
-                    GoogleAccount(
-                        name = token.displayName ?: token.givenName ?: token.id,
-                        email = token.id,
-                    )
-                } else {
-                    Log.w(TAG, "Unexpected credential type: ${credential.type}")
-                    null
+                val idToken = try {
+                    requestGoogleIdToken(context, credentialManager, webClientId, oneTap = true)
+                } catch (_: NoCredentialException) {
+                    requestGoogleIdToken(context, credentialManager, webClientId, oneTap = false)
                 }
+                if (idToken != null) firebaseAuthWithGoogle(idToken) else null
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Surfaces the real cause (e.g. "[16] Caller not whitelisted" → the Android
-                // OAuth client is missing/mismatched for this package + signing SHA-1).
-                Log.e(TAG, "Google sign-in failed: ${e.javaClass.simpleName}: ${e.message}", e)
+                Log.e(TAG, "Firebase Google sign-in failed: ${e.javaClass.simpleName}: ${e.message}", e)
                 null
             }
             onResult(account)

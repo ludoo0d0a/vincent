@@ -1,0 +1,36 @@
+{
+  "project": {
+    "id": "vincent-499318",
+    "name": "Vincent",
+    "package": "fr.geoking.vincent",
+    "storageBucket": "vincent-499318.firebasestorage.app"
+  },
+  "urls": {
+    "firebase": {
+      "console": "https://console.firebase.google.com/project/vincent-499318/",
+      "settings": "https://console.firebase.google.com/project/vincent-499318/settings/general",
+      "authProviders": "https://console.firebase.google.com/project/vincent-499318/authentication/providers",
+      "authUsers": "https://console.firebase.google.com/project/vincent-499318/authentication/users"
+    },
+    "gcp": {
+      "console": "https://console.cloud.google.com/welcome?project=vincent-499318",
+      "credentials": "https://console.cloud.google.com/apis/credentials?project=vincent-499318",
+      "oauthConsent": "https://console.cloud.google.com/apis/credentials/consent?project=vincent-499318",
+      "playDeveloperApi": "https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com?project=vincent-499318",
+      "serviceAccounts": "https://console.cloud.google.com/iam-admin/serviceaccounts?project=vincent-499318"
+    },
+    "play": {
+      "developerId": "8648842673731499425",
+      "appId": "4975982411132001122",
+      "dashboard": "https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/app-dashboard",
+      "integrity": "https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/keymanagement",
+      "integrityHelp": "https://support.google.com/googleplay/android-developer/answer/9842756?hl=fr"
+    },
+    "gemini": {
+      "apiKeys": "https://aistudio.google.com/apikey"
+    },
+    "github": {
+      "actionsSecrets": "https://github.com/settings/secrets/actions"
+    }
+  }
+}

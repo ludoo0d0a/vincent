@@ -4,6 +4,7 @@ build/
 .idea/
 *.iml
 local.properties
+composeApp/google-services.json
 .DS_Store
 .kotlin/
 captures/

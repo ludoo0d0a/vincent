@@ -18,6 +18,7 @@ import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.bootstrapAuth
 import fr.geoking.vincent.db.RoomCellarRepository
 import fr.geoking.vincent.db.VincentDatabase
 import kotlinx.coroutines.MainScope
@@ -71,6 +72,8 @@ class MainActivity : ComponentActivity() {
         ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
         val repository = RoomCellarRepository(db.bottleDao())
         MainScope().launch { Cellar.bootstrap(repository) }
+
+        bootstrapAuth()
 
         appUpdateManager.registerListener(installListener)
         checkForUpdate()
