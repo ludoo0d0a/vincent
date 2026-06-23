@@ -3,7 +3,16 @@
     "id": "vincent-499318",
     "name": "Vincent",
     "package": "fr.geoking.vincent",
-    "storageBucket": "vincent-499318.firebasestorage.app"
+    "storageBucket": "vincent-499318.firebasestorage.app",
+    "firebaseAndroidAppId": "1:847279428684:android:02e414d58b904cd00110e9"
+  },
+  "build": {
+    "gradleModule": ":composeApp",
+    "googleServices": "composeApp/google-services.json",
+    "keystoreAlias": "key0",
+    "keystoreDn": "CN=Vincent, OU=GeoKing, O=GeoKing, L=Paris, C=FR",
+    "mainActivity": ".MainActivity",
+    "signInLogTag": "VincentSignIn"
   },
   "urls": {
     "firebase": {

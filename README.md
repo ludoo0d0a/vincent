@@ -86,9 +86,8 @@ composeApp/src/
   `bootstrapAuth()` in `MainActivity`. Account screen shows name/email + sign out.
   ⚠️ **Required**: `composeApp/google-services.json` from Firebase (project
   `vincent-499318`, package `fr.geoking.vincent`) + **Google** provider enabled in
-  Firebase Authentication. `./scripts/setup-release.sh firebase` sets it up; CI
-  reads secret `GOOGLE_SERVICES_JSON`. `WEB_CLIENT_ID` in `local.properties` is
-  a fallback if `default_web_client_id` is missing from the JSON.
+  Firebase Authentication. `./scripts/setup-release.sh firebase` sets it up (Firebase
+  CLI if `firebase login`, else manual download); CI reads secret `GOOGLE_SERVICES_JSON`.
 - **CSV import / export (wired).** `data/CsvFormat.kt` serialises the cellar
   (Vincent format, round-trip) and parses an incoming CSV with **tolerant column
   mapping**: detects Vincent / Vivino / PLOC / spreadsheet via headers (FR/EN) and
@@ -142,9 +141,9 @@ composeApp/src/
 
 ## Consoles & project manifest
 
-IDs and console URLs live in **`scripts/project.manifest.json`** (loaded by
-`scripts/project.manifest.sh` for setup/verify scripts). Edit the JSON once;
-scripts and docs stay in sync.
+IDs and console URLs live in **`scripts/project.manifest.json`** (per-project config;
+shared logic in sibling **[geoking-tools](https://github.com/ludoo0d0a/geoking-tools)**).
+Edit the JSON once; scripts and docs stay in sync.
 
 | Console | Lien |
 |---------|------|
@@ -161,9 +160,9 @@ Play app `4975982411132001122`.
 
 ## CI/CD (GitHub Actions)
 
-Workflows in `.github/workflows/` use a shared composite action
-`.github/actions/setup-gradle` (Temurin JDK 17 + `gradle/actions/setup-gradle`,
-pinned to Gradle 8.13 since the binary wrapper is not committed → call `gradle …`):
+Workflows in `.github/workflows/` are thin callers to reusable workflows in
+**[geoking-ci](https://github.com/ludoo0d0a/geoking-ci)** (JDK 17 + Gradle 8.13,
+pinned because the binary wrapper is not committed → call `gradle …`):
 
 - **`android-ci.yml`** — on push / PR to `main`: `assembleDebug` + APK artifact.
 - **`release-play.yml`** — **on every push to `main`** (track **internal**), plus on
@@ -179,7 +178,7 @@ local release build stays unsigned (debug works with nothing configured).
 > wizard that generates the keystore, opens each Google console page, and registers
 > every secret via `gh`. Run a single step with
 > `./scripts/setup-release.sh keystore|play|firebase|oauth|gemini|secrets|verify`.
-> Logique partagée : `scripts/release-lib.sh` + `scripts/project.manifest.json`.
+> Scripts partagés : clone `geoking-tools` next to this repo (or set `GEOKING_TOOLS`).
 
 ### Repository secrets to create (Settings → Secrets and variables → Actions)
 
