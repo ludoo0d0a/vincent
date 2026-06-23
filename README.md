@@ -160,10 +160,9 @@ Play app `4975982411132001122`.
 
 ## CI/CD (GitHub Actions)
 
-Workflows in `.github/workflows/` run inline (GitHub Free does not support reusable
-workflows from a private `geoking-ci` repo). The composite action
-`.github/actions/setup-gradle` mirrors **[geoking-ci](https://github.com/ludoo0d0a/geoking-ci)**
-(JDK 21 + Gradle 8.13; no wrapper jar committed → call `gradle …`):
+Workflows in `.github/workflows/` are thin callers to reusable workflows in public
+**[geoking-ci](https://github.com/ludoo0d0a/geoking-ci)** (JDK 21 + Gradle 8.13,
+no wrapper jar committed → call `gradle …`):
 
 - **`android-ci.yml`** — on push / PR to `main`: `assembleDebug` + APK artifact.
 - **`release-play.yml`** — **on every push to `main`** (track **internal**), plus on
