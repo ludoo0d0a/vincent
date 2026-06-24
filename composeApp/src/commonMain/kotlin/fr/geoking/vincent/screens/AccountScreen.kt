@@ -39,6 +39,7 @@ import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
+import fr.geoking.vincent.data.Updater
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
@@ -160,6 +161,11 @@ fun AccountScreen(
                 AccountLink(stringResource(Res.string.ploc_tastings), onOpenTastings)
                 AccountLink(stringResource(Res.string.ploc_producers), onOpenProducers)
                 AccountLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
+            }
+
+            SectionHeader(stringResource(Res.string.settings_section_app))
+            AccountLink(stringResource(Res.string.update_check)) {
+                Updater.checkForUpdate(true)
             }
 
             SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))

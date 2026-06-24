@@ -340,6 +340,14 @@
     <string name="producers_import_wrong_type">This file does not look like a producer export.</string>
     <string name="producers_empty">No producers yet. Import a PLOC CSV file to get started.</string>
 
+    <string name="update_check">Check for updates</string>
+    <string name="update_available">A new version is available.</string>
+    <string name="update_up_to_date">The app is up to date.</string>
+    <string name="update_downloaded">Update downloaded — restarting…</string>
+    <string name="update_error">Error checking for updates.</string>
+    <string name="update_ineligible">Update available but not eligible.</string>
+    <string name="settings_section_app">App</string>
+
     <string name="suppliers_title">My suppliers</string>
     <string name="suppliers_subtitle">%d suppliers registered</string>
     <string name="suppliers_import_button">Import suppliers</string>
