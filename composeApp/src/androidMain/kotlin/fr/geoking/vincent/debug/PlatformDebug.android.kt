@@ -3,7 +3,9 @@ package fr.geoking.vincent.debug
 import fr.geoking.vincent.BuildConfig
 
 actual fun initHttpDebug() {
-    HttpDebug.enabled = BuildConfig.DEBUG
+    val isDebug = BuildConfig.DEBUG
+    HttpDebug.enabled = isDebug
+    InternalLog.enabled = isDebug
     HttpDebug.apiKeyHint = when {
         BuildConfig.GEMINI_API_KEY.isBlank() ->
             "GEMINI_API_KEY: absente — ajoutez-la dans local.properties"

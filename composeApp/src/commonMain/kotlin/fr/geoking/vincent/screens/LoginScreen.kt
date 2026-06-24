@@ -26,6 +26,10 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,7 +49,11 @@ import fr.geoking.vincent.theme.VincentColors
 
 @Composable
 fun LoginScreen(onGuest: () -> Unit) {
-    val signIn = rememberGoogleSignIn { account -> if (account != null) Auth.account = account }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
+    val signIn = rememberGoogleSignIn(
+        onError = { errorMsg = it },
+        onResult = { account -> if (account != null) Auth.account = account }
+    )
     Column(
         Modifier.fillMaxSize().background(
             Brush.verticalGradient(listOf(Color(0xFFF7EEEF), VincentColors.Bg)),
@@ -74,6 +82,16 @@ fun LoginScreen(onGuest: () -> Unit) {
 
         // Bottom actions
         Column(Modifier.padding(horizontal = 22.dp).padding(bottom = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (errorMsg != null) {
+                Text(
+                    stringResource(Res.string.login_error, errorMsg!!),
+                    color = VincentColors.Red,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.W600,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 14.dp)) {
                 if (FeatureFlags.CLOUD_SYNC) {
                     Perk(Icons.Filled.CloudUpload, stringResource(Res.string.perk_cloud))

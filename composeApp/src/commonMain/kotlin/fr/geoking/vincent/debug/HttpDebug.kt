@@ -46,6 +46,14 @@ object HttpDebug {
         durationMs: Long = 0,
         error: String? = null,
     ) {
+        if (InternalLog.enabled) {
+            val msg = "HTTP $method $statusCode ${redactUrl(url)} (${durationMs}ms)${if (error != null) " ERROR: $error" else ""}"
+            if (error != null || (statusCode != null && statusCode >= 400)) {
+                InternalLog.e("HTTP", msg)
+            } else {
+                InternalLog.i("HTTP", msg)
+            }
+        }
         if (!enabled) return
         entries.add(
             0,
