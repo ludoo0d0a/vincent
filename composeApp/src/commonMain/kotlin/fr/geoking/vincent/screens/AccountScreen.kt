@@ -40,6 +40,7 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.Updater
+import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
@@ -54,6 +55,7 @@ fun AccountScreen(
     onOpenTastings: () -> Unit = {},
     onOpenProducers: () -> Unit = {},
     onOpenSuppliers: () -> Unit = {},
+    onOpenLogcat: () -> Unit = {},
     onOpenBottle: (Bottle) -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -166,6 +168,9 @@ fun AccountScreen(
             SectionHeader(stringResource(Res.string.settings_section_app))
             AccountLink(stringResource(Res.string.update_check)) {
                 Updater.checkForUpdate(true)
+            }
+            if (InternalLog.enabled) {
+                AccountLink(stringResource(Res.string.debug_internal_logs), onOpenLogcat)
             }
 
             SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))

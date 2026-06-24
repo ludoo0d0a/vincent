@@ -44,6 +44,7 @@ import fr.geoking.vincent.screens.BottlesScreen
 import fr.geoking.vincent.screens.CellarScreen
 import fr.geoking.vincent.screens.DashboardScreen
 import fr.geoking.vincent.screens.ImportExportScreen
+import fr.geoking.vincent.screens.LogcatScreen
 import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SearchScreen
@@ -73,6 +74,7 @@ private sealed interface Dest {
     data object Tastings : Dest
     data object Producers : Dest
     data object Suppliers : Dest
+    data object Logcat : Dest
 }
 
 @Composable
@@ -118,6 +120,7 @@ fun App() = VincentTheme {
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
+                    onOpenLogcat = { stack.add(Dest.Logcat) },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                     onSignOut = { Auth.signOut(); guest = false; stack.clear() },
                 )
@@ -127,6 +130,7 @@ fun App() = VincentTheme {
                 Dest.Tastings -> TastingsScreen(onBack = ::pop)
                 Dest.Producers -> ProducersScreen(onBack = ::pop)
                 Dest.Suppliers -> SuppliersScreen(onBack = ::pop)
+                Dest.Logcat -> LogcatScreen(onBack = ::pop)
 
                 Dest.Recent -> RecentScreen(
                     onBack = ::pop,

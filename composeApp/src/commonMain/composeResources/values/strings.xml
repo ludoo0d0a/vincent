@@ -27,6 +27,8 @@
     </plurals>
     <string name="sign_out">Se déconnecter</string>
     <string name="sign_in">Se connecter</string>
+    <string name="login_error">Erreur de connexion : %s</string>
+    <string name="debug_internal_logs">Logs internes</string>
     <string name="my_cellar">Ma cave</string>
     <string name="cellar_subtitle">Cave de l\'appartement · Paris</string>
     <string name="avg_price">Prix moyen</string>

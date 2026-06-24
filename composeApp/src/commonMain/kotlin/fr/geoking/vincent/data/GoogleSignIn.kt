@@ -8,4 +8,7 @@ import androidx.compose.runtime.Composable
  * uses Credential Manager + Firebase Authentication (Google provider).
  */
 @Composable
-expect fun rememberGoogleSignIn(onResult: (GoogleAccount?) -> Unit): () -> Unit
+expect fun rememberGoogleSignIn(
+    onError: (String) -> Unit,
+    onResult: (GoogleAccount?) -> Unit,
+): () -> Unit
