@@ -50,6 +50,7 @@ import fr.geoking.vincent.screens.SearchScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
 import fr.geoking.vincent.screens.SuppliersScreen
+import fr.geoking.vincent.screens.FavoritesScreen
 import fr.geoking.vincent.debug.HttpDebugBar
 import fr.geoking.vincent.debug.initHttpDebug
 import fr.geoking.vincent.theme.VincentColors
@@ -73,6 +74,7 @@ private sealed interface Dest {
     data object Tastings : Dest
     data object Producers : Dest
     data object Suppliers : Dest
+    data object Favorites : Dest
 }
 
 @Composable
@@ -102,6 +104,8 @@ fun App() = VincentTheme {
                     onAdd = { stack.add(Dest.Add()) },
                     onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
+                    onOpenFavorites = { stack.add(Dest.Favorites) },
+                    onOpenRecent = { stack.add(Dest.Recent) },
                 )
 
                 is Dest.Detail -> BottleDetailScreen(
@@ -118,6 +122,7 @@ fun App() = VincentTheme {
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
+                    onOpenFavorites = { stack.add(Dest.Favorites) },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                     onSignOut = { Auth.signOut(); guest = false; stack.clear() },
                 )
@@ -129,6 +134,11 @@ fun App() = VincentTheme {
                 Dest.Suppliers -> SuppliersScreen(onBack = ::pop)
 
                 Dest.Recent -> RecentScreen(
+                    onBack = ::pop,
+                    onOpenBottle = { stack.add(Dest.Detail(it)) },
+                )
+
+                Dest.Favorites -> FavoritesScreen(
                     onBack = ::pop,
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                 )
@@ -150,6 +160,8 @@ private fun MainScaffold(
     onAdd: () -> Unit,
     onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
+    onOpenFavorites: () -> Unit,
+    onOpenRecent: () -> Unit,
 ) {
     Scaffold(
         containerColor = VincentColors.Bg,
@@ -189,9 +201,18 @@ private fun MainScaffold(
     ) { inner ->
         val content = Modifier.padding(inner)
         when (tab) {
-            Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onAccount = onAccount)
+            Tab.HOME -> DashboardScreen(
+                content,
+                onOpenBottle = onOpenBottle,
+                onAccount = onAccount,
+                onOpenRecent = onOpenRecent,
+            )
             Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle, onAddToCell = onAddToCell)
-            Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle)
+            Tab.BOTTLES -> BottlesScreen(
+                content,
+                onOpenBottle = onOpenBottle,
+                onOpenFavorites = onOpenFavorites,
+            )
             Tab.SEARCH -> SearchScreen(content)
         }
     }

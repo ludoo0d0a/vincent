@@ -2,6 +2,7 @@ package fr.geoking.vincent.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +54,7 @@ fun ScreenHeader(
 }
 
 @Composable
-fun SectionHeader(title: String, action: String? = null) {
+fun SectionHeader(title: String, action: String? = null, onAction: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -63,7 +64,13 @@ fun SectionHeader(title: String, action: String? = null) {
     ) {
         Text(title, fontSize = 14.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
         if (action != null) {
-            Text(action, fontSize = 12.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent)
+            Text(
+                action,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.W600,
+                color = VincentColors.Accent,
+                modifier = Modifier.clickable(onClick = onAction),
+            )
         }
     }
 }

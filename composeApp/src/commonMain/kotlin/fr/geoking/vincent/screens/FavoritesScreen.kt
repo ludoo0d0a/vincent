@@ -29,19 +29,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.RecentRow
 
 @Composable
-fun RecentScreen(
+fun FavoritesScreen(
     onBack: () -> Unit,
     onOpenBottle: (Bottle) -> Unit,
 ) {
-    val today = Cellar.recent.take(2)
-    val week = Cellar.recent.drop(2)
+    val favorites = Cellar.favorites
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -51,22 +50,26 @@ fun RecentScreen(
             ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(stringResource(Res.string.recent_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text(stringResource(Res.string.recent_subtitle), fontSize = 11.5.sp, color = VincentColors.Muted)
+                Text(stringResource(Res.string.my_favorites), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(pluralStringResource(Res.plurals.vines_count, favorites.size, favorites.size), fontSize = 11.5.sp, color = VincentColors.Muted)
             }
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
-            DayGroup(stringResource(Res.string.recent_today))
-            today.forEach { RecentRow(it, onOpenBottle) }
-            DayGroup(stringResource(Res.string.recent_this_week))
-            week.forEach { RecentRow(it, onOpenBottle) }
+            favorites.chunked(2).forEach { pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                    pair.forEach { b -> BottleCard(b, Modifier.weight(1f)) { onOpenBottle(b) } }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(11.dp))
+            }
+            if (favorites.isEmpty()) {
+                Text(
+                    stringResource(Res.string.bottles_no_result_filter),
+                    fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
-}
-
-@Composable
-private fun DayGroup(label: String) {
-    Text(label.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Muted, letterSpacing = 0.6.sp, modifier = Modifier.padding(top = 14.dp, bottom = 9.dp))
 }

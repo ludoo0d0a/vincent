@@ -39,7 +39,9 @@ import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
+import fr.geoking.vincent.data.rememberGoogleSignIn
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.versionInfo
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.SectionHeader
@@ -50,6 +52,7 @@ fun AccountScreen(
     onBack: () -> Unit,
     onOpenRecent: () -> Unit,
     onOpenTransfer: () -> Unit,
+    onOpenFavorites: () -> Unit,
     onOpenTastings: () -> Unit = {},
     onOpenProducers: () -> Unit = {},
     onOpenSuppliers: () -> Unit = {},
@@ -57,6 +60,8 @@ fun AccountScreen(
     onSignOut: () -> Unit,
 ) {
     val acc = Auth.account
+    val signIn = rememberGoogleSignIn { account -> if (account != null) Auth.account = account }
+
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -78,7 +83,9 @@ fun AccountScreen(
             // account card
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                    .background(Brush.linearGradient(listOf(VincentColors.AccentDeep, VincentColors.Accent))).padding(15.dp),
+                    .background(Brush.linearGradient(listOf(VincentColors.AccentDeep, VincentColors.Accent)))
+                    .then(if (acc == null) Modifier.clickable(onClick = signIn) else Modifier)
+                    .padding(15.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
@@ -136,17 +143,7 @@ fun AccountScreen(
                 }
             }
 
-            // recent link
             Spacer(Modifier.height(11.dp))
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenRecent).padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(Res.string.last_added), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-                Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
-            }
-
-            Spacer(Modifier.height(9.dp))
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenTransfer).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -162,21 +159,34 @@ fun AccountScreen(
                 AccountLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
             }
 
-            SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))
-            Cellar.favorites.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                    pair.forEach { b -> BottleCard(b, Modifier.weight(1f)) { onOpenBottle(b) } }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(11.dp))
+            SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size)) {
+                onOpenFavorites()
             }
-            Spacer(Modifier.height(4.dp))
-            OutlinedButton(
-                onClick = onSignOut,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                shape = RoundedCornerShape(13.dp),
-            ) { Text(if (acc != null) stringResource(Res.string.sign_out) else stringResource(Res.string.sign_in), fontWeight = FontWeight.W700, color = VincentColors.Accent) }
-            Spacer(Modifier.height(24.dp))
+            AccountLink(stringResource(Res.string.my_favorites), onOpenFavorites)
+
+            if (acc != null) {
+                Spacer(Modifier.height(18.dp))
+                OutlinedButton(
+                    onClick = onSignOut,
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(13.dp),
+                ) {
+                    Text(
+                        stringResource(Res.string.sign_out),
+                        fontWeight = FontWeight.W700,
+                        color = VincentColors.Accent
+                    )
+                }
+            }
+            Spacer(Modifier.height(32.dp))
+            Text(
+                versionInfo,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontSize = 11.sp,
+                color = VincentColors.Faint,
+                fontWeight = FontWeight.W600,
+            )
         }
     }
 }
