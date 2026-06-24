@@ -40,6 +40,7 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.rememberGoogleSignIn
+import fr.geoking.vincent.data.Updater
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.versionInfo
 import fr.geoking.vincent.model.Bottle

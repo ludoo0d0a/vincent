@@ -340,6 +340,14 @@
     <string name="producers_import_wrong_type">Le fichier ne semble pas être un export de producteurs.</string>
     <string name="producers_empty">Aucun producteur. Importez un fichier CSV de PLOC pour commencer.</string>
 
+    <string name="update_check">Vérifier les mises à jour</string>
+    <string name="update_available">Une nouvelle version est disponible.</string>
+    <string name="update_up_to_date">L\'application est à jour.</string>
+    <string name="update_downloaded">Mise à jour téléchargée — redémarrage…</string>
+    <string name="update_error">Erreur lors de la vérification de la mise à jour.</string>
+    <string name="update_ineligible">Mise à jour disponible mais non éligible.</string>
+    <string name="settings_section_app">Application</string>
+
     <string name="suppliers_title">Mes fournisseurs</string>
     <string name="suppliers_subtitle">%d fournisseurs enregistrés</string>
     <string name="suppliers_import_button">Importer des fournisseurs</string>
