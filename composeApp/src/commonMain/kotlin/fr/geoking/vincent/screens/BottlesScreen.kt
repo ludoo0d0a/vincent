@@ -66,6 +66,7 @@ private sealed interface BottleImportStatus {
 fun BottlesScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (Bottle) -> Unit,
+    onOpenFavorites: () -> Unit,
 ) {
     var selected by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
@@ -105,10 +106,17 @@ fun BottlesScreen(
             stringResource(Res.string.bottles_title),
             pluralStringResource(Res.plurals.bottles_subtitle_format, list.size, Cellar.totalBottles(), list.size),
             trailing = {
-                Box(
-                    Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { onOpenFavorites() },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Filled.Favorite, contentDescription = stringResource(Res.string.my_favorites), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+
+                    Box(
+                        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                }
             },
         )
         Column(Modifier.padding(horizontal = 16.dp)) {

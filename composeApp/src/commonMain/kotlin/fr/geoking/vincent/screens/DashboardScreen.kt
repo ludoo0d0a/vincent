@@ -36,6 +36,7 @@ import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BrandAvatar
+import fr.geoking.vincent.ui.RecentRow
 import fr.geoking.vincent.ui.ScreenHeader
 import fr.geoking.vincent.ui.SectionHeader
 import fr.geoking.vincent.ui.VCard
@@ -44,6 +45,7 @@ import fr.geoking.vincent.ui.VCard
 fun DashboardScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (fr.geoking.vincent.model.Bottle) -> Unit,
+    onOpenRecent: () -> Unit,
     onAccount: () -> Unit,
 ) {
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -62,6 +64,10 @@ fun DashboardScreen(
             }
             SectionHeader(stringResource(Res.string.breakdown_by_color), stringResource(Res.string.details))
             BreakdownCard()
+            SectionHeader(stringResource(Res.string.last_added), stringResource(Res.string.details), onAction = onOpenRecent)
+            Cellar.recent.take(3).forEach { b ->
+                RecentRow(b, onOpenBottle)
+            }
             Spacer(Modifier.height(80.dp))
         }
     }
