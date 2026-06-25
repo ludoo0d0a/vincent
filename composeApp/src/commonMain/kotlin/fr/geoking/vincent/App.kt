@@ -43,6 +43,7 @@ import fr.geoking.vincent.screens.BottleDetailScreen
 import fr.geoking.vincent.screens.BottlesScreen
 import fr.geoking.vincent.screens.CellarScreen
 import fr.geoking.vincent.screens.DashboardScreen
+import fr.geoking.vincent.screens.FavoritesScreen
 import fr.geoking.vincent.screens.ImportExportScreen
 import fr.geoking.vincent.screens.LogcatScreen
 import fr.geoking.vincent.screens.LoginScreen
@@ -70,6 +71,7 @@ private sealed interface Dest {
     data class Add(val placement: RackPlacement? = null) : Dest
     data object Account : Dest
     data object Recent : Dest
+    data object Favorites : Dest
     data object Transfer : Dest
     data object Tastings : Dest
     data object Producers : Dest
@@ -87,6 +89,11 @@ fun App() = VincentTheme {
     val stack = remember { mutableStateListOf<Dest>() }
     fun pop() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
 
+    val onSignIn = rememberGoogleSignIn(
+        onError = { /* ignored for now as per instructions */ },
+        onResult = { if (it != null) { Auth.account = it; guest = false } }
+    )
+
     // System back button: while screens are stacked, pop instead of exiting.
     NavBackHandler(enabled = loggedIn && stack.isNotEmpty()) { pop() }
 
@@ -101,6 +108,8 @@ fun App() = VincentTheme {
                     tab = tab,
                     onTab = { tab = it },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
+                    onOpenRecent = { stack.add(Dest.Recent) },
+                    onOpenFavorites = { stack.add(Dest.Favorites) },
                     onAdd = { stack.add(Dest.Add()) },
                     onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
@@ -115,7 +124,9 @@ fun App() = VincentTheme {
 
                 Dest.Account -> AccountScreen(
                     onBack = ::pop,
+                    onSignIn = onSignIn,
                     onOpenRecent = { stack.add(Dest.Recent) },
+                    onOpenFavorites = { stack.add(Dest.Favorites) },
                     onOpenTransfer = { stack.add(Dest.Transfer) },
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
@@ -136,6 +147,11 @@ fun App() = VincentTheme {
                     onBack = ::pop,
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                 )
+
+                Dest.Favorites -> FavoritesScreen(
+                    onBack = ::pop,
+                    onOpenBottle = { stack.add(Dest.Detail(it)) },
+                )
             }
             HttpDebugBar(
                 modifier = Modifier
@@ -151,6 +167,8 @@ private fun MainScaffold(
     tab: Tab,
     onTab: (Tab) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
+    onOpenRecent: () -> Unit,
+    onOpenFavorites: () -> Unit,
     onAdd: () -> Unit,
     onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
@@ -193,9 +211,9 @@ private fun MainScaffold(
     ) { inner ->
         val content = Modifier.padding(inner)
         when (tab) {
-            Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onAccount = onAccount)
+            Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onOpenRecent = onOpenRecent, onAccount = onAccount)
             Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle, onAddToCell = onAddToCell)
-            Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle)
+            Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, onOpenFavorites = onOpenFavorites)
             Tab.SEARCH -> SearchScreen(content)
         }
     }
