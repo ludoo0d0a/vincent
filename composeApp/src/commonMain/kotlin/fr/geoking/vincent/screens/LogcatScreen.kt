@@ -15,16 +15,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,9 +41,14 @@ import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.debug.LogLevel
 import fr.geoking.vincent.theme.VincentColors
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.Res
+import vincent.composeapp.generated.resources.debug_internal_logs
 
 @Composable
 fun LogcatScreen(onBack: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+
     Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
         // Toolbar
         Row(
@@ -77,12 +91,71 @@ fun LogcatScreen(onBack: () -> Unit) {
             }
         }
 
+        // Search field
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 10.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(VincentColors.Surface2)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = VincentColors.Muted
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f)) {
+                if (query.isEmpty()) {
+                    Text(
+                        "Rechercher…",
+                        color = VincentColors.Muted,
+                        fontSize = 14.sp
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = VincentColors.Fg, fontSize = 14.sp),
+                    cursorBrush = SolidColor(VincentColors.Fg),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (query.isNotEmpty()) {
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Clear search",
+                    modifier = Modifier.size(18.dp).clickable { query = "" },
+                    tint = VincentColors.Muted
+                )
+            }
+        }
+
         HorizontalDivider(color = VincentColors.Border)
 
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(InternalLog.entries) { entry ->
-                LogEntryRow(entry)
-                HorizontalDivider(color = VincentColors.Border.copy(alpha = 0.5f))
+        val filtered = InternalLog.entries.filter { entry ->
+            query.isBlank() ||
+                entry.message.contains(query, ignoreCase = true) ||
+                entry.tag.contains(query, ignoreCase = true)
+        }
+
+        if (filtered.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    if (InternalLog.entries.isEmpty()) "Aucun log" else "Aucun résultat",
+                    color = VincentColors.Muted,
+                    fontSize = 14.sp
+                )
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(filtered) { entry ->
+                    LogEntryRow(entry)
+                    HorizontalDivider(color = VincentColors.Border.copy(alpha = 0.5f))
+                }
             }
         }
     }
