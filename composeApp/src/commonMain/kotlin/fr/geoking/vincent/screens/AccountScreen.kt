@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
@@ -40,11 +41,11 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.rememberGoogleSignIn
-import fr.geoking.vincent.data.Updater
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.versionInfo
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.AccountLink
 import fr.geoking.vincent.ui.SectionHeader
 import fr.geoking.vincent.ui.VCard
 
@@ -160,9 +161,7 @@ fun AccountScreen(
                 AccountLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
             }
 
-            SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size)) {
-                onOpenFavorites()
-            }
+            SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))
             AccountLink(stringResource(Res.string.my_favorites), onOpenFavorites)
 
             if (acc != null) {
@@ -183,7 +182,7 @@ fun AccountScreen(
             Text(
                 versionInfo,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                textAlign = TextAlign.Center,
                 fontSize = 11.sp,
                 color = VincentColors.Faint,
                 fontWeight = FontWeight.W600,
@@ -192,13 +191,3 @@ fun AccountScreen(
     }
 }
 
-@Composable
-private fun AccountLink(label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onClick).padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-        Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
-    }
-}

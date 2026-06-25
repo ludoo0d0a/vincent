@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BrandAvatar
@@ -44,7 +45,7 @@ import fr.geoking.vincent.ui.VCard
 @Composable
 fun DashboardScreen(
     modifier: Modifier = Modifier,
-    onOpenBottle: (fr.geoking.vincent.model.Bottle) -> Unit,
+    onOpenBottle: (Bottle) -> Unit,
     onAccount: () -> Unit,
     onOpenRecent: () -> Unit,
 ) {

@@ -54,7 +54,18 @@ fun ScreenHeader(
 }
 
 @Composable
-fun SectionHeader(title: String, action: String? = null, onAction: () -> Unit = {}) {
+fun AccountLink(label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onClick).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+        Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
+    }
+}
+
+@Composable
+fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -69,7 +80,7 @@ fun SectionHeader(title: String, action: String? = null, onAction: () -> Unit = 
                 fontSize = 12.sp,
                 fontWeight = FontWeight.W600,
                 color = VincentColors.Accent,
-                modifier = Modifier.clickable(onClick = onAction),
+                modifier = if (onAction != null) Modifier.clickable(onClick = onAction) else Modifier,
             )
         }
     }

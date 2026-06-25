@@ -34,6 +34,7 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.BottleCard
 
 @Composable
 fun FavoritesScreen(

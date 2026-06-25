@@ -18,14 +18,11 @@ import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
 import fr.geoking.vincent.data.Cellar
-import fr.geoking.vincent.data.Updater
 import fr.geoking.vincent.data.bootstrapAuth
 import fr.geoking.vincent.db.RoomCellarRepository
 import fr.geoking.vincent.db.VincentDatabase
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.getString
-import vincent.composeapp.generated.resources.*
 
 private val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -47,10 +44,8 @@ class MainActivity : ComponentActivity() {
     // Flexible update: as soon as the download finishes, auto-complete it (restarts the app).
     private val installListener = InstallStateUpdatedListener { state ->
         if (state.installStatus() == InstallStatus.DOWNLOADED) {
-            MainScope().launch {
-                Toast.makeText(this@MainActivity, getString(Res.string.update_downloaded), Toast.LENGTH_SHORT).show()
-                appUpdateManager.completeUpdate()
-            }
+            Toast.makeText(this, "Mise à jour téléchargée — redémarrage…", Toast.LENGTH_SHORT).show()
+            appUpdateManager.completeUpdate()
         }
     }
 
@@ -81,8 +76,7 @@ class MainActivity : ComponentActivity() {
         bootstrapAuth()
 
         appUpdateManager.registerListener(installListener)
-        Updater.triggerUpdate = { manual -> checkForUpdate(manual) }
-        checkForUpdate(manual = false)
+        checkForUpdate()
 
         setContent {
             App()
@@ -90,7 +84,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /** On startup: if Play has an update, show the (flexible) update popup. */
-    private fun checkForUpdate(manual: Boolean) {
+    private fun checkForUpdate() {
         appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
             if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
                 info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
@@ -100,21 +94,6 @@ class MainActivity : ComponentActivity() {
                     updateLauncher,
                     AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
                 )
-            } else if (manual) {
-                MainScope().launch {
-                    val msg = if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE) {
-                        getString(Res.string.update_ineligible)
-                    } else {
-                        getString(Res.string.update_up_to_date)
-                    }
-                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
-                }
-            }
-        }.addOnFailureListener {
-            if (manual) {
-                MainScope().launch {
-                    Toast.makeText(this@MainActivity, getString(Res.string.update_error), Toast.LENGTH_SHORT).show()
-                }
             }
         }
     }
@@ -129,7 +108,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         appUpdateManager.unregisterListener(installListener)
-        Updater.triggerUpdate = null
         super.onDestroy()
     }
 }
