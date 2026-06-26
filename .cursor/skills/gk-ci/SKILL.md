@@ -123,9 +123,23 @@ Triggers belong to the **caller** (the app), not the reusable workflow (`on: wor
 
 Required GitHub repo secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_SERVICES_JSON`, `WEB_CLIENT_ID`, and `GEMINI_API_KEY` (if the app uses Gemini).
 
+## Pulling google-services.json (Firebase CLI)
+
+Never hand-edit `google-services.json`. Download the authoritative file straight from Firebase — this also resyncs `WEB_CLIENT_ID` in `local.properties`:
+
+```bash
+firebase login                            # once
+./scripts/pull-google-services.sh         # local: file + local.properties
+./scripts/pull-google-services.sh --push  # also sync GitHub secrets
+```
+
+It resolves the Android app ID (manifest `firebaseAndroidAppId` → existing file → `firebase apps:list`), runs `firebase apps:sdkconfig ANDROID`, verifies the package matches, backs up any previous file to `*.bak`, and extracts the web client (`client_type 3`) into `WEB_CLIENT_ID`. With `--push` (or `GK_PULL_PUSH_SECRET=true`) it also pushes the `GOOGLE_SERVICES_JSON` **and** `WEB_CLIENT_ID` GitHub secrets via `gh`, keeping `local.properties` and CI in lockstep. Use it whenever sign-in fails with “aucun jeton Google reçu” or a stale/wrong `WEB_CLIENT_ID` (a stale config is a common root cause). The Firebase wizard step (`setup-release.sh firebase`) calls the pull automatically when the CLI is logged in.
+
+> OAuth clients: `google-services.json` must contain **both** an **Android** client (`client_type 1`, bound to package + each SHA-1) and a **Web** client (`client_type 3`). The code/`WEB_CLIENT_ID` use only the **Web** one; the Android one authorizes the app via its signature. Missing either (or a stale Web ID) breaks sign-in. Full table in [reference.md](reference.md).
+
 ## First release order
 
-Firebase (add app, download `google-services.json` → `composeApp/`) → keystore → Play Console (note `developerId`/`appId`) → service account → OAuth (register SHA-1 debug + Play App Signing) → verify → push `main` → first internal upload.
+Firebase (add app → `firebase login` → `./scripts/pull-google-services.sh`) → keystore → Play Console (note `developerId`/`appId`) → service account → OAuth (register SHA-1 debug + Play App Signing) → verify → push `main` → first internal upload.
 
 ## Non-default Gradle module
 

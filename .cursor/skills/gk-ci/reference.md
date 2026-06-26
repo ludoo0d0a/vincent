@@ -144,6 +144,19 @@ Copy `geoking-tools/templates/project.manifest.template.json`. Required fields:
 
 Play URL pattern: `https://play.google.com/console/u/0/developers/{developerId}/app/{appId}/app-dashboard`
 
+## OAuth client types in `google-services.json`
+
+Google Sign-In needs **both** OAuth client types present in the Firebase project; the **code** only ever uses the **Web** one.
+
+| `client_type` | Client | Role | Bound to | Used in code? |
+|---|---|---|---|---|
+| `1` | **Android** | Authorizes the app/device to request Google sign-in | `package_name` + **SHA-1** | No — Google matches the app signature automatically |
+| `3` | **Web** ("server client ID") | Audience of the ID token Firebase verifies | nothing physical (server ID) | **Yes** — `setServerClientId(...)` / `default_web_client_id` / `WEB_CLIENT_ID` |
+
+- `WEB_CLIENT_ID` (local.properties, BuildConfig, CI secret) is the **type 3 Web** client — never the Android one.
+- Register **one type-1 client per fingerprint**: debug SHA-1, upload SHA-1, and Play App Signing SHA-1 (the last is required or sign-in breaks on Play even when debug works).
+- Common failure: a `google-services.json` with only a type-3 client (or the wrong one) and no type-1 → "aucun jeton Google reçu" / `signInWithCredential` fails. Fix: `./scripts/pull-google-services.sh` re-downloads the file with all clients and resyncs `WEB_CLIENT_ID`.
+
 ## Local scripts (geoking-tools/bin via wrappers)
 
 | Command | Use |
@@ -151,6 +164,7 @@ Play URL pattern: `https://play.google.com/console/u/0/developers/{developerId}/
 | `./scripts/setup-release.sh` | full release wizard (keystore, Play, Firebase, OAuth, Gemini) |
 | `./scripts/show-secrets.sh` | local vs GitHub secrets recap |
 | `./scripts/verify-oauth.sh` | Google Sign-In / SHA-1 check |
+| `./scripts/pull-google-services.sh` | download `google-services.json` from Firebase (CLI) + sync `WEB_CLIENT_ID` in `local.properties`; `--push` also syncs the `GOOGLE_SERVICES_JSON` + `WEB_CLIENT_ID` GitHub secrets; alias `setup-release.sh config` |
 | `./scripts/gen-keystore.sh` | generate release.keystore |
 | `./scripts/build-aab.sh` | local signed AAB + fingerprint check |
 | `./scripts/deploy-device.sh` | build APK + install on device |
