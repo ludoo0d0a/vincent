@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Auth
+import fr.geoking.vincent.data.rememberGoogleSignIn
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.screens.AccountScreen
