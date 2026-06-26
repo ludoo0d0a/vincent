@@ -14,6 +14,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 // GEMINI_API_KEY comes from local.properties (or CI env) via BuildConfig — never
 // hardcoded. Get a free key at https://aistudio.google.com/apikey. Blank = no-op.
@@ -26,7 +27,8 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     override suspend fun pairings(bottle: Bottle): List<String> = withContext(Dispatchers.IO) {
         val q = "${bottle.domain} ${bottle.vintage} — ${bottle.color.label}, ${bottle.appellation}"
         val json = generate(
-            "Propose 6 accords mets-vin concis (un plat chacun, 1–3 mots) pour ce vin. " +
+            langDirective() +
+                "Propose 6 accords mets-vin concis (un plat chacun, 1–3 mots) pour ce vin. " +
                 "JSON {pairings:[string]}. Vin: \"$q\"",
             imageB64 = null,
         ) ?: return@withContext emptyList()
@@ -36,7 +38,8 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
 
     override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
         val json = generate(
-            "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category}. " +
+            langDirective() +
+                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category}. " +
                 "color parmi rouge/blanc/rosé/pétillant. Titre: \"$title\"",
             imageB64 = null,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
@@ -48,7 +51,8 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     override suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome = withContext(Dispatchers.IO) {
         val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
         val json = generate(
-            "Lis l'étiquette de cette bouteille et renvoie JSON " +
+            langDirective() +
+                "Lis l'étiquette de cette bouteille et renvoie JSON " +
                 "{domain, appellation, color, region, vintage, category}.",
             imageB64 = b64,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
@@ -60,13 +64,22 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     override suspend fun estimate(bottle: Bottle): PriceEstimate? = withContext(Dispatchers.IO) {
         val q = "${bottle.domain} ${bottle.vintage} ${bottle.appellation}".trim()
         val json = generate(
-            "Donne le prix marché estimé en euros (entier) pour ce vin, avec une source courte. " +
+            langDirective() +
+                "Donne le prix marché estimé en euros (entier) pour ce vin, avec une source courte. " +
                 "JSON {price:int, source:string}. Vin: \"$q\"",
             imageB64 = null,
         ) ?: return@withContext null
         val price = json.optInt("price", 0)
         if (price <= 0) null
         else PriceEstimate(price, json.optString("source", "estimation"), "estimation IA")
+    }
+
+    // Instructs Gemini to reply in the device's current language so user-facing
+    // text (pairings, price source…) matches the rest of the localized UI.
+    private fun langDirective(): String {
+        val locale = Locale.getDefault()
+        val name = locale.getDisplayLanguage(Locale.ENGLISH).ifBlank { locale.language }
+        return "Respond in $name (locale \"${locale.language}\"). "
     }
 
     private var lastError: String? = null
