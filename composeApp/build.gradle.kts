@@ -9,6 +9,15 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+// On CI, the google-services.json is provided via an environment variable.
+// This block writes it to the expected location before the Google Services plugin runs.
+System.getenv("GOOGLE_SERVICES_JSON")?.takeIf { it.isNotBlank() }?.let { json ->
+    val target = project.file("google-services.json")
+    if (!target.exists()) {
+        target.writeText(json)
+    }
+}
+
 // Secrets read from local.properties (or CI env), surfaced via BuildConfig — never hardcoded.
 val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
