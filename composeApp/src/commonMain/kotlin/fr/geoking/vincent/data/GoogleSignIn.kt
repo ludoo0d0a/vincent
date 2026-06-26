@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
  */
 @Composable
 expect fun rememberGoogleSignIn(
+    onLoading: (Boolean) -> Unit = {},
     onError: (String) -> Unit,
     onResult: (GoogleAccount?) -> Unit,
 ): () -> Unit

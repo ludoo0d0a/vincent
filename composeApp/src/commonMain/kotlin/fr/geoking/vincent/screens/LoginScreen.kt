@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,7 +51,9 @@ import fr.geoking.vincent.theme.VincentColors
 @Composable
 fun LoginScreen(onGuest: () -> Unit) {
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
     val signIn = rememberGoogleSignIn(
+        onLoading = { isLoading = it },
         onError = { errorMsg = it },
         onResult = { account -> if (account != null) Auth.account = account }
     )
@@ -107,11 +110,15 @@ fun LoginScreen(onGuest: () -> Unit) {
             Row(
                 Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp))
                     .background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp))
-                    .clickable(onClick = signIn),
+                    .clickable(enabled = !isLoading, onClick = signIn),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
-                GoogleG()
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = VincentColors.Accent, strokeWidth = 2.dp)
+                } else {
+                    GoogleG()
+                }
                 Spacer(Modifier.width(11.dp))
                 Text(stringResource(Res.string.continue_google), fontSize = 14.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
             }

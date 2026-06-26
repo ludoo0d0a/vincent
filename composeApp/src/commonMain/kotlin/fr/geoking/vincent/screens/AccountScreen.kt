@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ import fr.geoking.vincent.ui.VCard
 fun AccountScreen(
     onBack: () -> Unit,
     onSignIn: () -> Unit,
+    isLoading: Boolean = false,
     onOpenRecent: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenTransfer: () -> Unit,
@@ -85,12 +87,16 @@ fun AccountScreen(
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
                     .background(Brush.linearGradient(listOf(VincentColors.AccentDeep, VincentColors.Accent)))
-                    .clickable(enabled = acc == null, onClick = onSignIn)
+                    .clickable(enabled = acc == null && !isLoading, onClick = onSignIn)
                     .padding(15.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-                    Text(acc?.initial ?: "?", color = Color.White, fontWeight = FontWeight.W800, fontSize = 18.sp)
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text(acc?.initial ?: "?", color = Color.White, fontWeight = FontWeight.W800, fontSize = 18.sp)
+                    }
                 }
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
