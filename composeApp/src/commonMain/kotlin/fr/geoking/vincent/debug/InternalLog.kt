@@ -1,6 +1,7 @@
 package fr.geoking.vincent.debug
 
 import androidx.compose.runtime.mutableStateListOf
+import fr.geoking.vincent.data.Settings
 
 enum class LogLevel {
     INFO, WARN, ERROR
@@ -15,7 +16,10 @@ data class LogEntry(
 )
 
 object InternalLog {
-    var enabled = false
+    var enabled: Boolean
+        get() = Settings.internalLogEnabled
+        set(value) = Settings.setInternalLogEnabled(value)
+
     val entries = mutableStateListOf<LogEntry>()
     private const val MAX_ENTRIES = 500
 

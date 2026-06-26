@@ -341,6 +341,8 @@
     <string name="producers_empty">No producers yet. Import a PLOC CSV file to get started.</string>
 
     <string name="update_check">Check for updates</string>
+    <string name="settings_internal_logs_toggle">Enable logs</string>
+    <string name="settings_internal_logs_view">View logs</string>
     <string name="update_available">A new version is available.</string>
     <string name="update_up_to_date">The app is up to date.</string>
     <string name="update_downloaded">Update downloaded — restarting…</string>

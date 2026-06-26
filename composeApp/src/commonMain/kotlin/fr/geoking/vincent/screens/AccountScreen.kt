@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -180,8 +182,13 @@ fun AccountScreen(
             AccountLink(stringResource(Res.string.update_check)) {
                 Updater.checkForUpdate(true)
             }
+            AccountToggle(
+                label = stringResource(Res.string.settings_internal_logs_toggle),
+                checked = InternalLog.enabled,
+                onCheckedChange = { InternalLog.enabled = it }
+            )
             if (InternalLog.enabled) {
-                AccountLink(stringResource(Res.string.debug_internal_logs), onOpenLogcat)
+                AccountLink(stringResource(Res.string.settings_internal_logs_view), onOpenLogcat)
             }
 
             SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))
@@ -201,6 +208,27 @@ fun AccountScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun AccountToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = VincentColors.Accent,
+                uncheckedThumbColor = VincentColors.Faint,
+                uncheckedTrackColor = VincentColors.Surface2,
+                uncheckedBorderColor = VincentColors.Border,
+            )
+        )
     }
 }
 
