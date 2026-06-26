@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Auth
+import fr.geoking.vincent.data.ProvideAppLocale
 import fr.geoking.vincent.data.rememberGoogleSignIn
 import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.model.Bottle
@@ -51,6 +52,7 @@ import fr.geoking.vincent.screens.LogcatScreen
 import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SearchScreen
+import fr.geoking.vincent.screens.SettingsScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
 import fr.geoking.vincent.screens.SuppliersScreen
@@ -72,6 +74,7 @@ private sealed interface Dest {
     /** [placement] pre-fills the rack cell when adding from the cellar grid. */
     data class Add(val placement: RackPlacement? = null) : Dest
     data object Account : Dest
+    data object Settings : Dest
     data object Recent : Dest
     data object Favorites : Dest
     data object Transfer : Dest
@@ -102,6 +105,8 @@ fun App() = VincentTheme {
     NavBackHandler(enabled = loggedIn && stack.isNotEmpty()) { pop() }
 
     Surface(color = VincentColors.Bg, modifier = Modifier.fillMaxSize()) {
+      // Applies the user's chosen language to all string resources below.
+      ProvideAppLocale {
         // No fullscreen: keep all content within the system bars so the top
         // back button and the bottom navigation are never hidden behind them.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
@@ -136,9 +141,14 @@ fun App() = VincentTheme {
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
-                    onOpenLogcat = { stack.add(Dest.Logcat) },
+                    onOpenSettings = { stack.add(Dest.Settings) },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                     onSignOut = { Auth.signOut(); guest = false; stack.clear() },
+                )
+
+                Dest.Settings -> SettingsScreen(
+                    onBack = ::pop,
+                    onOpenLogcat = { stack.add(Dest.Logcat) },
                 )
 
                 Dest.Transfer -> ImportExportScreen(onBack = ::pop)
@@ -164,6 +174,7 @@ fun App() = VincentTheme {
                     .padding(end = 16.dp, bottom = 96.dp),
             )
         }
+      }
     }
 }
 

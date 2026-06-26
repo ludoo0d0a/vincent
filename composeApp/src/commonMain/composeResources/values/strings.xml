@@ -361,4 +361,23 @@
     </plurals>
     <string name="suppliers_import_wrong_type">Le fichier ne semble pas être un export de fournisseurs.</string>
     <string name="suppliers_empty">Aucun fournisseur. Importez un fichier CSV de PLOC pour commencer.</string>
+
+    <string name="settings_title">Réglages</string>
+    <string name="settings_language_section">Langue</string>
+    <string name="settings_language_system">Langue du système</string>
+
+    <string name="log_empty">Aucun log</string>
+    <string name="log_no_result">Aucun résultat</string>
+
+    <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.</string>
+    <string name="ai_error_bad_key">Clé API au mauvais format (attendu AIzaSy… depuis aistudio.google.com/apikey).</string>
+    <string name="ai_error_extract_text">Impossible d\'extraire les infos du texte.</string>
+    <string name="ai_error_no_label">Aucun domaine détecté sur l\'étiquette.</string>
+    <string name="ai_error_generic">Identification impossible — réessayez ou passez en manuel.</string>
+    <string name="ai_error_http_403">Clé API invalide ou API non activée.%1$s</string>
+    <string name="ai_error_http_404">Modèle ou URL introuvable (%1$d).%2$s</string>
+    <string name="ai_error_http_429">Quota Gemini dépassé — réessayez plus tard.</string>
+    <string name="ai_error_http_4xx">Requête refusée par l\'IA (%1$d)%2$s</string>
+    <string name="ai_error_http_other">Identification impossible (erreur réseau %1$d)%2$s</string>
+    <string name="ai_added_label">IA</string>
 </resources>

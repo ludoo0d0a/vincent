@@ -44,6 +44,8 @@ import fr.geoking.vincent.theme.VincentColors
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.Res
 import vincent.composeapp.generated.resources.debug_internal_logs
+import vincent.composeapp.generated.resources.log_empty
+import vincent.composeapp.generated.resources.log_no_result
 
 @Composable
 fun LogcatScreen(onBack: () -> Unit) {
@@ -145,7 +147,7 @@ fun LogcatScreen(onBack: () -> Unit) {
         if (filtered.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    if (InternalLog.entries.isEmpty()) "Aucun log" else "Aucun résultat",
+                    if (InternalLog.entries.isEmpty()) stringResource(Res.string.log_empty) else stringResource(Res.string.log_no_result),
                     color = VincentColors.Muted,
                     fontSize = 14.sp
                 )

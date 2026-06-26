@@ -25,8 +25,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,8 +40,6 @@ import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
-import fr.geoking.vincent.data.Updater
-import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.getAppVersion
 import fr.geoking.vincent.model.Bottle
@@ -62,7 +58,7 @@ fun AccountScreen(
     onOpenTastings: () -> Unit = {},
     onOpenProducers: () -> Unit = {},
     onOpenSuppliers: () -> Unit = {},
-    onOpenLogcat: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onOpenBottle: (Bottle) -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -179,17 +175,7 @@ fun AccountScreen(
             }
 
             SectionHeader(stringResource(Res.string.settings_section_app))
-            AccountLink(stringResource(Res.string.update_check)) {
-                Updater.checkForUpdate(true)
-            }
-            AccountToggle(
-                label = stringResource(Res.string.settings_internal_logs_toggle),
-                checked = InternalLog.enabled,
-                onCheckedChange = { InternalLog.enabled = it }
-            )
-            if (InternalLog.enabled) {
-                AccountLink(stringResource(Res.string.settings_internal_logs_view), onOpenLogcat)
-            }
+            AccountLink(stringResource(Res.string.settings_title), onOpenSettings)
 
             SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))
             AccountLink(stringResource(Res.string.my_favorites), onOpenFavorites)
@@ -208,27 +194,6 @@ fun AccountScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
-    }
-}
-
-@Composable
-private fun AccountToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = VincentColors.Accent,
-                uncheckedThumbColor = VincentColors.Faint,
-                uncheckedTrackColor = VincentColors.Surface2,
-                uncheckedBorderColor = VincentColors.Border,
-            )
-        )
     }
 }
 

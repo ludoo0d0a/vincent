@@ -359,4 +359,23 @@
     </plurals>
     <string name="suppliers_import_wrong_type">This file does not look like a supplier export.</string>
     <string name="suppliers_empty">No suppliers yet. Import a PLOC CSV file to get started.</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_language_section">Language</string>
+    <string name="settings_language_system">System default</string>
+
+    <string name="log_empty">No logs</string>
+    <string name="log_no_result">No result</string>
+
+    <string name="ai_error_no_key">Missing Gemini API key. Add GEMINI_API_KEY to local.properties.</string>
+    <string name="ai_error_bad_key">API key has the wrong format (expected AIzaSy… from aistudio.google.com/apikey).</string>
+    <string name="ai_error_extract_text">Could not extract wine details from the text.</string>
+    <string name="ai_error_no_label">No estate detected on the label.</string>
+    <string name="ai_error_generic">Identification failed — try again or switch to manual.</string>
+    <string name="ai_error_http_403">Invalid API key or API not enabled.%1$s</string>
+    <string name="ai_error_http_404">Model or URL not found (%1$d).%2$s</string>
+    <string name="ai_error_http_429">Gemini quota exceeded — try again later.</string>
+    <string name="ai_error_http_4xx">Request rejected by the AI (%1$d)%2$s</string>
+    <string name="ai_error_http_other">Identification failed (network error %1$d)%2$s</string>
+    <string name="ai_added_label">AI</string>
 </resources>

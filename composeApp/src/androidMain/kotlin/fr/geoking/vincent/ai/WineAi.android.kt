@@ -10,11 +10,13 @@ import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.getString
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import vincent.composeapp.generated.resources.*
 
 // GEMINI_API_KEY comes from local.properties (or CI env) via BuildConfig — never
 // hardcoded. Get a free key at https://aistudio.google.com/apikey. Blank = no-op.
@@ -44,7 +46,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             imageB64 = null,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
         val bottle = toBottle(json, "ia-${title.hashCode()}")
-        if (bottle == null) RecognizeOutcome(error = "Impossible d'extraire les infos du texte.")
+        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
         else RecognizeOutcome(bottle = bottle)
     }
 
@@ -57,7 +59,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             imageB64 = b64,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
         val bottle = toBottle(json, "ia-img-${jpeg.size}")
-        if (bottle == null) RecognizeOutcome(error = "Aucun domaine détecté sur l'étiquette.")
+        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_no_label))
         else RecognizeOutcome(bottle = bottle)
     }
 
@@ -90,15 +92,13 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         return null
     }
 
-    private fun generate(prompt: String, imageB64: String?): JSONObject? {
+    private suspend fun generate(prompt: String, imageB64: String?): JSONObject? {
         lastError = null
         if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-            return fail("Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.")
+            return fail(getString(Res.string.ai_error_no_key))
         }
         if (!BuildConfig.GEMINI_API_KEY.startsWith("AIza")) {
-            return fail(
-                "Clé API au mauvais format (attendu AIzaSy… depuis aistudio.google.com/apikey).",
-            )
+            return fail(getString(Res.string.ai_error_bad_key))
         }
         val started = System.currentTimeMillis()
         val endpoint =
@@ -174,7 +174,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
                 durationMs = elapsed,
                 error = "${e.javaClass.simpleName}: ${e.message}",
             )
-            fail("Identification impossible — réessayez ou passez en manuel.")
+            fail(getString(Res.string.ai_error_generic))
         }
     }
 
@@ -189,18 +189,18 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         }
     }
 
-    private fun httpFailMessage(code: Int, raw: String?): String {
+    private suspend fun httpFailMessage(code: Int, raw: String?): String {
         val detail = geminiErrorDetail(raw)?.let { " — $it" }.orEmpty()
         return when (code) {
-            403 -> "Clé API invalide ou API non activée.$detail"
-            404 -> "Modèle ou URL introuvable ($code). Vérifiez le modèle « $MODEL ».$detail"
-            429 -> "Quota Gemini dépassé — réessayez plus tard."
-            in 400..499 -> "Requête refusée par l'IA ($code)$detail"
-            else -> "Identification impossible (erreur réseau $code)$detail"
+            403 -> getString(Res.string.ai_error_http_403, detail)
+            404 -> getString(Res.string.ai_error_http_404, code, detail)
+            429 -> getString(Res.string.ai_error_http_429)
+            in 400..499 -> getString(Res.string.ai_error_http_4xx, code, detail)
+            else -> getString(Res.string.ai_error_http_other, code, detail)
         }
     }
 
-    private fun toBottle(j: JSONObject, id: String): Bottle? {
+    private suspend fun toBottle(j: JSONObject, id: String): Bottle? {
         val domain = j.optString("domain").trim()
         if (domain.isEmpty()) return null
         val region = j.optString("region")
@@ -218,10 +218,10 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             cellarSpot = "—",
             provenance = region.ifBlank { appellation },
             merchant = "—",
-            purchaseDate = "Aujourd'hui",
+            purchaseDate = getString(Res.string.add_today),
             occasion = "—",
             source = AddSource.SCAN,
-            addedLabel = "IA",
+            addedLabel = getString(Res.string.ai_added_label),
         )
     }
 
