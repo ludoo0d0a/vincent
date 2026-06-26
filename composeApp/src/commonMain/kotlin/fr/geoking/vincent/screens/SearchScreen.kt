@@ -80,6 +80,7 @@ private enum class Crit(val label: org.jetbrains.compose.resources.StringResourc
 @Composable
 fun SearchScreen(modifier: Modifier = Modifier) {
     var colorIdx by remember { mutableIntStateOf(0) }
+    var query by remember { mutableStateOf("") }
     var selections by remember { mutableStateOf<Map<Crit, Set<String>>>(emptyMap()) }
     var picker by remember { mutableStateOf<Crit?>(null) }
 
@@ -90,18 +91,59 @@ fun SearchScreen(modifier: Modifier = Modifier) {
     }
 
     val color = WineColor.entries[colorIdx]
-    val count = Cellar.matching(color).size
+    val categoryLabels = WineCategory.entries.associateWith { stringResource(it.label).lowercase() }
+    val count = Cellar.bottles.filter { b ->
+        val q = query.trim().lowercase()
+        val matchesQuery = q.isBlank() ||
+            b.domain.lowercase().contains(q) ||
+            b.appellation.lowercase().contains(q) ||
+            categoryLabels[b.category]?.contains(q) == true ||
+            b.vintage.lowercase().contains(q) ||
+            b.merchant.lowercase().contains(q)
+
+        val matchesColor = b.color == color
+
+        val selectedRegions = selections[Crit.REGION] ?: emptySet()
+        val matchesRegion = selectedRegions.isEmpty() ||
+            selectedRegions.any { it.lowercase() == b.provenance.lowercase() } ||
+            selectedRegions.any { it.lowercase() == categoryLabels[b.category] }
+
+        val selectedGrapes = selections[Crit.GRAPE] ?: emptySet()
+        // Note: SampleData doesn't have grape info, but we match against appellation/domain as fallback or just empty
+        val matchesGrape = selectedGrapes.isEmpty() ||
+            selectedGrapes.any { b.appellation.lowercase().contains(it.lowercase()) }
+
+        val selectedTastes = selections[Crit.TASTE] ?: emptySet()
+        val matchesTaste = selectedTastes.isEmpty() ||
+            selectedTastes.any { b.tastingNotes.lowercase().contains(it.lowercase()) }
+
+        val selectedMerchants = selections[Crit.MERCHANT] ?: emptySet()
+        val matchesMerchant = selectedMerchants.isEmpty() ||
+            selectedMerchants.any { b.merchant.lowercase().contains(it.lowercase()) }
+
+        val selectedOccasions = selections[Crit.OCCASION] ?: emptySet()
+        val matchesOccasion = selectedOccasions.isEmpty() ||
+            selectedOccasions.any { b.occasion.lowercase().contains(it.lowercase()) }
+
+        matchesQuery && matchesColor && matchesRegion && matchesGrape && matchesTaste && matchesMerchant && matchesOccasion
+    }.size
 
     Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxSize()) {
             ScreenHeader(stringResource(Res.string.search_title), stringResource(Res.string.search_subtitle), trailing = {
                 Text(stringResource(Res.string.search_reset), fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
-                    modifier = Modifier.clickable { selections = emptyMap(); colorIdx = 0 })
+                    modifier = Modifier.clickable { selections = emptyMap(); colorIdx = 0; query = "" })
             })
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                SearchField(stringResource(Res.string.search_keyword_placeholder))
-                Spacer(Modifier.height(15.dp))
+            Box(Modifier.padding(horizontal = 16.dp)) {
+                SearchField(
+                    stringResource(Res.string.search_keyword_placeholder),
+                    value = query,
+                    onValueChange = { query = it }
+                )
+            }
+            Spacer(Modifier.height(15.dp))
 
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
                 GroupLabel(stringResource(Res.string.search_color_label))
                 ColorPicker(colorIdx) { colorIdx = it }
                 Spacer(Modifier.height(15.dp))
