@@ -36,6 +36,7 @@ import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.rememberGoogleSignIn
+import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.screens.AccountScreen
@@ -90,8 +91,10 @@ fun App() = VincentTheme {
     val stack = remember { mutableStateListOf<Dest>() }
     fun pop() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
 
+    var googleLoading by remember { mutableStateOf(false) }
     val onSignIn = rememberGoogleSignIn(
-        onError = { /* ignored for now as per instructions */ },
+        onLoading = { googleLoading = it },
+        onError = { InternalLog.e("App", "Google Sign-in error: $it") },
         onResult = { if (it != null) { Auth.account = it; guest = false } }
     )
 
@@ -126,6 +129,7 @@ fun App() = VincentTheme {
                 Dest.Account -> AccountScreen(
                     onBack = ::pop,
                     onSignIn = onSignIn,
+                    isLoading = googleLoading,
                     onOpenRecent = { stack.add(Dest.Recent) },
                     onOpenFavorites = { stack.add(Dest.Favorites) },
                     onOpenTransfer = { stack.add(Dest.Transfer) },
