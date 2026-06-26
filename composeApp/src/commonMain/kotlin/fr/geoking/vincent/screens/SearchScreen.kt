@@ -41,6 +41,7 @@ import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ScreenHeader
