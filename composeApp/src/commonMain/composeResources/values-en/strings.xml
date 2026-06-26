@@ -368,6 +368,7 @@
     <string name="log_no_result">No result</string>
 
     <string name="ai_error_no_key">Missing Gemini API key. Add GEMINI_API_KEY to local.properties.</string>
+    <string name="ai_error_sign_in">Sign in to use AI features.</string>
     <string name="ai_error_bad_key">API key has the wrong format (expected AIzaSy… from aistudio.google.com/apikey).</string>
     <string name="ai_error_extract_text">Could not extract wine details from the text.</string>
     <string name="ai_error_no_label">No estate detected on the label.</string>
@@ -378,4 +379,25 @@
     <string name="ai_error_http_4xx">Request rejected by the AI (%1$d)%2$s</string>
     <string name="ai_error_http_other">Identification failed (network error %1$d)%2$s</string>
     <string name="ai_added_label">AI</string>
+
+    <!-- AR cellar -->
+    <string name="ar_open">AR view</string>
+    <string name="ar_title">AR cellar</string>
+    <string name="ar_back">Back</string>
+    <string name="ar_unsupported">This device does not support augmented reality (ARCore).</string>
+    <string name="ar_install">AR requires \"Google Play Services for AR\". Install it and try again.</string>
+    <string name="ar_install_action">Install</string>
+    <string name="ar_permission">Camera access is required for the AR view.</string>
+    <string name="ar_permission_action">Allow camera</string>
+    <string name="ar_no_setup">This rack is not set up for AR yet. Take a photo of the rack face, then place the 4 corners.</string>
+    <string name="ar_setup_start">Set up with a photo</string>
+    <string name="ar_setup_title">Calibrate the rack</string>
+    <string name="ar_setup_hint">Drag the 4 corners onto the rack face.</string>
+    <string name="ar_setup_save">Save</string>
+    <string name="ar_retake">Retake photo</string>
+    <string name="ar_searching">Point the camera at the rack…</string>
+    <string name="ar_record_start">Record video</string>
+    <string name="ar_record_stop">Stop recording</string>
+    <string name="ar_empty_cell">empty</string>
+    <string name="ar_low_quality">Photo has too little detail for reliable tracking. Retake it with more texture/light.</string>
 </resources>

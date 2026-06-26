@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- AR cellar: record the camera + overlay (MediaProjection foreground service). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- ARCore is optional: the app still installs on non-AR devices; the feature
+         flag + runtime ArCoreApk check hide/disable the AR screen there. -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+
     <!-- Required on Android 11+ so SpeechRecognizer can see the recognition service. -->
     <queries>
         <intent>
@@ -24,6 +33,17 @@
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="barcode_ui" />
+
+        <!-- ARCore optional: Play Services for AR installs on demand, not required. -->
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional" />
+
+        <!-- Foreground service that holds the MediaProjection while recording AR video. -->
+        <service
+            android:name="fr.geoking.vincent.ar.ScreenRecordService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
         <activity
             android:name="fr.geoking.vincent.MainActivity"

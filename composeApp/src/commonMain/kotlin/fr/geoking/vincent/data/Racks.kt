@@ -2,6 +2,7 @@ package fr.geoking.vincent.data
 
 import androidx.compose.runtime.mutableStateListOf
 import fr.geoking.vincent.model.Rack
+import fr.geoking.vincent.model.RackArCalibration
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.SampleData
 import fr.geoking.vincent.model.rowLabel
@@ -12,6 +13,12 @@ object Racks {
 
     fun update(index: Int, rack: Rack) {
         if (index in all.indices) all[index] = rack
+    }
+
+    /** Attach (or update) the AR reference photo + calibration for the rack at [index]. */
+    fun setArCalibration(index: Int, imagePath: String, calibration: RackArCalibration) {
+        val rack = all.getOrNull(index) ?: return
+        all[index] = rack.copy(arImagePath = imagePath, arCalibration = calibration)
     }
 
     fun add(rack: Rack) {

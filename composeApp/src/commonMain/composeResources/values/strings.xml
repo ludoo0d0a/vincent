@@ -370,6 +370,7 @@
     <string name="log_no_result">Aucun résultat</string>
 
     <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.</string>
+    <string name="ai_error_sign_in">Connectez-vous pour utiliser l\'IA.</string>
     <string name="ai_error_bad_key">Clé API au mauvais format (attendu AIzaSy… depuis aistudio.google.com/apikey).</string>
     <string name="ai_error_extract_text">Impossible d\'extraire les infos du texte.</string>
     <string name="ai_error_no_label">Aucun domaine détecté sur l\'étiquette.</string>
@@ -380,4 +381,25 @@
     <string name="ai_error_http_4xx">Requête refusée par l\'IA (%1$d)%2$s</string>
     <string name="ai_error_http_other">Identification impossible (erreur réseau %1$d)%2$s</string>
     <string name="ai_added_label">IA</string>
+
+    <!-- AR cellar -->
+    <string name="ar_open">Vue AR</string>
+    <string name="ar_title">Cave en réalité augmentée</string>
+    <string name="ar_back">Retour</string>
+    <string name="ar_unsupported">Cet appareil ne prend pas en charge la réalité augmentée (ARCore).</string>
+    <string name="ar_install">La réalité augmentée nécessite « Google Play Services for AR ». Installez-le puis réessayez.</string>
+    <string name="ar_install_action">Installer</string>
+    <string name="ar_permission">L\'accès à la caméra est nécessaire pour la vue AR.</string>
+    <string name="ar_permission_action">Autoriser la caméra</string>
+    <string name="ar_no_setup">Ce casier n\'est pas encore configuré pour l\'AR. Prenez une photo de la façade du casier, puis placez les 4 coins.</string>
+    <string name="ar_setup_start">Configurer avec une photo</string>
+    <string name="ar_setup_title">Calibrer le casier</string>
+    <string name="ar_setup_hint">Déplacez les 4 coins sur la façade du casier.</string>
+    <string name="ar_setup_save">Enregistrer</string>
+    <string name="ar_retake">Reprendre la photo</string>
+    <string name="ar_searching">Pointez la caméra vers le casier…</string>
+    <string name="ar_record_start">Enregistrer la vidéo</string>
+    <string name="ar_record_stop">Arrêter l\'enregistrement</string>
+    <string name="ar_empty_cell">vide</string>
+    <string name="ar_low_quality">Photo trop peu détaillée pour un suivi fiable. Reprenez-la avec plus de texture/lumière.</string>
 </resources>

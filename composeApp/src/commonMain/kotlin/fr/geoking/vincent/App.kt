@@ -42,6 +42,7 @@ import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.screens.AccountScreen
 import fr.geoking.vincent.screens.AddScreen
+import fr.geoking.vincent.screens.ArScreen
 import fr.geoking.vincent.screens.BottleDetailScreen
 import fr.geoking.vincent.screens.BottlesScreen
 import fr.geoking.vincent.screens.CellarScreen
@@ -82,6 +83,8 @@ private sealed interface Dest {
     data object Producers : Dest
     data object Suppliers : Dest
     data object Logcat : Dest
+    /** AR view of the rack at [rackIndex]. */
+    data class Ar(val rackIndex: Int) : Dest
 }
 
 @Composable
@@ -122,6 +125,7 @@ fun App() = VincentTheme {
                     onAdd = { stack.add(Dest.Add()) },
                     onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
+                    onOpenAr = { stack.add(Dest.Ar(it)) },
                 )
 
                 is Dest.Detail -> BottleDetailScreen(
@@ -158,6 +162,8 @@ fun App() = VincentTheme {
                 Dest.Suppliers -> SuppliersScreen(onBack = ::pop)
                 Dest.Logcat -> LogcatScreen(onBack = ::pop)
 
+                is Dest.Ar -> ArScreen(rackIndex = top.rackIndex, onBack = ::pop)
+
                 Dest.Recent -> RecentScreen(
                     onBack = ::pop,
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
@@ -188,6 +194,7 @@ private fun MainScaffold(
     onAdd: () -> Unit,
     onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
+    onOpenAr: (Int) -> Unit,
 ) {
     Scaffold(
         containerColor = VincentColors.Bg,
@@ -228,7 +235,7 @@ private fun MainScaffold(
         val content = Modifier.padding(inner)
         when (tab) {
             Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onOpenRecent = onOpenRecent, onAccount = onAccount)
-            Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle, onAddToCell = onAddToCell)
+            Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle, onAddToCell = onAddToCell, onOpenAr = onOpenAr)
             Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, onOpenFavorites = onOpenFavorites)
             Tab.SEARCH -> SearchScreen(content)
         }

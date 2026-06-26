@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -64,6 +65,7 @@ import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.CsvFormat
+import fr.geoking.vincent.data.Features
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.data.RackClipboard
 import fr.geoking.vincent.data.RackClipboardEntry
@@ -144,6 +146,7 @@ fun CellarScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (Bottle) -> Unit,
     onAddToCell: (RackPlacement) -> Unit = {},
+    onOpenAr: (Int) -> Unit = {},
 ) {
     var rackIdx by remember { mutableIntStateOf(0) }
     val rack = Racks.all[rackIdx.coerceIn(0, Racks.all.lastIndex)]
@@ -230,10 +233,18 @@ fun CellarScreen(
                 stringResource(Res.string.cellar_title),
                 stringResource(Res.string.cellar_subtitle_format, rack.capacity, rack.occupiedCount),
                 trailing = {
-                    Box(
-                        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (Features.arEnabled) {
+                            Box(
+                                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { onOpenAr(rackIdx) },
+                                contentAlignment = Alignment.Center,
+                            ) { Icon(Icons.Filled.ViewInAr, contentDescription = stringResource(Res.string.ar_open), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                        }
+                        Box(
+                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                    }
                 },
             )
 

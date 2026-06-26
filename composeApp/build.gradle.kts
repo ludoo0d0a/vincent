@@ -89,6 +89,10 @@ kotlin {
             implementation(libs.google.code.scanner)
             implementation(libs.google.app.update.ktx)
             implementation(libs.coil.compose)
+            // ARCore (Google Play Services for AR) + SceneView (Filament + Compose)
+            // for the offline AR cellar screen. Android target only.
+            implementation(libs.google.arcore)
+            implementation(libs.sceneview.arsceneview)
         }
     }
 }
@@ -106,6 +110,9 @@ android {
         versionName = (System.getenv("VERSION_NAME")?.takeIf { it.isNotBlank() } ?: versionProps.getProperty("versionName") ?: "1.0").removePrefix("v")
         buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
         buildConfigField("String", "WEB_CLIENT_ID", "\"${secret("WEB_CLIENT_ID")}\"")
+        // Feature flag for the ARCore "AR cellar" screen. Optional AR_ENABLED in
+        // local.properties / CI env (true|false) flips it; defaults to enabled.
+        buildConfigField("Boolean", "AR_ENABLED", secret("AR_ENABLED").ifBlank { "true" })
     }
 
     buildFeatures {

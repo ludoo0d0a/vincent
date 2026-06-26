@@ -15,6 +15,8 @@ appUpdate = "2.1.0"
 coil = "2.7.0"
 firebase-bom = "34.15.0"
 google-services = "4.4.2"
+arcore = "1.53.0"
+sceneview = "4.18.0"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
@@ -42,6 +44,8 @@ coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
+google-arcore = { module = "com.google.ar:core", version.ref = "arcore" }
+sceneview-arsceneview = { module = "io.github.sceneview:arsceneview", version.ref = "sceneview" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

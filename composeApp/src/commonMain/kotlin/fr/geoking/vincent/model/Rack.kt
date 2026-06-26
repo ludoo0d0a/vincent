@@ -23,6 +23,18 @@ fun cellIndexFromSpot(spot: String, cols: Int): Int? {
     return row * cols + col
 }
 
+/** A point in normalised image space (0..1, origin top-left). Used for AR calibration. */
+data class NormPoint(val x: Float, val y: Float)
+
+/**
+ * The four calibration corners of the rack face inside the reference photo, in
+ * the order topLeft, topRight, bottomRight, bottomLeft (normalised 0..1). Used to
+ * bilinearly place each cell over the tracked image in AR.
+ */
+data class RackArCalibration(val corners: List<NormPoint>) {
+    val isValid: Boolean get() = corners.size == 4
+}
+
 /** A named rack: a [cols]×[rows] grid of [RackCell], optionally staggered (quinconce). */
 data class Rack(
     val name: String,
@@ -30,7 +42,13 @@ data class Rack(
     val rows: Int,
     val staggered: Boolean,
     val cells: List<RackCell>,
+    /** Absolute path to the photo of this physical rack, used as the AR image target. */
+    val arImagePath: String? = null,
+    /** Calibration of the rack face within [arImagePath]; null until the user calibrates. */
+    val arCalibration: RackArCalibration? = null,
 ) {
+    /** True when this rack has been photographed and calibrated for AR. */
+    val arReady: Boolean get() = arImagePath != null && arCalibration?.isValid == true
     val capacity: Int get() = cols * rows
     val occupiedCount: Int get() = cells.count { it.occupied }
 
