@@ -343,6 +343,8 @@
     <string name="producers_empty">Aucun producteur. Importez un fichier CSV de PLOC pour commencer.</string>
 
     <string name="update_check">Vérifier les mises à jour</string>
+    <string name="settings_internal_logs_toggle">Activer les logs</string>
+    <string name="settings_internal_logs_view">Voir les logs</string>
     <string name="update_available">Une nouvelle version est disponible.</string>
     <string name="update_up_to_date">L\'application est à jour.</string>
     <string name="update_downloaded">Mise à jour téléchargée — redémarrage…</string>
