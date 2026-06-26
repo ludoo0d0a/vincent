@@ -99,7 +99,7 @@ composeApp/src/
   `actual` `ai/WineAi.android.kt` calls **Gemini Flash** (HTTP + `org.json`,
   structured JSON output). Wired into the Add screen (scan/photo): an
   "identify with AI" button fills the fields + an estimated price, then the add
-  reuses those values. ⚠️ Set `GEMINI_API_KEY` in `local.properties` (gitignored,
+  reuses those values. ⚠️ Set `gemoni_api_key` in `local.properties` (gitignored,
   via `BuildConfig`; free key at aistudio.google.com) — otherwise it no-ops cleanly.
   Price is always shown as an **estimate** (source displayed).
 - **Food pairings (AI, wired).** `FoodPairer` (same `GeminiClient`): the bottle

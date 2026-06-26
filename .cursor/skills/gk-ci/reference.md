@@ -28,7 +28,7 @@ fun secret(key: String) = localProps.getProperty(key) ?: System.getenv(key) ?: "
 android {
     defaultConfig {
         buildConfigField("String", "WEB_CLIENT_ID", "\"${secret("WEB_CLIENT_ID")}\"")
-        buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
+        buildConfigField("String", "GEMONI_API_KEY", "\"${secret("gemoni_api_key")}\"")
     }
     buildFeatures { buildConfig = true }
 }
@@ -122,7 +122,7 @@ versionName=1.0.0
 | `PLAY_SERVICE_ACCOUNT_JSON` | Play API service account JSON |
 | `GOOGLE_SERVICES_JSON` | `google-services.json`, base64 |
 | `WEB_CLIENT_ID` | Web OAuth client (Firebase Auth) |
-| `GEMINI_API_KEY` | Gemini key (optional) |
+| `gemoni_api_key` | Gemini key (optional) |
 
 ## Manifest (`scripts/project.manifest.json`)
 

@@ -15,7 +15,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-// GEMINI_API_KEY comes from local.properties (or CI env) via BuildConfig — never
+// gemoni_api_key comes from local.properties (or CI env) via BuildConfig — never
 // hardcoded. Get a free key at https://aistudio.google.com/apikey. Blank = no-op.
 private const val MODEL = "gemini-2.5-flash"
 private const val TAG = "VincentAI"
@@ -79,10 +79,10 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
 
     private fun generate(prompt: String, imageB64: String?): JSONObject? {
         lastError = null
-        if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-            return fail("Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.")
+        if (BuildConfig.GEMONI_API_KEY.isBlank()) {
+            return fail("Clé API Gemini manquante. Ajoutez gemoni_api_key dans local.properties.")
         }
-        if (!BuildConfig.GEMINI_API_KEY.startsWith("AIza")) {
+        if (!BuildConfig.GEMONI_API_KEY.startsWith("AIza")) {
             return fail(
                 "Clé API au mauvais format (attendu AIzaSy… depuis aistudio.google.com/apikey).",
             )
@@ -90,7 +90,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         val started = System.currentTimeMillis()
         val endpoint =
             "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent" +
-                "?key=${BuildConfig.GEMINI_API_KEY}"
+                "?key=${BuildConfig.GEMONI_API_KEY}"
         return try {
             val parts = JSONArray().put(JSONObject().put("text", prompt))
             if (imageB64 != null) {

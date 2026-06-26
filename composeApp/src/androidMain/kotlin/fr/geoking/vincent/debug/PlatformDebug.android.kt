@@ -6,11 +6,11 @@ actual fun initHttpDebug() {
     val isDebug = BuildConfig.DEBUG
     HttpDebug.enabled = isDebug
     HttpDebug.apiKeyHint = when {
-        BuildConfig.GEMINI_API_KEY.isBlank() ->
-            "GEMINI_API_KEY: absente — ajoutez-la dans local.properties"
-        !BuildConfig.GEMINI_API_KEY.startsWith("AIza") ->
-            "GEMINI_API_KEY: format suspect (attendu AIzaSy… depuis aistudio.google.com/apikey)"
+        BuildConfig.GEMONI_API_KEY.isBlank() ->
+            "gemoni_api_key: absente — ajoutez-la dans local.properties"
+        !BuildConfig.GEMONI_API_KEY.startsWith("AIza") ->
+            "gemoni_api_key: format suspect (attendu AIzaSy… depuis aistudio.google.com/apikey)"
         else ->
-            "GEMINI_API_KEY: présente (${BuildConfig.GEMINI_API_KEY.length} car.)"
+            "gemoni_api_key: présente (${BuildConfig.GEMONI_API_KEY.length} car.)"
     }
 }

@@ -121,7 +121,7 @@ Triggers belong to the **caller** (the app), not the reusable workflow (`on: wor
 ./scripts/show-secrets.sh           # local vs GitHub recap
 ```
 
-Required GitHub repo secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_SERVICES_JSON`, `WEB_CLIENT_ID`, and `GEMINI_API_KEY` (if the app uses Gemini).
+Required GitHub repo secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_SERVICES_JSON`, `WEB_CLIENT_ID`, and `gemoni_api_key` (if the app uses Gemini).
 
 ## First release order
 
