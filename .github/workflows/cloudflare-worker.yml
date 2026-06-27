@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       # (Re)upload GEMINI_API_KEY as a Worker Secret from the GitHub secret, so the
       # key is never committed and CI stays the source of truth. Uses the latest
       # wrangler via `npx wrangler` (no pinned version).
