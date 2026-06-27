@@ -202,9 +202,6 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         if (BuildConfig.GEMINI_API_KEY.isBlank()) {
             return fail(getString(Res.string.ai_error_no_key))
         }
-        if (!BuildConfig.GEMINI_API_KEY.startsWith("AIza")) {
-            return fail(getString(Res.string.ai_error_bad_key))
-        }
         val started = System.currentTimeMillis()
         val endpoint =
             "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent" +

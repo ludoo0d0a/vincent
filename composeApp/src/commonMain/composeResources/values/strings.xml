@@ -375,7 +375,6 @@
 
     <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.</string>
     <string name="ai_error_sign_in">Connectez-vous pour utiliser l\'IA.</string>
-    <string name="ai_error_bad_key">Clé API au mauvais format (attendu AIzaSy… depuis aistudio.google.com/apikey).</string>
     <string name="ai_error_extract_text">Impossible d\'extraire les infos du texte.</string>
     <string name="ai_error_no_label">Aucun domaine détecté sur l\'étiquette.</string>
     <string name="ai_error_generic">Identification impossible — réessayez ou passez en manuel.</string>

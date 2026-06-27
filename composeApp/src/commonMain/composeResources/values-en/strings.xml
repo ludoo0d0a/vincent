@@ -374,7 +374,6 @@
 
     <string name="ai_error_no_key">Missing Gemini API key. Add GEMINI_API_KEY to local.properties.</string>
     <string name="ai_error_sign_in">Sign in to use AI features.</string>
-    <string name="ai_error_bad_key">API key has the wrong format (expected AIzaSy… from aistudio.google.com/apikey).</string>
     <string name="ai_error_extract_text">Could not extract wine details from the text.</string>
     <string name="ai_error_no_label">No estate detected on the label.</string>
     <string name="ai_error_generic">Identification failed — try again or switch to manual.</string>
