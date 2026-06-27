@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import org.jetbrains.compose.resources.stringResource
@@ -15,8 +14,6 @@ import vincent.composeapp.generated.resources.ar_low_quality
 import vincent.composeapp.generated.resources.ar_no_setup
 import vincent.composeapp.generated.resources.ar_permission
 import vincent.composeapp.generated.resources.ar_permission_action
-import vincent.composeapp.generated.resources.ar_record_start
-import vincent.composeapp.generated.resources.ar_record_stop
 import vincent.composeapp.generated.resources.ar_retake
 import vincent.composeapp.generated.resources.ar_searching
 import vincent.composeapp.generated.resources.ar_setup_hint
@@ -84,7 +81,6 @@ import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import com.google.ar.core.TrackingState
 import fr.geoking.vincent.ar.ArProjection
-import fr.geoking.vincent.ar.rememberScreenRecorder
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Racks
@@ -403,8 +399,6 @@ private fun ArSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit, onBack: () -
 
 @Composable
 private fun ArLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val recorder = rememberScreenRecorder()
     val calibration = rack.arCalibration
     val refBitmap = remember(rack.arImagePath) { rack.arImagePath?.let { BitmapFactory.decodeFile(it) } }
 
@@ -475,30 +469,6 @@ private fun ArLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit
                     .clickable { onReconfigure() }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) { Text(stringResource(Res.string.ar_retake), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700) }
-        }
-
-        val recording = recorder.isRecording
-        Box(Modifier.fillMaxSize().padding(bottom = 28.dp), contentAlignment = Alignment.BottomCenter) {
-            Button(
-                onClick = {
-                    if (recording) {
-                        recorder.stop()
-                        recorder.lastOutputPath?.let {
-                            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-                        }
-                    } else {
-                        recorder.start()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (recording) VincentColors.Red else VincentColors.Accent,
-                ),
-            ) {
-                Text(
-                    stringResource(if (recording) Res.string.ar_record_stop else Res.string.ar_record_start),
-                    fontWeight = FontWeight.W700,
-                )
-            }
         }
 
         if (lowQuality) ArHint(stringResource(Res.string.ar_low_quality))

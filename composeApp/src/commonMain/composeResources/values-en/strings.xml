@@ -396,8 +396,6 @@
     <string name="ar_setup_save">Save</string>
     <string name="ar_retake">Retake photo</string>
     <string name="ar_searching">Point the camera at the rack…</string>
-    <string name="ar_record_start">Record video</string>
-    <string name="ar_record_stop">Stop recording</string>
     <string name="ar_empty_cell">empty</string>
     <string name="ar_low_quality">Photo has too little detail for reliable tracking. Retake it with more texture/light.</string>
 </resources>

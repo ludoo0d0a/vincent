@@ -5,11 +5,6 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Foreground service permissions for AR screen recording (required for Android 14+). -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
     <!-- ARCore is optional: the app still installs on non-AR devices; the feature
          flag + runtime ArCoreApk check hide/disable the AR screen there. -->
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
@@ -38,12 +33,6 @@
         <meta-data
             android:name="com.google.ar.core"
             android:value="optional" />
-
-        <!-- Foreground service that holds the MediaProjection while recording AR video. -->
-        <service
-            android:name="fr.geoking.vincent.ar.ScreenRecordService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
 
         <activity
             android:name="fr.geoking.vincent.MainActivity"

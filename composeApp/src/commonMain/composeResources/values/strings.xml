@@ -398,8 +398,6 @@
     <string name="ar_setup_save">Enregistrer</string>
     <string name="ar_retake">Reprendre la photo</string>
     <string name="ar_searching">Pointez la caméra vers le casier…</string>
-    <string name="ar_record_start">Enregistrer la vidéo</string>
-    <string name="ar_record_stop">Arrêter l\'enregistrement</string>
     <string name="ar_empty_cell">vide</string>
     <string name="ar_low_quality">Photo trop peu détaillée pour un suivi fiable. Reprenez-la avec plus de texture/lumière.</string>
 </resources>
