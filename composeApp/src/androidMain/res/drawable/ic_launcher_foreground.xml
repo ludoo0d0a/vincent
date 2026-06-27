@@ -10,6 +10,10 @@
         android:scaleY="3.6"
         android:translateX="10.8"
         android:translateY="14.4">
+        <!-- Red wine filling the lower part of the bowl. -->
+        <path
+            android:pathData="M7.9,5.5H16.1L15.6,10A3.6,3.6 0 0 1 8.4,10L7.9,5.5Z"
+            android:fillColor="#D62F44" />
         <path
             android:pathData="M7,3h10l-0.8,7a4.2,4.2 0 0 1 -8.4,0L7,3Z"
             android:strokeColor="#FFFFFF"
