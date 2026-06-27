@@ -188,6 +188,6 @@ The wrapper resolves geoking-tools via `GK_TOOLS`, then sibling `../geoking-tool
 
 `android-ci.yml`: `artifact_name` (required); defaults — `gradle_module=:composeApp`, `assemble_task=Debug`, `apk_glob=composeApp/build/outputs/apk/debug/*.apk`, `google_services_path`, `gradle_version=8.13`, `java_version`, `geoking_ci_repo`, `geoking_ci_ref=main`.
 
-`release-play.yml`: `package_name` (required); defaults — `gradle_module=:composeApp`, `aab_glob=composeApp/build/outputs/bundle/release/composeApp-release.aab`, `google_services_path`, `whatsnew_script=scripts/whatsnew.py`, `default_track=internal`, `gradle_version=8.13`, `java_version=21`, plus `workflow_dispatch_track`, `workflow_dispatch_skip_review`, `is_workflow_dispatch`, `version_name_override`.
+`release-play.yml`: `package_name` (required); defaults — `gradle_module=:composeApp`, `aab_glob=composeApp/build/outputs/bundle/release/composeApp-release.aab`, `google_services_path`, `whatsnew_script=scripts/whatsnew.py`, `default_tracks=internal`, `gradle_version=8.13`, `java_version=21`, plus `workflow_dispatch_tracks`, `workflow_dispatch_skip_review`, `is_workflow_dispatch`, `version_name_override`.
 
 Pin `@main` for latest shared logic, or a tag/SHA for reproducibility.
