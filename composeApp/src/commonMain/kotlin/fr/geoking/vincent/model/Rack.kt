@@ -42,6 +42,7 @@ data class Rack(
     val rows: Int,
     val staggered: Boolean,
     val cells: List<RackCell>,
+    val id: String = "rack-${kotlin.math.abs(name.hashCode())}-${cols}x${rows}",
     /** Absolute path to the photo of this physical rack, used as the AR image target. */
     val arImagePath: String? = null,
     /** Calibration of the rack face within [arImagePath]; null until the user calibrates. */
