@@ -85,6 +85,8 @@ kotlin {
             implementation(libs.androidx.credentials.play.services)
             implementation(libs.google.identity.googleid)
             implementation(libs.firebase.auth)
+            implementation(libs.firebase.appcheck)
+            implementation(libs.firebase.appcheck.playintegrity)
             implementation(libs.kotlinx.coroutines.play.services)
             implementation(libs.google.code.scanner)
             implementation(libs.google.app.update.ktx)
@@ -108,8 +110,10 @@ android {
         // CI overrides these via env so Play always gets an increasing versionCode.
         versionCode = (System.getenv("VERSION_CODE") ?: versionProps.getProperty("versionCode") ?: "1").toInt()
         versionName = (System.getenv("VERSION_NAME")?.takeIf { it.isNotBlank() } ?: versionProps.getProperty("versionName") ?: "1.0").removePrefix("v")
-        buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
         buildConfigField("String", "WEB_CLIENT_ID", "\"${secret("WEB_CLIENT_ID")}\"")
+        // AI calls go through the Cloudflare Worker proxy (key held server-side).
+        // Set by ./scripts/setup-ai-proxy.sh (local.properties) or the CI secret.
+        buildConfigField("String", "AI_PROXY_URL", "\"${secret("AI_PROXY_URL")}\"")
         // Feature flag for the ARCore "AR cellar" screen. Optional AR_ENABLED in
         // local.properties / CI env (true|false) flips it; defaults to enabled.
         buildConfigField("Boolean", "AR_ENABLED", secret("AR_ENABLED").ifBlank { "true" })
@@ -140,8 +144,15 @@ android {
     }
 
     buildTypes {
+        // The Gemini key is NEVER embedded in release builds — release AI traffic
+        // goes through the Worker proxy. Debug builds keep an optional direct-key
+        // fallback (BuildConfig.GEMINI_API_KEY) for local testing without the proxy.
+        getByName("debug") {
+            buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("String", "GEMINI_API_KEY", "\"\"")
             if (keystorePath != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -161,4 +172,7 @@ android {
 // Room annotation processing for the Android target (entities/DAO live in androidMain).
 dependencies {
     add("kspAndroid", libs.androidx.room.compiler)
+    // Debug-only App Check provider so local/dev builds can mint debug tokens
+    // (register the printed debug token in the Firebase console). Release uses Play Integrity.
+    add("debugImplementation", libs.firebase.appcheck.debug)
 }

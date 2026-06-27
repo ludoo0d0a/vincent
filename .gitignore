@@ -16,6 +16,11 @@ scripts/.keystore-credentials
 scripts/.play-service-account.json
 scripts/.adb-wireless
 
+# Cloudflare Worker (AI proxy) — deps, local build, and local dev secrets
+worker/node_modules/
+.wrangler/
+worker/.dev.vars
+
 # Generated Play release notes (from playstore/whatsnew.xml)
 playstore/whatsnew/
 /secrets/*.json

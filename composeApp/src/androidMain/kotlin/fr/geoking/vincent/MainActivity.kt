@@ -17,6 +17,9 @@ import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
+import com.google.firebase.appcheck.AppCheckProviderFactory
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Settings
 import fr.geoking.vincent.data.Updater
@@ -81,6 +84,19 @@ class MainActivity : ComponentActivity() {
         MainScope().launch { Cellar.bootstrap(repository) }
 
         bootstrapAuth()
+
+        // App Check attests calls to the Gemini proxy Worker. Play Integrity in
+        // release; the debug provider in debug builds (register the logged token).
+        // The debug factory ships only in debug (debugImplementation), so it is
+        // loaded reflectively to keep its class off the release classpath.
+        val appCheckFactory: AppCheckProviderFactory = if (BuildConfig.DEBUG) {
+            Class.forName("com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory")
+                .getMethod("getInstance")
+                .invoke(null) as AppCheckProviderFactory
+        } else {
+            PlayIntegrityAppCheckProviderFactory.getInstance()
+        }
+        FirebaseAppCheck.getInstance().installAppCheckProviderFactory(appCheckFactory)
 
         appUpdateManager.registerListener(installListener)
         Updater.triggerUpdate = { manual -> checkForUpdate(manual) }

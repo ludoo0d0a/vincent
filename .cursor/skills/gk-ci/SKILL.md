@@ -121,7 +121,19 @@ Triggers belong to the **caller** (the app), not the reusable workflow (`on: wor
 ./scripts/show-secrets.sh           # local vs GitHub recap
 ```
 
-Required GitHub repo secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_SERVICES_JSON`, `WEB_CLIENT_ID`, and `GEMINI_API_KEY` (if the app uses Gemini).
+Required GitHub repo secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_SERVICES_JSON`, `WEB_CLIENT_ID`, and `GEMINI_API_KEY` (if the app uses Gemini). Apps using the AI proxy Worker also need `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `AI_PROXY_URL`.
+
+## AI proxy Worker (Gemini, key off-device)
+
+Apps that call Gemini route through a Cloudflare Worker (`worker/`) instead of embedding the key in the APK. The Worker holds `GEMINI_API_KEY` as a Worker Secret, verifies Firebase App Check + the user's Firebase ID token, enforces a per-user KV quota + cache, then forwards to Gemini. Release builds embed only `AI_PROXY_URL` (`…/v1/generate`), never the key.
+
+```bash
+./scripts/setup-ai-proxy.sh          # provision KV + Worker secret + first deploy
+./scripts/setup-ai-proxy.sh --push   # also sync CLOUDFLARE_* / AI_PROXY_URL GitHub secrets
+./scripts/deploy-ai-proxy.sh         # redeploy after worker/ changes
+```
+
+CI deploys on `worker/**` changes via `.github/workflows/cloudflare-worker.yml` (mirrors `cloudflare-pages.yml`).
 
 ## Pulling google-services.json (Firebase CLI)
 

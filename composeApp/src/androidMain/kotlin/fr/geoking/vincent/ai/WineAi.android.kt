@@ -2,6 +2,8 @@ package fr.geoking.vincent.ai
 
 import android.util.Base64
 import android.util.Log
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.auth.FirebaseAuth
 import fr.geoking.vincent.BuildConfig
 import fr.geoking.vincent.debug.HttpDebug
 import fr.geoking.vincent.model.AddSource
@@ -9,6 +11,7 @@ import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.getString
 import org.json.JSONArray
@@ -18,9 +21,11 @@ import java.net.URL
 import java.util.Locale
 import vincent.composeapp.generated.resources.*
 
-// GEMINI_API_KEY comes from local.properties (or CI env) via BuildConfig — never
-// hardcoded. Get a free key at https://aistudio.google.com/apikey. Blank = no-op.
-private const val MODEL = "gemini-2.5-flash"
+// AI calls go through the Cloudflare Worker proxy (BuildConfig.AI_PROXY_URL): the
+// Gemini key stays server-side and each call carries an App Check token + the user's
+// Firebase ID token. Debug builds without a proxy fall back to a direct Gemini call
+// using BuildConfig.GEMINI_API_KEY (blank in release → no key ever ships in the APK).
+private const val MODEL = "gemini-3.5-flash"
 private const val TAG = "VincentAI"
 
 /** Single Gemini-backed client implementing both seams. */
@@ -94,6 +99,106 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
 
     private suspend fun generate(prompt: String, imageB64: String?): JSONObject? {
         lastError = null
+        val proxyUrl = BuildConfig.AI_PROXY_URL
+        return if (proxyUrl.isNotBlank()) {
+            generateViaProxy(proxyUrl, prompt, imageB64)
+        } else {
+            generateDirect(prompt, imageB64)
+        }
+    }
+
+    // Production path: POST to the Cloudflare Worker proxy. The Gemini key stays
+    // server-side; the call is authenticated with an App Check token and the user's
+    // Firebase ID token. The Worker returns the raw Gemini response, parsed below.
+    private suspend fun generateViaProxy(
+        proxyUrl: String,
+        prompt: String,
+        imageB64: String?,
+    ): JSONObject? {
+        val appCheckToken = try {
+            FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
+        } catch (e: Exception) {
+            Log.w(TAG, "App Check token unavailable: ${e.message}")
+            ""
+        }
+        val idToken = try {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+        } catch (e: Exception) {
+            Log.w(TAG, "ID token unavailable: ${e.message}")
+            null
+        }
+        if (idToken.isNullOrBlank()) {
+            return fail(getString(Res.string.ai_error_sign_in))
+        }
+        val started = System.currentTimeMillis()
+        return try {
+            val body = JSONObject()
+                .put("prompt", prompt)
+                .put("responseMimeType", "application/json")
+                .put("cacheable", imageB64 == null)
+            if (imageB64 != null) body.put("imageB64", imageB64)
+            val bodyText = body.toString()
+            val logBody = if (imageB64 != null) {
+                bodyText.replace(imageB64, "<image ${imageB64.length} chars>")
+            } else {
+                bodyText
+            }
+
+            val conn = (URL(proxyUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 15000
+                readTimeout = 25000
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $idToken")
+                setRequestProperty("X-Firebase-AppCheck", appCheckToken)
+            }
+            conn.outputStream.use { it.write(bodyText.encodeToByteArray()) }
+            val code = conn.responseCode
+            val elapsed = System.currentTimeMillis() - started
+            if (code !in 200..299) {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+                Log.e(TAG, "AI proxy HTTP $code: ${err?.take(400)}")
+                HttpDebug.log(
+                    label = "AI proxy",
+                    method = "POST",
+                    url = proxyUrl,
+                    requestBody = logBody,
+                    statusCode = code,
+                    responseBody = err,
+                    durationMs = elapsed,
+                    error = geminiErrorDetail(err),
+                )
+                return fail(httpFailMessage(code, err))
+            }
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            HttpDebug.log(
+                label = "AI proxy",
+                method = "POST",
+                url = proxyUrl,
+                requestBody = logBody,
+                statusCode = code,
+                responseBody = resp,
+                durationMs = elapsed,
+            )
+            parseModelJson(resp)
+        } catch (e: Exception) {
+            val elapsed = System.currentTimeMillis() - started
+            Log.e(TAG, "AI proxy call failed: ${e.javaClass.simpleName}: ${e.message}", e)
+            HttpDebug.log(
+                label = "AI proxy",
+                method = "POST",
+                url = proxyUrl,
+                durationMs = elapsed,
+                error = "${e.javaClass.simpleName}: ${e.message}",
+            )
+            fail(getString(Res.string.ai_error_generic))
+        }
+    }
+
+    // Dev fallback (debug builds without a configured proxy): call Gemini directly
+    // with BuildConfig.GEMINI_API_KEY. Never reached in release (key is blank there).
+    private suspend fun generateDirect(prompt: String, imageB64: String?): JSONObject? {
         if (BuildConfig.GEMINI_API_KEY.isBlank()) {
             return fail(getString(Res.string.ai_error_no_key))
         }
@@ -159,11 +264,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
                 responseBody = resp,
                 durationMs = elapsed,
             )
-            val text = JSONObject(resp)
-                .getJSONArray("candidates").getJSONObject(0)
-                .getJSONObject("content").getJSONArray("parts").getJSONObject(0)
-                .getString("text")
-            JSONObject(text)
+            parseModelJson(resp)
         } catch (e: Exception) {
             val elapsed = System.currentTimeMillis() - started
             Log.e(TAG, "Gemini call failed: ${e.javaClass.simpleName}: ${e.message}", e)
@@ -176,6 +277,16 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             )
             fail(getString(Res.string.ai_error_generic))
         }
+    }
+
+    // The proxy and the direct call both return the raw Gemini generateContent
+    // response; the model's JSON answer is the text of the first candidate part.
+    private fun parseModelJson(resp: String): JSONObject {
+        val text = JSONObject(resp)
+            .getJSONArray("candidates").getJSONObject(0)
+            .getJSONObject("content").getJSONArray("parts").getJSONObject(0)
+            .getString("text")
+        return JSONObject(text)
     }
 
     private fun geminiErrorDetail(raw: String?): String? {

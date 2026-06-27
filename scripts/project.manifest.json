@@ -40,6 +40,11 @@
     },
     "github": {
       "actionsSecrets": "https://github.com/settings/secrets/actions"
-    }
+    },
+    "worker": "https://vin-cent-ai.ludovic-valente.workers.dev"
+  },
+  "cloudflare": {
+    "workerName": "vin-cent-ai",
+    "kvBinding": "AI_KV"
   }
 }

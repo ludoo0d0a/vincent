@@ -28,7 +28,13 @@ fun secret(key: String) = localProps.getProperty(key) ?: System.getenv(key) ?: "
 android {
     defaultConfig {
         buildConfigField("String", "WEB_CLIENT_ID", "\"${secret("WEB_CLIENT_ID")}\"")
-        buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
+        // AI goes through the Cloudflare Worker proxy; the Gemini key stays server-side.
+        buildConfigField("String", "AI_PROXY_URL", "\"${secret("AI_PROXY_URL")}\"")
+    }
+    buildTypes {
+        // Never embed the Gemini key in release — only a debug-only dev fallback.
+        getByName("debug")   { buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"") }
+        getByName("release") { buildConfigField("String", "GEMINI_API_KEY", "\"\"") }
     }
     buildFeatures { buildConfig = true }
 }
@@ -122,7 +128,10 @@ versionName=1.0.0
 | `PLAY_SERVICE_ACCOUNT_JSON` | Play API service account JSON |
 | `GOOGLE_SERVICES_JSON` | `google-services.json`, base64 |
 | `WEB_CLIENT_ID` | Web OAuth client (Firebase Auth) |
-| `GEMINI_API_KEY` | Gemini key (optional) |
+| `GEMINI_API_KEY` | Gemini key — also pushed as a **Worker Secret** (see AI proxy) |
+| `CLOUDFLARE_API_TOKEN` | deploy the AI proxy Worker (and Pages) |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account for the Worker/Pages |
+| `AI_PROXY_URL` | Worker endpoint baked into release builds (`…/v1/generate`) |
 
 ## Manifest (`scripts/project.manifest.json`)
 
@@ -168,6 +177,8 @@ Google Sign-In needs **both** OAuth client types present in the Firebase project
 | `./scripts/gen-keystore.sh` | generate release.keystore |
 | `./scripts/build-aab.sh` | local signed AAB + fingerprint check |
 | `./scripts/deploy-device.sh` | build APK + install on device |
+| `./scripts/setup-ai-proxy.sh` | provision the Gemini proxy Worker (KV + `GEMINI_API_KEY` secret + deploy); `--push` syncs `CLOUDFLARE_*` / `AI_PROXY_URL` GitHub secrets |
+| `./scripts/deploy-ai-proxy.sh` | redeploy the Worker (`wrangler deploy`) |
 | `./scripts/adb-reconnect.sh` | wireless adb reconnect loop |
 | `./scripts/whatsnew.py` | generate `playstore/whatsnew/` from `whatsnew.xml` |
 
