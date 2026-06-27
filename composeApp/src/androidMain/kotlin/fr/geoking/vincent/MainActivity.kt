@@ -99,8 +99,6 @@ class MainActivity : ComponentActivity() {
             Suppliers.bootstrap(supplierRepo)
         }
 
-        bootstrapAuth()
-
         // App Check attests calls to the Gemini proxy Worker. Play Integrity in
         // release; the debug provider in debug builds (register the logged token).
         // The debug factory ships only in debug (debugImplementation), so it is
@@ -113,6 +111,8 @@ class MainActivity : ComponentActivity() {
             PlayIntegrityAppCheckProviderFactory.getInstance()
         }
         FirebaseAppCheck.getInstance().installAppCheckProviderFactory(appCheckFactory)
+
+        bootstrapAuth()
 
         appUpdateManager.registerListener(installListener)
         Updater.triggerUpdate = { manual -> checkForUpdate(manual) }

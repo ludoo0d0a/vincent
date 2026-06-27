@@ -2,6 +2,10 @@ package fr.geoking.vincent.debug
 
 import androidx.compose.runtime.mutableStateListOf
 import fr.geoking.vincent.data.Settings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 enum class LogLevel {
     INFO, WARN, ERROR
@@ -22,6 +26,7 @@ object InternalLog {
 
     val entries = mutableStateListOf<LogEntry>()
     private const val MAX_ENTRIES = 500
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     fun i(tag: String, message: String) = log(LogLevel.INFO, tag, message)
     fun w(tag: String, message: String) = log(LogLevel.WARN, tag, message)
@@ -29,13 +34,11 @@ object InternalLog {
 
     private fun log(level: LogLevel, tag: String, message: String, throwable: Throwable? = null) {
         if (!enabled) return
-        // No explicit synchronization: we assume main-thread access or that
-        // mutableStateListOf handles concurrent modifications safely enough for debug logs.
-        // If crashes occur in background, consider wrapping in withContext(Dispatchers.Main)
-        // or using a proper concurrent list.
-        entries.add(0, LogEntry(level, tag, message, throwable = throwable))
-        if (entries.size > MAX_ENTRIES) {
-            entries.removeAt(entries.lastIndex)
+        scope.launch {
+            entries.add(0, LogEntry(level, tag, message, throwable = throwable))
+            if (entries.size > MAX_ENTRIES) {
+                entries.removeAt(entries.lastIndex)
+            }
         }
     }
 
