@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import fr.geoking.vincent.ai.AiUsage
 import fr.geoking.vincent.ai.PriceEstimate
 import fr.geoking.vincent.ai.priceEstimator
 import fr.geoking.vincent.ai.rememberBarcodeScanner
@@ -238,6 +239,17 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
                 },
                 fontSize = 11.5.sp, color = VincentColors.Muted, lineHeight = 15.sp,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+
+        // Remaining daily AI allowance, reported by the proxy after each call.
+        AiUsage.quota?.let { q ->
+            Text(
+                stringResource(Res.string.ai_quota_remaining, q.remaining, q.limit),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.W600,
+                color = if (q.remaining == 0) VincentColors.Red else VincentColors.Muted,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
 

@@ -387,6 +387,10 @@
     <string name="ai_error_http_4xx">Requête refusée par l\'IA (%1$d)%2$s</string>
     <string name="ai_error_http_other">Identification impossible (erreur réseau %1$d)%2$s</string>
     <string name="ai_added_label">IA</string>
+    <string name="ai_quota_remaining">%1$d/%2$d analyses IA restantes aujourd\'hui</string>
+    <string name="ai_error_quota_daily">Limite quotidienne atteinte (%1$d analyses). Réinitialisation demain.</string>
+    <string name="ai_error_quota_burst">Trop de demandes d\'un coup — patientez quelques secondes.</string>
+    <string name="ai_error_quota_global">Service IA très sollicité — réessayez un peu plus tard.</string>
 
     <!-- AR cellar -->
     <string name="ar_open">Vue AR</string>

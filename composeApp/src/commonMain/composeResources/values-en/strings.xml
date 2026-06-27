@@ -386,6 +386,10 @@
     <string name="ai_error_http_4xx">Request rejected by the AI (%1$d)%2$s</string>
     <string name="ai_error_http_other">Identification failed (network error %1$d)%2$s</string>
     <string name="ai_added_label">AI</string>
+    <string name="ai_quota_remaining">%1$d/%2$d AI scans left today</string>
+    <string name="ai_error_quota_daily">Daily limit reached (%1$d scans). Resets tomorrow.</string>
+    <string name="ai_error_quota_burst">Too many requests at once — wait a few seconds.</string>
+    <string name="ai_error_quota_global">AI service is busy — please try again later.</string>
 
     <!-- AR cellar -->
     <string name="ar_open">AR view</string>

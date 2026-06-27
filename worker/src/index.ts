@@ -16,6 +16,9 @@ export interface Env {
   WEB_CLIENT_ID: string;
   GEMINI_MODEL: string;
   DAILY_QUOTA: string;
+  GLOBAL_DAILY_QUOTA: string;
+  BURST_LIMIT: string;
+  BURST_WINDOW_SECONDS: string;
   CACHE_TTL_SECONDS: string;
   ENFORCE_APP_CHECK: string;
   ENFORCE_AUTH: string;
@@ -82,16 +85,64 @@ export default {
     const imageB64 = payload.imageB64 || null;
     const responseMimeType = payload.responseMimeType || "application/json";
 
-    // 4. Per-user daily quota (soft; KV is eventually consistent).
-    const quota = parseInt(env.DAILY_QUOTA || "0", 10);
-    if (quota > 0 && uid !== "anon") {
-      const key = `quota:${uid}:${dayStamp()}`;
-      const used = parseInt((await env.AI_KV.get(key)) || "0", 10);
-      if (used >= quota) {
-        return json({ error: { message: "Daily AI quota exceeded", status: "RESOURCE_EXHAUSTED" } }, 429);
+    // 4. Rate limits (all soft; KV is eventually consistent), enforced before we
+    //    spend a Gemini call. We read + reject first and only increment the
+    //    counters once every check passes, so a rejected request never inflates a
+    //    counter. The 429 body carries a `reason` (burst | daily | global) the app
+    //    maps to a friendly message; the per-user remaining is echoed via
+    //    X-AI-Quota-* headers.
+    const day = dayStamp();
+    const perUser = uid !== "anon";
+    const burstLimit = parseInt(env.BURST_LIMIT || "0", 10);
+    const burstWindow = parseInt(env.BURST_WINDOW_SECONDS || "60", 10);
+    const userQuota = parseInt(env.DAILY_QUOTA || "0", 10);
+    const globalQuota = parseInt(env.GLOBAL_DAILY_QUOTA || "0", 10);
+    let quotaHeaders: Record<string, string> = {};
+
+    // 4a. Per-user burst limit — stops rapid-fire loops within a short window.
+    const burstActive = burstLimit > 0 && burstWindow > 0 && perUser;
+    const burstKey = `burst:${uid}:${burstActive ? Math.floor(Date.now() / 1000 / burstWindow) : 0}`;
+    if (burstActive) {
+      const used = parseInt((await env.AI_KV.get(burstKey)) || "0", 10);
+      if (used >= burstLimit) {
+        return json({ error: { message: "Too many requests, slow down", status: "RESOURCE_EXHAUSTED", reason: "burst" } }, 429);
       }
-      // Increment first so a slow Gemini call can't be hammered in parallel.
-      await env.AI_KV.put(key, String(used + 1), { expirationTtl: 60 * 60 * 48 });
+    }
+
+    // 4b. Per-user daily quota.
+    const userActive = userQuota > 0 && perUser;
+    const userKey = `quota:${uid}:${day}`;
+    let userUsed = 0;
+    if (userActive) {
+      userUsed = parseInt((await env.AI_KV.get(userKey)) || "0", 10);
+      if (userUsed >= userQuota) {
+        return json({ error: { message: "Daily AI quota exceeded", status: "RESOURCE_EXHAUSTED", reason: "daily" } }, 429, quotaHeadersFor(userQuota, 0));
+      }
+    }
+
+    // 4c. Global daily ceiling — hard cap on total spend across all users.
+    const globalActive = globalQuota > 0;
+    const globalKey = `quota:global:${day}`;
+    let globalUsed = 0;
+    if (globalActive) {
+      globalUsed = parseInt((await env.AI_KV.get(globalKey)) || "0", 10);
+      if (globalUsed >= globalQuota) {
+        return json({ error: { message: "Global daily AI quota exceeded", status: "RESOURCE_EXHAUSTED", reason: "global" } }, 429);
+      }
+    }
+
+    // 4d. All checks passed → consume one unit from each active counter (before the
+    //     Gemini call, so a slow call can't be hammered in parallel).
+    if (burstActive) {
+      const used = parseInt((await env.AI_KV.get(burstKey)) || "0", 10);
+      await env.AI_KV.put(burstKey, String(used + 1), { expirationTtl: burstWindow * 2 });
+    }
+    if (userActive) {
+      await env.AI_KV.put(userKey, String(userUsed + 1), { expirationTtl: 60 * 60 * 48 });
+      quotaHeaders = quotaHeadersFor(userQuota, userQuota - (userUsed + 1));
+    }
+    if (globalActive) {
+      await env.AI_KV.put(globalKey, String(globalUsed + 1), { expirationTtl: 60 * 60 * 48 });
     }
 
     // 5. Cache (text-only requests are deterministic enough to reuse).
@@ -102,7 +153,7 @@ export default {
     if (cacheable) {
       cacheKey = `cache:${model}:${await sha256Hex(`${responseMimeType}\n${prompt}`)}`;
       const hit = await env.AI_KV.get(cacheKey);
-      if (hit) return new Response(hit, { headers: { ...JSON_HEADERS, "x-cache": "HIT" } });
+      if (hit) return new Response(hit, { headers: { ...JSON_HEADERS, ...quotaHeaders, "x-cache": "HIT" } });
     }
 
     // 6. Forward to Gemini.
@@ -131,19 +182,26 @@ export default {
     // 7. Forward Gemini's status + body verbatim so the client's existing
     //    httpFailMessage(code, body) mapping (403/404/429/4xx) keeps working.
     if (!upstream.ok) {
-      return new Response(text, { status: upstream.status, headers: JSON_HEADERS });
+      return new Response(text, { status: upstream.status, headers: { ...JSON_HEADERS, ...quotaHeaders } });
     }
     if (cacheable && cacheKey) {
       await env.AI_KV.put(cacheKey, text, { expirationTtl: cacheTtl });
     }
-    return new Response(text, { headers: { ...JSON_HEADERS, "x-cache": "MISS" } });
+    return new Response(text, { headers: { ...JSON_HEADERS, ...quotaHeaders, "x-cache": "MISS" } });
   },
 } satisfies ExportedHandler<Env>;
 
 // ---- helpers ---------------------------------------------------------------
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...JSON_HEADERS, ...extraHeaders } });
+}
+
+function quotaHeadersFor(limit: number, remaining: number): Record<string, string> {
+  return {
+    "X-AI-Quota-Limit": String(limit),
+    "X-AI-Quota-Remaining": String(Math.max(0, remaining)),
+  };
 }
 
 function truthy(v: string | undefined): boolean {

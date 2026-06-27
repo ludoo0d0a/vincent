@@ -97,6 +97,14 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         return null
     }
 
+    // The proxy reports the user's remaining daily allowance via these headers
+    // (present on success, cache hits and the 429 quota-exceeded response).
+    private fun readQuotaHeaders(conn: HttpURLConnection) {
+        val remaining = conn.getHeaderField("X-AI-Quota-Remaining")?.toIntOrNull() ?: return
+        val limit = conn.getHeaderField("X-AI-Quota-Limit")?.toIntOrNull() ?: return
+        AiUsage.update(remaining = remaining, limit = limit)
+    }
+
     private suspend fun generate(prompt: String, imageB64: String?): JSONObject? {
         lastError = null
         val proxyUrl = BuildConfig.AI_PROXY_URL
@@ -156,6 +164,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             conn.outputStream.use { it.write(bodyText.encodeToByteArray()) }
             val code = conn.responseCode
             val elapsed = System.currentTimeMillis() - started
+            readQuotaHeaders(conn)
             if (code !in 200..299) {
                 val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
                 Log.e(TAG, "AI proxy HTTP $code: ${err?.take(400)}")
@@ -298,6 +307,17 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     }
 
     private suspend fun httpFailMessage(code: Int, raw: String?): String {
+        // The proxy tags its own 429s with a reason so we can show a tailored,
+        // friendlier message instead of the generic Gemini-quota one.
+        if (code == 429) {
+            when (proxyQuotaReason(raw)) {
+                "burst" -> return getString(Res.string.ai_error_quota_burst)
+                "global" -> return getString(Res.string.ai_error_quota_global)
+                "daily" -> AiUsage.quota?.limit?.let {
+                    return getString(Res.string.ai_error_quota_daily, it)
+                }
+            }
+        }
         val detail = geminiErrorDetail(raw)?.let { " — $it" }.orEmpty()
         return when (code) {
             403 -> getString(Res.string.ai_error_http_403, detail)
@@ -305,6 +325,19 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             429 -> getString(Res.string.ai_error_http_429)
             in 400..499 -> getString(Res.string.ai_error_http_4xx, code, detail)
             else -> getString(Res.string.ai_error_http_other, code, detail)
+        }
+    }
+
+    // A RESOURCE_EXHAUSTED 429 from our proxy carries error.reason; null for
+    // upstream/Gemini 429s (which fall back to the generic message).
+    private fun proxyQuotaReason(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        return try {
+            val err = JSONObject(raw).optJSONObject("error") ?: return null
+            if (err.optString("status") != "RESOURCE_EXHAUSTED") return null
+            err.optString("reason").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
         }
     }
 
