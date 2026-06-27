@@ -55,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -166,6 +167,11 @@ fun CellarScreen(
     var dragHover by remember(rackIdx) { mutableStateOf<Int?>(null) }
     var cellBounds by remember(rackIdx) { mutableStateOf<Map<Int, Rect>>(emptyMap()) }
     val clipboard = RackClipboard.entry
+    // Height of the bottom-pinned selected-bottle detail, so the scrolling grid
+    // can reserve matching space and never hide its last rows behind it.
+    val density = LocalDensity.current
+    var peekHeightPx by remember { mutableIntStateOf(0) }
+    val peekHeight = with(density) { peekHeightPx.toDp() }
 
     fun findCellAt(offset: Offset): Int? =
         cellBounds.entries.firstOrNull { (_, bounds) -> bounds.contains(offset) }?.key
@@ -291,28 +297,41 @@ fun CellarScreen(
                         dragHover = null
                     },
                 )
-                Spacer(Modifier.height(11.dp))
-                PeekCard(
-                    rack, rackIdx, selectedIdx, moving == selectedIdx, clipboard, onOpenBottle,
-                    onAddBottle = { onAddToCell(RackPlacement(rackIdx, selectedIdx)) },
-                    onMove = { moving = if (moving == selectedIdx) null else selectedIdx },
-                    onCut = {
-                        val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
-                        if (cell.occupied) RackClipboard.cut(rackIdx, selectedIdx, cell)
-                    },
-                    onCopy = {
-                        val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
-                        if (cell.occupied) RackClipboard.copy(rackIdx, selectedIdx, cell)
-                    },
-                    onPaste = { pasteAt(selectedIdx) },
-                    onConsume = {
-                        Racks.update(rackIdx, rack.replaceCell(selectedIdx, RackCell(rowLabel(selectedIdx / rack.cols), false)))
-                        moving = null
-                        selectedIdx = Racks.all[rackIdx].cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
-                    },
-                )
-                Spacer(Modifier.height(24.dp))
+                // Reserve room for the bottom-pinned detail card so the last rack
+                // rows can always be scrolled clear of it.
+                Spacer(Modifier.height(peekHeight + 24.dp))
             }
+        }
+
+        // Selected-bottle detail, pinned to the bottom and always visible
+        // regardless of how tall the rack is.
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(VincentColors.Bg)
+                .onGloballyPositioned { peekHeightPx = it.size.height }
+                .padding(horizontal = 16.dp, vertical = 11.dp),
+        ) {
+            PeekCard(
+                rack, rackIdx, selectedIdx, moving == selectedIdx, clipboard, onOpenBottle,
+                onAddBottle = { onAddToCell(RackPlacement(rackIdx, selectedIdx)) },
+                onMove = { moving = if (moving == selectedIdx) null else selectedIdx },
+                onCut = {
+                    val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
+                    if (cell.occupied) RackClipboard.cut(rackIdx, selectedIdx, cell)
+                },
+                onCopy = {
+                    val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
+                    if (cell.occupied) RackClipboard.copy(rackIdx, selectedIdx, cell)
+                },
+                onPaste = { pasteAt(selectedIdx) },
+                onConsume = {
+                    Racks.update(rackIdx, rack.replaceCell(selectedIdx, RackCell(rowLabel(selectedIdx / rack.cols), false)))
+                    moving = null
+                    selectedIdx = Racks.all[rackIdx].cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
+                },
+            )
         }
 
         if (editing) {
