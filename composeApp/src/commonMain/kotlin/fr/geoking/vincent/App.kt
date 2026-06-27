@@ -98,10 +98,11 @@ fun App() = VincentTheme {
     fun pop() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
 
     var googleLoading by remember { mutableStateOf(false) }
+    var googleError by remember { mutableStateOf<String?>(null) }
     val onSignIn = rememberGoogleSignIn(
-        onLoading = { googleLoading = it },
-        onError = { InternalLog.e("App", "Google Sign-in error: $it") },
-        onResult = { if (it != null) { Auth.account = it; guest = false } }
+        onLoading = { googleLoading = it; if (it) googleError = null },
+        onError = { googleError = it; InternalLog.e("App", "Google Sign-in error: $it") },
+        onResult = { if (it != null) { Auth.account = it; guest = false; googleError = null } }
     )
 
     // System back button: while screens are stacked, pop instead of exiting.
@@ -139,6 +140,7 @@ fun App() = VincentTheme {
                     onBack = ::pop,
                     onSignIn = onSignIn,
                     isLoading = googleLoading,
+                    errorMsg = googleError,
                     onOpenRecent = { stack.add(Dest.Recent) },
                     onOpenFavorites = { stack.add(Dest.Favorites) },
                     onOpenTransfer = { stack.add(Dest.Transfer) },

@@ -87,7 +87,7 @@ fun LoginScreen(onGuest: () -> Unit) {
         Column(Modifier.padding(horizontal = 22.dp).padding(bottom = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             if (errorMsg != null) {
                 Text(
-                    stringResource(Res.string.login_error, errorMsg!!),
+                    errorMsg!!,
                     color = VincentColors.Red,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.W600,

@@ -52,6 +52,7 @@ fun AccountScreen(
     onBack: () -> Unit,
     onSignIn: () -> Unit,
     isLoading: Boolean = false,
+    errorMsg: String? = null,
     onOpenRecent: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenTransfer: () -> Unit,
@@ -102,6 +103,16 @@ fun AccountScreen(
                     Text(acc?.email ?: stringResource(Res.string.connected_no_account), color = Color.White.copy(alpha = 0.85f), fontSize = 11.5.sp)
                 }
                 GoogleG(22)
+            }
+
+            if (acc == null && errorMsg != null) {
+                Text(
+                    errorMsg,
+                    color = VincentColors.Red,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.W600,
+                    modifier = Modifier.padding(top = 10.dp, start = 4.dp),
+                )
             }
 
             Spacer(Modifier.height(11.dp))

@@ -13,6 +13,7 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import fr.geoking.vincent.BuildConfig
@@ -24,6 +25,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.getString
+import vincent.composeapp.generated.resources.Res
+import vincent.composeapp.generated.resources.login_error_config
+import vincent.composeapp.generated.resources.login_error_generic
+import vincent.composeapp.generated.resources.login_error_network
+import vincent.composeapp.generated.resources.login_error_no_account
+import java.io.IOException
 
 private const val TAG = "VincentSignIn"
 
@@ -34,6 +42,16 @@ private const val TAG = "VincentSignIn"
 private fun resolveWebClientId(context: Context): String {
     val fromFirebase = runCatching { context.getString(R.string.default_web_client_id) }.getOrDefault("")
     return fromFirebase.takeIf { it.isNotBlank() } ?: BuildConfig.WEB_CLIENT_ID
+}
+
+/** Maps a sign-in failure to a short, localized, user-facing message. */
+private suspend fun friendlyError(error: Throwable): String = when {
+    // No usable Google account on the device (One-Tap and the explicit flow both came up empty).
+    error is NoCredentialException -> getString(Res.string.login_error_no_account)
+    // Offline / Firebase couldn't reach the network to exchange the token.
+    error is FirebaseNetworkException || error is IOException || error.cause is IOException ->
+        getString(Res.string.login_error_network)
+    else -> getString(Res.string.login_error_generic)
 }
 
 private suspend fun firebaseAuthWithGoogle(idToken: String): GoogleAccount? = withContext(Dispatchers.IO) {
@@ -71,6 +89,8 @@ private suspend fun requestGoogleIdToken(
         GetGoogleIdOption.Builder()
             .setServerClientId(webClientId)
             .setFilterByAuthorizedAccounts(true)
+            // Returning users (single previously-used account) are signed in without a tap.
+            .setAutoSelectEnabled(true)
             .build()
     } else {
         GetSignInWithGoogleOption.Builder(webClientId).build()
@@ -113,11 +133,12 @@ actual fun rememberGoogleSignIn(
             try {
                 val webClientId = resolveWebClientId(context)
                 if (webClientId.isBlank()) {
-                    val error = "Web client ID missing — add google-services.json or WEB_CLIENT_ID in local.properties."
-                    Log.e(TAG, error)
-                    InternalLog.e(TAG, error)
+                    val devError = "Web client ID missing — add google-services.json or WEB_CLIENT_ID in local.properties."
+                    Log.e(TAG, devError)
+                    InternalLog.e(TAG, devError)
+                    val userError = getString(Res.string.login_error_config)
                     withContext(Dispatchers.Main) {
-                        onError(error)
+                        onError(userError)
                         onResult(null)
                     }
                     return@launch
@@ -133,19 +154,20 @@ actual fun rememberGoogleSignIn(
                     if (idToken != null) {
                         firebaseAuthWithGoogle(idToken)
                     } else {
-                        val error = "Google login failed: no ID token received"
-                        InternalLog.w(TAG, error)
-                        withContext(Dispatchers.Main) { onError(error) }
+                        InternalLog.w(TAG, "Google login failed: no ID token received")
+                        val userError = getString(Res.string.login_error_generic)
+                        withContext(Dispatchers.Main) { onError(userError) }
                         null
                     }
                 } catch (e: GetCredentialCancellationException) {
                     InternalLog.i(TAG, "Sign-in cancelled by user (CredentialManager)")
                     null
                 } catch (e: Exception) {
-                    val errorMsg = "Firebase Google sign-in failed: ${e.javaClass.simpleName}: ${e.message}"
-                    Log.e(TAG, errorMsg, e)
-                    InternalLog.e(TAG, errorMsg, e)
-                    withContext(Dispatchers.Main) { onError(e.message ?: e.javaClass.simpleName) }
+                    val devError = "Firebase Google sign-in failed: ${e.javaClass.simpleName}: ${e.message}"
+                    Log.e(TAG, devError, e)
+                    InternalLog.e(TAG, devError, e)
+                    val userError = friendlyError(e)
+                    withContext(Dispatchers.Main) { onError(userError) }
                     null
                 }
                 if (account != null) {
