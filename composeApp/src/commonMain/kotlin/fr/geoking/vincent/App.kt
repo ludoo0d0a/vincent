@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +51,6 @@ import fr.geoking.vincent.screens.ImportExportScreen
 import fr.geoking.vincent.screens.LogcatScreen
 import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
-import fr.geoking.vincent.screens.SearchScreen
 import fr.geoking.vincent.screens.SettingsScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
@@ -66,7 +64,6 @@ enum class Tab(val label: org.jetbrains.compose.resources.StringResource, val ic
     HOME(Res.string.tab_home, Icons.Filled.Home),
     CELLAR(Res.string.tab_cellar, Icons.Filled.GridView),
     BOTTLES(Res.string.tab_bottles, Icons.Filled.FormatListBulleted),
-    SEARCH(Res.string.tab_search, Icons.Filled.Search),
 }
 
 /** A screen pushed above the tabbed home. Back pops the top of the stack. */
@@ -239,7 +236,6 @@ private fun MainScaffold(
             Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onOpenRecent = onOpenRecent, onAccount = onAccount)
             Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle, onAddToCell = onAddToCell, onOpenAr = onOpenAr)
             Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, onOpenFavorites = onOpenFavorites)
-            Tab.SEARCH -> SearchScreen(content)
         }
     }
 }

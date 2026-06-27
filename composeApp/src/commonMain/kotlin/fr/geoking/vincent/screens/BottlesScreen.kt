@@ -7,21 +7,33 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +51,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
@@ -62,6 +75,72 @@ private sealed interface BottleImportStatus {
     data object WrongType : BottleImportStatus
 }
 
+/** A faceted search dimension: its label, the full option list, and how many to show inline. */
+private enum class Crit(val label: StringResource, val all: List<String>, val common: Int) {
+    TASTE(
+        Res.string.search_crit_taste,
+        listOf("Fruité", "Sec", "Minéral", "Tannique", "Boisé", "Vif", "Rond", "Épicé",
+            "Floral", "Léger", "Puissant", "Acidulé", "Doux", "Complexe", "Fumé", "Long en bouche"),
+        6,
+    ),
+    GRAPE(
+        Res.string.search_crit_grape,
+        listOf("Cabernet Sauvignon", "Merlot", "Pinot Noir", "Syrah", "Grenache", "Chardonnay",
+            "Sauvignon Blanc", "Chenin", "Riesling", "Gamay", "Cinsault", "Mourvèdre", "Viognier", "Sémillon"),
+        5,
+    ),
+    REGION(
+        Res.string.search_crit_region,
+        listOf("Bordeaux", "Bourgogne", "Rhône", "Provence", "Loire", "Champagne",
+            "Languedoc", "Alsace", "Beaujolais", "Sud-Ouest", "Italie", "Espagne", "Portugal"),
+        6,
+    ),
+    MERCHANT(
+        Res.string.search_crit_merchant,
+        listOf("Lavinia", "Nicolas", "Caviste local", "En ligne", "Producteur", "Foire aux vins"),
+        4,
+    ),
+    OCCASION(
+        Res.string.search_crit_occasion,
+        listOf("À offrir", "Cave de garde", "Tous les jours", "Fête", "Accord mets", "Découverte"),
+        4,
+    ),
+}
+
+/** All advanced (non quick-chip) filter criteria applied on top of the keyword + colour filters. */
+private data class AdvFilters(
+    val price: ClosedFloatingPointRange<Float>? = null,
+    val selections: Map<Crit, Set<String>> = emptyMap(),
+) {
+    val activeCount: Int
+        get() = selections.values.sumOf { it.size } + (if (price != null) 1 else 0)
+}
+
+private fun Bottle.matchesAdv(adv: AdvFilters, categoryLabels: Map<WineCategory, String>): Boolean {
+    adv.price?.let { if (price < it.start || price > it.endInclusive) return false }
+
+    val regions = adv.selections[Crit.REGION].orEmpty()
+    if (regions.isNotEmpty() && !regions.any {
+            it.lowercase() == provenance.lowercase() || it.lowercase() == categoryLabels[category]
+        }) return false
+
+    val grapes = adv.selections[Crit.GRAPE].orEmpty()
+    if (grapes.isNotEmpty() && !grapes.any {
+            appellation.lowercase().contains(it.lowercase()) || domain.lowercase().contains(it.lowercase())
+        }) return false
+
+    val tastes = adv.selections[Crit.TASTE].orEmpty()
+    if (tastes.isNotEmpty() && !tastes.any { tastingNotes.lowercase().contains(it.lowercase()) }) return false
+
+    val merchants = adv.selections[Crit.MERCHANT].orEmpty()
+    if (merchants.isNotEmpty() && !merchants.any { merchant.lowercase().contains(it.lowercase()) }) return false
+
+    val occasions = adv.selections[Crit.OCCASION].orEmpty()
+    if (occasions.isNotEmpty() && !occasions.any { occasion.lowercase().contains(it.lowercase()) }) return false
+
+    return true
+}
+
 @Composable
 fun BottlesScreen(
     modifier: Modifier = Modifier,
@@ -70,6 +149,9 @@ fun BottlesScreen(
 ) {
     var selected by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
+    var adv by remember { mutableStateOf(AdvFilters()) }
+    var showFilters by remember { mutableStateOf(false) }
+
     val filterItems = listOf(
         Filter(stringResource(Res.string.bottles_filter_all), null),
         Filter(stringResource(WineColor.RED.label), WineColor.RED),
@@ -79,7 +161,10 @@ fun BottlesScreen(
     )
     val f = filterItems[selected]
     val categoryLabels = WineCategory.entries.associateWith { stringResource(it.label).lowercase() }
-    val list = Cellar.bottles.filter {
+
+    // Bottles after the quick colour/favourite chip and the keyword field, but before the
+    // advanced panel — also the base list the panel counts its live results against.
+    val base = Cellar.bottles.filter {
         (f.color == null || it.color == f.color) && (!f.favOnly || it.favorite)
     }.filter { b ->
         val q = query.trim().lowercase()
@@ -89,6 +174,12 @@ fun BottlesScreen(
             categoryLabels[b.category]?.contains(q) == true ||
             b.vintage.lowercase().contains(q)
     }
+    val list = base.filter { it.matchesAdv(adv, categoryLabels) }
+
+    val prices = Cellar.bottles.map { it.price }
+    val priceMin = (prices.minOrNull() ?: 0).toFloat()
+    val priceMaxRaw = (prices.maxOrNull() ?: 100).toFloat()
+    val priceBounds = priceMin..(if (priceMaxRaw > priceMin) priceMaxRaw else priceMin + 1f)
 
     var importStatus by remember { mutableStateOf<BottleImportStatus?>(null) }
     val importCsv = rememberCsvImport { text ->
@@ -101,56 +192,108 @@ fun BottlesScreen(
         }
     }
 
-    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-        ScreenHeader(
-            stringResource(Res.string.bottles_title),
-            pluralStringResource(Res.plurals.bottles_subtitle_format, list.size, Cellar.totalBottles(), list.size),
-            trailing = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(
-                        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { onOpenFavorites() },
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.Favorite, contentDescription = stringResource(Res.string.my_favorites), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
-
-                    Box(
-                        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
-                }
-            },
-        )
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            when (val status = importStatus) {
-                is BottleImportStatus.Success -> Box(
-                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(pluralStringResource(Res.plurals.transfer_import_success, status.count, status.count, "", status.source), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                BottleImportStatus.None -> Box(
-                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(stringResource(Res.string.transfer_import_none), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                BottleImportStatus.WrongType -> Box(
-                    Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                ) { Text(stringResource(Res.string.bottles_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                null -> Unit
+    // Removable summary chips for every active advanced criterion.
+    val activeChips: List<Pair<String, () -> Unit>> = buildList {
+        adv.price?.let { range ->
+            add("${range.start.toInt()}–${range.endInclusive.toInt()} €" to { adv = adv.copy(price = null) })
+        }
+        adv.selections.forEach { (crit, values) ->
+            values.forEach { v ->
+                add(v to {
+                    adv = adv.copy(selections = adv.selections + (crit to (adv.selections[crit].orEmpty() - v)))
+                })
             }
-            SearchField(stringResource(Res.string.bottles_search_placeholder), value = query, onValueChange = { query = it })
-            Spacer(Modifier.height(11.dp))
-            FilterChips(selected, filterItems) { selected = it }
-            Spacer(Modifier.height(11.dp))
-            list.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                    pair.forEach { b -> BottleCard(b, Modifier.weight(1f)) { onOpenBottle(b) } }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+        }
+    }
+
+    Box(modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            // --- Fixed top zone: header, search row, quick chips, active chips ---
+            ScreenHeader(
+                stringResource(Res.string.bottles_title),
+                pluralStringResource(Res.plurals.bottles_subtitle_format, list.size, Cellar.totalBottles(), list.size),
+                trailing = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { onOpenFavorites() },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.Favorite, contentDescription = stringResource(Res.string.my_favorites), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+
+                        Box(
+                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
+                    }
+                },
+            )
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                when (val status = importStatus) {
+                    is BottleImportStatus.Success -> Box(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                    ) { Text(pluralStringResource(Res.plurals.transfer_import_success, status.count, status.count, "", status.source), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                    BottleImportStatus.None -> Box(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                    ) { Text(stringResource(Res.string.transfer_import_none), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                    BottleImportStatus.WrongType -> Box(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
+                    ) { Text(stringResource(Res.string.bottles_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
+                    null -> Unit
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        SearchField(
+                            stringResource(Res.string.bottles_search_placeholder),
+                            value = query,
+                            onValueChange = { query = it },
+                            onClear = { query = "" },
+                        )
+                    }
+                    FilterButton(adv.activeCount) { showFilters = true }
+                }
+                Spacer(Modifier.height(11.dp))
+                FilterChips(selected, filterItems) { selected = it }
+                if (activeChips.isNotEmpty()) {
+                    Spacer(Modifier.height(9.dp))
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        activeChips.forEach { (label, onRemove) -> RemovableChip(label, onRemove) }
+                    }
                 }
                 Spacer(Modifier.height(11.dp))
             }
-            if (list.isEmpty()) {
-                Text(
-                    if (query.isNotBlank()) stringResource(Res.string.bottles_no_result, query)
-                    else stringResource(Res.string.bottles_no_result_filter),
-                    fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
-                )
+
+            // --- Scrolling zone: only the results scroll ---
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 90.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                items(list.chunked(2)) { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                        pair.forEach { b -> BottleCard(b, Modifier.weight(1f)) { onOpenBottle(b) } }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+                if (list.isEmpty()) {
+                    item {
+                        Text(
+                            if (query.isNotBlank()) stringResource(Res.string.bottles_no_result, query)
+                            else stringResource(Res.string.bottles_no_result_filter),
+                            fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.height(70.dp))
+        }
+
+        if (showFilters) {
+            AdvancedFilterPanel(
+                initial = adv,
+                priceBounds = priceBounds,
+                baseList = base,
+                categoryLabels = categoryLabels,
+                onApply = { adv = it; showFilters = false },
+                onClose = { showFilters = false },
+            )
         }
     }
 }
@@ -160,6 +303,7 @@ fun SearchField(
     placeholder: String,
     value: String = "",
     onValueChange: (String) -> Unit = {},
+    onClear: (() -> Unit)? = null,
 ) {
     Row(
         Modifier
@@ -187,6 +331,66 @@ fun SearchField(
                     inner()
                 }
             },
+        )
+        if (onClear != null && value.isNotEmpty()) {
+            Spacer(Modifier.size(8.dp))
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = stringResource(Res.string.search_reset),
+                tint = VincentColors.Faint,
+                modifier = Modifier.size(16.dp).clickable { onClear() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterButton(activeCount: Int, onClick: () -> Unit) {
+    val active = activeCount > 0
+    Box(contentAlignment = Alignment.TopEnd) {
+        Box(
+            Modifier
+                .size(46.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(if (active) VincentColors.AccentSoft else VincentColors.Surface)
+                .border(1.dp, if (active) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(13.dp))
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Tune, contentDescription = stringResource(Res.string.search_title), modifier = Modifier.size(18.dp), tint = VincentColors.Accent)
+        }
+        if (active) {
+            Box(
+                Modifier
+                    .offset(x = 5.dp, y = (-5).dp)
+                    .size(17.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(VincentColors.Accent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("$activeCount", fontSize = 9.5.sp, fontWeight = FontWeight.W700, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemovableChip(label: String, onRemove: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(VincentColors.AccentSoft)
+            .border(1.dp, VincentColors.Accent, RoundedCornerShape(20.dp))
+            .padding(start = 11.dp, end = 7.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent)
+        Spacer(Modifier.size(4.dp))
+        Icon(
+            Icons.Filled.Close,
+            contentDescription = stringResource(Res.string.search_reset),
+            tint = VincentColors.Accent,
+            modifier = Modifier.size(13.dp).clickable(onClick = onRemove),
         )
     }
 }
@@ -259,5 +463,214 @@ fun BottleCard(b: Bottle, modifier: Modifier = Modifier, onClick: () -> Unit) {
             Text("${b.price} €", style = MonoNumber, color = VincentColors.Fg)
             Stars(b.rating)
         }
+    }
+}
+
+// --- Advanced filter slide-over panel (folds in the former SEARCH tab) ---
+
+@Composable
+private fun AdvancedFilterPanel(
+    initial: AdvFilters,
+    priceBounds: ClosedFloatingPointRange<Float>,
+    baseList: List<Bottle>,
+    categoryLabels: Map<WineCategory, String>,
+    onApply: (AdvFilters) -> Unit,
+    onClose: () -> Unit,
+) {
+    var price by remember { mutableStateOf(initial.price ?: priceBounds) }
+    var selections by remember { mutableStateOf(initial.selections) }
+    var picker by remember { mutableStateOf<Crit?>(null) }
+
+    fun toggle(crit: Crit, item: String) {
+        val current = selections[crit] ?: emptySet()
+        selections = selections + (crit to (if (item in current) current - item else current + item))
+    }
+
+    val priceActive = price.start > priceBounds.start || price.endInclusive < priceBounds.endInclusive
+    val pending = AdvFilters(if (priceActive) price else null, selections)
+    val count = baseList.count { it.matchesAdv(pending, categoryLabels) }
+
+    Box(Modifier.fillMaxSize().background(VincentColors.Bg)) {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+                Spacer(Modifier.size(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(Res.string.search_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                    Text(pluralStringResource(Res.plurals.selected_count, pending.activeCount, pending.activeCount), fontSize = 11.5.sp, color = VincentColors.Muted)
+                }
+                Text(
+                    stringResource(Res.string.search_reset),
+                    fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
+                    modifier = Modifier.clickable { price = priceBounds; selections = emptyMap() },
+                )
+            }
+
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+                GroupLabel(stringResource(Res.string.search_price_label))
+                PriceRange(priceBounds, price) { price = it }
+                Spacer(Modifier.height(15.dp))
+
+                Crit.entries.forEach { crit ->
+                    CritSection(
+                        crit = crit,
+                        selected = selections[crit] ?: emptySet(),
+                        onToggle = { toggle(crit, it) },
+                        onMore = { picker = crit },
+                    )
+                    Spacer(Modifier.height(15.dp))
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
+            Button(
+                onClick = { onApply(pending) },
+                modifier = Modifier.fillMaxWidth().padding(16.dp).height(46.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+            ) {
+                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(pluralStringResource(Res.plurals.see_bottles, count, count), fontWeight = FontWeight.W700)
+            }
+        }
+
+        picker?.let { crit ->
+            CriteriaPicker(
+                crit = crit,
+                selected = selections[crit] ?: emptySet(),
+                onToggle = { toggle(crit, it) },
+                onClose = { picker = null },
+            )
+        }
+    }
+}
+
+@Composable
+private fun GroupLabel(text: String) {
+    Text(text.uppercase(), fontSize = 11.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Muted, letterSpacing = 0.6.sp, modifier = Modifier.padding(bottom = 9.dp))
+}
+
+@Composable
+private fun CritSection(crit: Crit, selected: Set<String>, onToggle: (String) -> Unit, onMore: () -> Unit) {
+    val common = crit.all.take(crit.common)
+    // Always surface selected items even if they live beyond the common subset.
+    val shown = (common + selected.filter { it !in common }).distinct()
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        GroupLabel(stringResource(crit.label))
+        if (selected.isNotEmpty()) {
+            Text(pluralStringResource(Res.plurals.selected_count, selected.size, selected.size), fontSize = 10.5.sp, color = VincentColors.Accent, fontWeight = FontWeight.W600)
+        }
+    }
+    (shown + "…").chunked(3).forEach { row ->
+        Row(Modifier.padding(bottom = 7.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            row.forEach { item ->
+                if (item == "…") MoreChip(onMore) else Chip(item, item in selected) { onToggle(item) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(20.dp))
+            .background(if (on) VincentColors.Fg else VincentColors.Surface)
+            .border(1.dp, if (on) VincentColors.Fg else VincentColors.Border, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 6.dp),
+    ) {
+        Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.W600, color = if (on) Color.White else VincentColors.Muted)
+    }
+}
+
+@Composable
+private fun MoreChip(onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(20.dp))
+            .background(VincentColors.AccentSoft)
+            .border(1.dp, VincentColors.Accent, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 6.dp),
+    ) {
+        Text("…", fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
+    }
+}
+
+@Composable
+private fun CriteriaPicker(crit: Crit, selected: Set<String>, onToggle: (String) -> Unit, onClose: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
+            Spacer(Modifier.size(12.dp))
+            Column {
+                Text(stringResource(crit.label), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(pluralStringResource(Res.plurals.criteria_count, crit.all.size, crit.all.size) + " · " + pluralStringResource(Res.plurals.selected_count, selected.size, selected.size), fontSize = 11.5.sp, color = VincentColors.Muted)
+            }
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Spacer(Modifier.height(4.dp))
+            crit.all.chunked(2).forEach { row ->
+                Row(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { item ->
+                        Box(Modifier.weight(1f)) { WideChip(item, item in selected) { onToggle(item) } }
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+        Button(
+            onClick = onClose,
+            modifier = Modifier.fillMaxWidth().padding(16.dp).height(46.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+        ) { Text(stringResource(Res.string.search_apply), fontWeight = FontWeight.W700) }
+    }
+}
+
+@Composable
+private fun WideChip(label: String, on: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(if (on) VincentColors.AccentSoft else VincentColors.Surface)
+            .border(if (on) 1.5.dp else 1.dp, if (on) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = if (on) VincentColors.Accent else VincentColors.Fg)
+        if (on) Text("✓", fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
+    }
+}
+
+@Composable
+private fun PriceRange(
+    bounds: ClosedFloatingPointRange<Float>,
+    value: ClosedFloatingPointRange<Float>,
+    onValueChange: (ClosedFloatingPointRange<Float>) -> Unit,
+) {
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("${value.start.toInt()} €", style = MonoNumber, color = VincentColors.Fg)
+            Text("${value.endInclusive.toInt()} €", style = MonoNumber, color = VincentColors.Fg)
+        }
+        RangeSlider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = bounds,
+            colors = SliderDefaults.colors(
+                thumbColor = VincentColors.Accent,
+                activeTrackColor = VincentColors.Accent,
+                inactiveTrackColor = VincentColors.Border,
+            ),
+        )
     }
 }
