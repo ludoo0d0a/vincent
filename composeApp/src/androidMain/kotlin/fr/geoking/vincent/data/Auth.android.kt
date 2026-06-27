@@ -1,11 +1,24 @@
 package fr.geoking.vincent.data
 
 import com.google.firebase.auth.FirebaseAuth
+import fr.geoking.vincent.debug.InternalLog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+private val authScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+private const val TAG = "VincentAuth"
 
 /** Wires [Auth.account] to the Firebase Auth session (persisted across restarts). */
 actual fun bootstrapAuth() {
+    InternalLog.i(TAG, "Bootstrapping Auth state listener")
     FirebaseAuth.getInstance().addAuthStateListener { firebaseAuth ->
-        Auth.account = firebaseAuth.currentUser?.toGoogleAccount()
+        val user = firebaseAuth.currentUser
+        InternalLog.i(TAG, "Auth state changed: ${user?.email ?: "signed out"}")
+        authScope.launch {
+            Auth.account = user?.toGoogleAccount()
+        }
     }
 }
 

@@ -18,9 +18,12 @@ import com.google.firebase.auth.GoogleAuthProvider
 import fr.geoking.vincent.BuildConfig
 import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.R
+import fr.geoking.vincent.util.findActivity
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 private const val TAG = "VincentSignIn"
 
@@ -33,16 +36,27 @@ private fun resolveWebClientId(context: Context): String {
     return fromFirebase.takeIf { it.isNotBlank() } ?: BuildConfig.WEB_CLIENT_ID
 }
 
-private suspend fun firebaseAuthWithGoogle(idToken: String): GoogleAccount? {
+private suspend fun firebaseAuthWithGoogle(idToken: String): GoogleAccount? = withContext(Dispatchers.IO) {
+    InternalLog.i(TAG, "Authenticating with Firebase using Google ID token")
     val auth = FirebaseAuth.getInstance()
     val credential = GoogleAuthProvider.getCredential(idToken, null)
-    auth.signInWithCredential(credential).await()
-    return auth.currentUser?.let { user ->
-        GoogleAccount(
-            name = user.displayName ?: user.email?.substringBefore('@') ?: user.uid,
-            email = user.email.orEmpty(),
-            uid = user.uid,
-        )
+    try {
+        val result = auth.signInWithCredential(credential).await()
+        val user = result.user
+        if (user != null) {
+            InternalLog.i(TAG, "Firebase Auth successful: ${user.email}")
+            GoogleAccount(
+                name = user.displayName ?: user.email?.substringBefore('@') ?: user.uid,
+                email = user.email.orEmpty(),
+                uid = user.uid,
+            )
+        } else {
+            InternalLog.e(TAG, "Firebase Auth successful but currentUser is null")
+            null
+        }
+    } catch (e: Exception) {
+        InternalLog.e(TAG, "Firebase Auth failed", e)
+        throw e
     }
 }
 
@@ -52,6 +66,7 @@ private suspend fun requestGoogleIdToken(
     webClientId: String,
     oneTap: Boolean,
 ): String? {
+    InternalLog.i(TAG, "requestGoogleIdToken(oneTap=$oneTap)")
     val option = if (oneTap) {
         GetGoogleIdOption.Builder()
             .setServerClientId(webClientId)
@@ -61,14 +76,25 @@ private suspend fun requestGoogleIdToken(
         GetSignInWithGoogleOption.Builder(webClientId).build()
     }
     val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
-    val response = credentialManager.getCredential(context, request)
+
+    // Use Activity context if available for CredentialManager to show UI
+    val activityContext = context.findActivity() ?: context
+    if (activityContext != context) {
+        InternalLog.i(TAG, "Using Activity context for CredentialManager")
+    }
+
+    val response = credentialManager.getCredential(activityContext, request)
     val credential = response.credential
     if (credential is CustomCredential &&
         credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
     ) {
-        return GoogleIdTokenCredential.createFrom(credential.data).idToken
+        val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+        InternalLog.i(TAG, "Google ID token received (length=${idToken.length})")
+        return idToken
     }
-    Log.w(TAG, "Unexpected credential type: ${credential.type}")
+    val error = "Unexpected credential type: ${credential.type}"
+    Log.w(TAG, error)
+    InternalLog.w(TAG, error)
     return null
 }
 
@@ -83,32 +109,33 @@ actual fun rememberGoogleSignIn(
     return {
         scope.launch {
             InternalLog.i(TAG, "Starting Google Sign-in flow")
-            onLoading(true)
+            withContext(Dispatchers.Main) { onLoading(true) }
             try {
                 val webClientId = resolveWebClientId(context)
                 if (webClientId.isBlank()) {
                     val error = "Web client ID missing — add google-services.json or WEB_CLIENT_ID in local.properties."
                     Log.e(TAG, error)
                     InternalLog.e(TAG, error)
-                    onError(error)
-                    onResult(null)
+                    withContext(Dispatchers.Main) {
+                        onError(error)
+                        onResult(null)
+                    }
                     return@launch
                 }
                 val account = try {
                     val credentialManager = CredentialManager.create(context)
                     val idToken = try {
-                        InternalLog.i(TAG, "Requesting Google ID token (oneTap = true)")
                         requestGoogleIdToken(context, credentialManager, webClientId, oneTap = true)
                     } catch (_: NoCredentialException) {
-                        InternalLog.i(TAG, "OneTap failed, requesting Google ID token (oneTap = false)")
+                        InternalLog.i(TAG, "OneTap failed (NoCredential), requesting Google ID token (oneTap = false)")
                         requestGoogleIdToken(context, credentialManager, webClientId, oneTap = false)
                     }
                     if (idToken != null) {
-                        InternalLog.i(TAG, "ID token received, authenticating with Firebase")
                         firebaseAuthWithGoogle(idToken)
                     } else {
-                        InternalLog.w(TAG, "No ID token received")
-                        onError("Google login failed: no ID token received")
+                        val error = "Google login failed: no ID token received"
+                        InternalLog.w(TAG, error)
+                        withContext(Dispatchers.Main) { onError(error) }
                         null
                     }
                 } catch (e: GetCredentialCancellationException) {
@@ -118,18 +145,18 @@ actual fun rememberGoogleSignIn(
                     val errorMsg = "Firebase Google sign-in failed: ${e.javaClass.simpleName}: ${e.message}"
                     Log.e(TAG, errorMsg, e)
                     InternalLog.e(TAG, errorMsg, e)
-                    onError(e.message ?: e.javaClass.simpleName)
+                    withContext(Dispatchers.Main) { onError(e.message ?: e.javaClass.simpleName) }
                     null
                 }
                 if (account != null) {
                     InternalLog.i(TAG, "Sign-in successful: ${account.email}")
                 }
-                onResult(account)
+                withContext(Dispatchers.Main) { onResult(account) }
             } catch (e: CancellationException) {
                 InternalLog.i(TAG, "Sign-in coroutine cancelled")
                 throw e
             } finally {
-                onLoading(false)
+                withContext(Dispatchers.Main) { onLoading(false) }
             }
         }
     }
