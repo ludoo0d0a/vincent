@@ -15,21 +15,23 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
-      # Deploys worker/ and (re)uploads GEMINI_API_KEY as a Worker Secret from the
-      # GitHub secret, so the key is never committed and CI stays the source of truth.
-      - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+      - uses: actions/setup-node@v4
         with:
-          # Pin a current wrangler; the action's bundled 3.90.0 has a bug where
-          # `secret bulk` wrongly rejects real Workers as "Pages projects".
-          wranglerVersion: '4.105.0'
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: worker
-          command: deploy
-          secrets: |
-            GEMINI_API_KEY
+          node-version: 20
+      # (Re)upload GEMINI_API_KEY as a Worker Secret from the GitHub secret, so the
+      # key is never committed and CI stays the source of truth. Uses the latest
+      # wrangler via `npx wrangler` (no pinned version).
+      - name: Upload GEMINI_API_KEY secret
+        run: printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@latest secret put GEMINI_API_KEY
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Deploy worker
+        run: npx --yes wrangler@latest deploy
