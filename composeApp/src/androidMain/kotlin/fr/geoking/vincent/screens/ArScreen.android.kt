@@ -645,7 +645,7 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
                             val cell = rack.cells.getOrNull(idx) ?: continue
                             if (!cell.occupied) continue
                             val p = ArProjection.cellQuadPoint(calibration, col, row, rack.cols, rack.rows, rack.staggered)
-                            CellChip(
+                            CellSquare(
                                 rack = rack,
                                 cellIndex = idx,
                                 x = p.x * w,
@@ -1006,6 +1006,36 @@ private fun quaternionFromAxes(ex: FloatArray, ey: FloatArray, ez: FloatArray): 
             floatArrayOf((m02 + m20) / s, (m12 + m21) / s, 0.25f * s, (m10 - m01) / s)
         }
     }
+}
+
+/** PHOTO mode marker: a fixed-size square showing only the bottle's position (no text, no image). */
+@Composable
+private fun CellSquare(
+    rack: Rack,
+    cellIndex: Int,
+    x: Float,
+    y: Float,
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
+    val density = LocalDensity.current
+    val cell = rack.cells.getOrNull(cellIndex) ?: return
+    val spot = cellSpotLabel(cellIndex, rack.cols)
+    val bottle = Cellar.bottles.firstOrNull { it.cellarSpot == spot }
+    val color: WineColor? = cell.color ?: bottle?.color
+    val squareColor = color?.glass ?: VincentColors.Accent
+
+    val sizeDp = 26.dp
+    val halfPx = with(density) { sizeDp.toPx() / 2f }
+
+    Box(
+        Modifier
+            .offset { IntOffset((x - halfPx).roundToInt(), (y - halfPx).roundToInt()) }
+            .size(sizeDp)
+            .background(squareColor.copy(alpha = if (selected) 0.85f else 0.5f))
+            .border(if (selected) 2.5.dp else 1.5.dp, squareColor)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+    )
 }
 
 @Composable
