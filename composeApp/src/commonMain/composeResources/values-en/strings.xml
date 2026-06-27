@@ -154,6 +154,9 @@
     <string name="cellar_action_copy">Copy</string>
     <string name="cellar_action_move">Move</string>
     <string name="cellar_action_consume">Consume</string>
+    <string name="cellar_action_drink">Drink</string>
+    <string name="cellar_actions_menu">Actions</string>
+    <string name="cellar_dismiss">Close</string>
     <string name="cellar_cut_pending">Cut pending — choose a free spot</string>
     <string name="cellar_copy_pending">Copy pending — choose a free spot</string>
     <string name="cellar_edit_title">Edit rack</string>

@@ -22,16 +22,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalBar
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -82,7 +85,6 @@ import fr.geoking.vincent.model.emptyRack
 import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.ColorTag
 import fr.geoking.vincent.ui.ScreenHeader
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
@@ -156,7 +158,7 @@ fun CellarScreen(
     val filter = rackFilters.getOrNull(filterIdx)
     var editing by remember { mutableStateOf(false) }
     var selectedIdx by remember(rackIdx) {
-        mutableIntStateOf(
+        mutableStateOf<Int?>(
             rack.cells.indexOfFirst { it.selected }.takeIf { it >= 0 }
                 ?: rack.cells.indexOfFirst { it.occupied }.coerceAtLeast(0),
         )
@@ -171,7 +173,7 @@ fun CellarScreen(
     // can reserve matching space and never hide its last rows behind it.
     val density = LocalDensity.current
     var peekHeightPx by remember { mutableIntStateOf(0) }
-    val peekHeight = with(density) { peekHeightPx.toDp() }
+    val peekHeight = if (selectedIdx != null) with(density) { peekHeightPx.toDp() } else 0.dp
 
     fun findCellAt(offset: Offset): Int? =
         cellBounds.entries.firstOrNull { (_, bounds) -> bounds.contains(offset) }?.key
@@ -303,35 +305,35 @@ fun CellarScreen(
             }
         }
 
-        // Selected-bottle detail, pinned to the bottom and always visible
-        // regardless of how tall the rack is.
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(VincentColors.Bg)
-                .onGloballyPositioned { peekHeightPx = it.size.height }
-                .padding(horizontal = 16.dp, vertical = 11.dp),
-        ) {
-            PeekCard(
-                rack, rackIdx, selectedIdx, moving == selectedIdx, clipboard, onOpenBottle,
-                onAddBottle = { onAddToCell(RackPlacement(rackIdx, selectedIdx)) },
-                onMove = { moving = if (moving == selectedIdx) null else selectedIdx },
-                onCut = {
-                    val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
-                    if (cell.occupied) RackClipboard.cut(rackIdx, selectedIdx, cell)
-                },
-                onCopy = {
-                    val cell = rack.cells.getOrNull(selectedIdx) ?: return@PeekCard
-                    if (cell.occupied) RackClipboard.copy(rackIdx, selectedIdx, cell)
-                },
-                onPaste = { pasteAt(selectedIdx) },
-                onConsume = {
-                    Racks.update(rackIdx, rack.replaceCell(selectedIdx, RackCell(rowLabel(selectedIdx / rack.cols), false)))
-                    moving = null
-                    selectedIdx = Racks.all[rackIdx].cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
-                },
-            )
+        // Selected-bottle detail, pinned to the bottom. Dismissable so the whole
+        // rack can be seen at a glance.
+        val sel = selectedIdx
+        if (sel != null) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(VincentColors.Bg)
+                    .onGloballyPositioned { peekHeightPx = it.size.height }
+                    .padding(horizontal = 16.dp, vertical = 11.dp),
+            ) {
+                PeekCard(
+                    rack, rackIdx, sel, moving == sel, clipboard, onOpenBottle,
+                    onAddBottle = { onAddToCell(RackPlacement(rackIdx, sel)) },
+                    onDismiss = { selectedIdx = null },
+                    onMove = { moving = if (moving == sel) null else sel },
+                    onCopy = {
+                        val cell = rack.cells.getOrNull(sel) ?: return@PeekCard
+                        if (cell.occupied) RackClipboard.copy(rackIdx, sel, cell)
+                    },
+                    onPaste = { pasteAt(sel) },
+                    onConsume = {
+                        Racks.update(rackIdx, rack.replaceCell(sel, RackCell(rowLabel(sel / rack.cols), false)))
+                        moving = null
+                        selectedIdx = Racks.all[rackIdx].cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
+                    },
+                )
+            }
         }
 
         if (editing) {
@@ -473,7 +475,7 @@ private fun RackGrid(
     rackIdx: Int,
     mode: RackMode,
     filter: RackFilter?,
-    selectedIdx: Int,
+    selectedIdx: Int?,
     moving: Int?,
     dragFrom: Int?,
     dragHover: Int?,
@@ -688,23 +690,28 @@ private fun PeekCard(
     clipboard: RackClipboardEntry?,
     onOpenBottle: (Bottle) -> Unit,
     onAddBottle: () -> Unit,
+    onDismiss: () -> Unit,
     onMove: () -> Unit,
-    onCut: () -> Unit,
     onCopy: () -> Unit,
     onPaste: () -> Unit,
     onConsume: () -> Unit,
 ) {
     val cell = rack.cells.getOrNull(selectedIdx)
+    val spot = RackPlacement(rackIdx, selectedIdx).spotLabel(rack.cols)
     if (cell == null || !cell.occupied) {
-        val spot = RackPlacement(rackIdx, selectedIdx).spotLabel(rack.cols)
         VCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
-                Text(stringResource(Res.string.cellar_spot_label, spot), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                Text(
-                    if (clipboard != null) stringResource(Res.string.cellar_free_spot_paste_desc)
-                    else stringResource(Res.string.cellar_free_spot_desc),
-                    fontSize = 11.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(Res.string.cellar_spot_label, spot), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                        Text(
+                            if (clipboard != null) stringResource(Res.string.cellar_free_spot_paste_desc)
+                            else stringResource(Res.string.cellar_free_spot_desc),
+                            fontSize = 11.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 3.dp),
+                        )
+                    }
+                    PeekIconButton(Icons.Filled.Close, stringResource(Res.string.cellar_dismiss), onDismiss)
+                }
                 Spacer(Modifier.height(11.dp))
                 if (clipboard != null) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -718,34 +725,53 @@ private fun PeekCard(
         }
         return
     }
-    val spot = "${rowLabel(selectedIdx / rack.cols)}${selectedIdx % rack.cols + 1}"
     // Best-effort link to a real bottle (colour + vintage + price); else info only.
     val match = Cellar.bottles.firstOrNull {
         it.color == cell.color && it.price == cell.price && it.vintage.takeLast(2) == cell.vintage?.takeLast(2)
     }
+    val categoryLabel = cell.category?.let { stringResource(it.label) }
+    val colorLabel = cell.color?.let { stringResource(it.label) }
+    val title = match?.domain ?: categoryLabel ?: colorLabel ?: stringResource(Res.string.cellar_spot_label, spot)
+    val subtitle = buildString {
+        append(spot)
+        cell.vintage?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+        cell.price?.let { append(" · $it €") }
+    }
+    var menuOpen by remember(selectedIdx) { mutableStateOf(false) }
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            val infoMod = if (match != null) Modifier.fillMaxWidth().clickable { onOpenBottle(match) } else Modifier.fillMaxWidth()
-            Row(infoMod, verticalAlignment = Alignment.CenterVertically) {
-                WineBottle(cell.color ?: WineColor.RED, Modifier.size(width = 30.dp, height = 46.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                WineBottle(cell.color ?: WineColor.RED, Modifier.size(width = 26.dp, height = 40.dp))
                 Spacer(Modifier.width(11.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(Res.string.cellar_spot_label, spot), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                    val categoryLabel = cell.category?.let { stringResource(it.label) }
-                    Text(
-                        buildString {
-                            append(cell.vintage.orEmpty())
-                            append(" · ${cell.price} €")
-                            if (categoryLabel != null) append(" · $categoryLabel")
-                        },
-                        fontSize = 11.sp, color = VincentColors.Muted,
-                    )
+                val infoMod = if (match != null) Modifier.weight(1f).clickable { onOpenBottle(match) } else Modifier.weight(1f)
+                Column(infoMod) {
+                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(subtitle, fontSize = 11.sp, color = VincentColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                cell.color?.let { ColorTag(it, label = cell.category?.let { cat -> stringResource(cat.label) } ?: stringResource(it.label)) }
+                Box {
+                    PeekIconButton(Icons.Filled.MoreVert, stringResource(Res.string.cellar_actions_menu)) { menuOpen = true }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.cellar_action_copy)) },
+                            leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            onClick = { menuOpen = false; onCopy() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.cellar_action_move)) },
+                            leadingIcon = { Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            onClick = { menuOpen = false; onMove() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.cellar_action_drink)) },
+                            leadingIcon = { Icon(Icons.Filled.LocalBar, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            onClick = { menuOpen = false; onConsume() },
+                        )
+                    }
+                }
+                PeekIconButton(Icons.Filled.Close, stringResource(Res.string.cellar_dismiss), onDismiss)
             }
-
-            Spacer(Modifier.height(11.dp))
             if (moving) {
+                Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         stringResource(Res.string.cellar_move_target_hint),
@@ -754,26 +780,32 @@ private fun PeekCard(
                     )
                     PeekAction(stringResource(Res.string.cellar_action_cancel), null, onMove)
                 }
-            } else {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PeekAction(stringResource(Res.string.cellar_action_cut), Icons.Filled.ContentCut, onCut, Modifier.weight(1f))
-                    PeekAction(stringResource(Res.string.cellar_action_copy), Icons.Filled.ContentCopy, onCopy, Modifier.weight(1f))
-                }
+            } else if (clipboard != null) {
                 Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PeekAction(stringResource(Res.string.cellar_action_move), Icons.Filled.SwapHoriz, onMove, Modifier.weight(1f))
-                    PeekAction(stringResource(Res.string.cellar_action_consume), Icons.Filled.LocalBar, onConsume, Modifier.weight(1f))
-                }
-                if (clipboard != null) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        if (clipboard.mode == RackClipboardMode.CUT) stringResource(Res.string.cellar_cut_pending)
-                        else stringResource(Res.string.cellar_copy_pending),
-                        fontSize = 11.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
-                    )
-                }
+                Text(
+                    if (clipboard.mode == RackClipboardMode.CUT) stringResource(Res.string.cellar_cut_pending)
+                    else stringResource(Res.string.cellar_copy_pending),
+                    fontSize = 11.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun PeekIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = VincentColors.Muted, modifier = Modifier.size(20.dp))
     }
 }
 

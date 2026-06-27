@@ -155,6 +155,9 @@
     <string name="cellar_action_copy">Copier</string>
     <string name="cellar_action_move">Déplacer</string>
     <string name="cellar_action_consume">Consommer</string>
+    <string name="cellar_action_drink">Boire</string>
+    <string name="cellar_actions_menu">Actions</string>
+    <string name="cellar_dismiss">Fermer</string>
     <string name="cellar_cut_pending">Coupe en attente — choisissez une case libre</string>
     <string name="cellar_copy_pending">Copie en attente — choisissez une case libre</string>
     <string name="cellar_edit_title">Éditer le casier</string>
