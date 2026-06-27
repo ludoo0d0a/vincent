@@ -20,12 +20,8 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.firebase.appcheck.AppCheckProviderFactory
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
-import fr.geoking.vincent.data.Cellar
-import fr.geoking.vincent.data.Settings
-import fr.geoking.vincent.data.Updater
-import fr.geoking.vincent.data.bootstrapAuth
-import fr.geoking.vincent.db.RoomCellarRepository
-import fr.geoking.vincent.db.VincentDatabase
+import fr.geoking.vincent.data.*
+import fr.geoking.vincent.db.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -41,6 +37,15 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE bottles ADD COLUMN photoBottleUri TEXT NOT NULL DEFAULT ''")
         db.execSQL("ALTER TABLE bottles ADD COLUMN photoBackUri TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+private val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `racks` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `cols` INTEGER NOT NULL, `rows` INTEGER NOT NULL, `staggered` INTEGER NOT NULL, `cellsData` TEXT NOT NULL, `arImagePath` TEXT, `arCalibrationData` TEXT, PRIMARY KEY(`id`))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `tastings` (`id` TEXT NOT NULL, `bottleId` TEXT, `wineName` TEXT NOT NULL, `date` TEXT NOT NULL, `rating` REAL NOT NULL, `notes` TEXT NOT NULL, `color` TEXT, `vintage` TEXT, PRIMARY KEY(`id`))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `producers` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `region` TEXT NOT NULL, `country` TEXT NOT NULL, `website` TEXT NOT NULL, `email` TEXT NOT NULL, `phone` TEXT NOT NULL, PRIMARY KEY(`id`))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `suppliers` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `website` TEXT NOT NULL, `email` TEXT NOT NULL, `phone` TEXT NOT NULL, PRIMARY KEY(`id`))")
     }
 }
 
@@ -78,10 +83,21 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             VincentDatabase::class.java,
             "vincent.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
         val repository = RoomCellarRepository(db.bottleDao())
+        val rackRepo = RoomRackRepository(db.rackDao())
+        val tastingRepo = RoomTastingRepository(db.tastingDao())
+        val producerRepo = RoomProducerRepository(db.producerDao())
+        val supplierRepo = RoomSupplierRepository(db.supplierDao())
+
         Settings.init(applicationContext)
-        MainScope().launch { Cellar.bootstrap(repository) }
+        MainScope().launch {
+            Cellar.bootstrap(repository)
+            Racks.bootstrap(rackRepo)
+            Tastings.bootstrap(tastingRepo)
+            Producers.bootstrap(producerRepo)
+            Suppliers.bootstrap(supplierRepo)
+        }
 
         bootstrapAuth()
 

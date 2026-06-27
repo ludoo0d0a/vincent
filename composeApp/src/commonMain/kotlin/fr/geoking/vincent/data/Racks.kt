@@ -6,35 +6,65 @@ import fr.geoking.vincent.model.RackArCalibration
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.SampleData
 import fr.geoking.vincent.model.rowLabel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /** Reactive list of racks, seeded from [SampleData] and editable at runtime. */
 object Racks {
     val all = mutableStateListOf<Rack>().also { it.addAll(SampleData.seedRacks()) }
 
+    private var repo: RackRepository? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** Wire a persistent store. If empty, the seed is persisted. */
+    suspend fun bootstrap(repository: RackRepository) {
+        repo = repository
+        val persisted = repository.loadAll()
+        if (persisted.isEmpty()) {
+            all.forEach { repository.upsert(it) }
+        } else {
+            all.clear(); all.addAll(persisted)
+        }
+    }
+
     fun update(index: Int, rack: Rack) {
-        if (index in all.indices) all[index] = rack
+        if (index in all.indices) {
+            all[index] = rack
+            persist(rack)
+        }
     }
 
     /** Attach (or update) the AR reference photo + calibration for the rack at [index]. */
     fun setArCalibration(index: Int, imagePath: String, calibration: RackArCalibration) {
         val rack = all.getOrNull(index) ?: return
-        all[index] = rack.copy(arImagePath = imagePath, arCalibration = calibration)
+        val updated = rack.copy(arImagePath = imagePath, arCalibration = calibration)
+        all[index] = updated
+        persist(updated)
     }
 
     fun add(rack: Rack) {
         all.add(rack)
+        persist(rack)
     }
 
     /** Insert a copy of the rack at [index] right after it (name suffixed "copie"). */
     fun duplicate(index: Int): Int {
         val src = all.getOrNull(index) ?: return index
-        all.add(index + 1, src.copy(name = "${src.name} (copie)"))
+        val updated = src.copy(name = "${src.name} (copie)", id = "rack-${src.id}-copy-${System.currentTimeMillis()}")
+        all.add(index + 1, updated)
+        persist(updated)
         return index + 1
     }
 
     /** Remove the rack at [index]; never removes the last remaining rack. */
     fun remove(index: Int) {
-        if (all.size > 1 && index in all.indices) all.removeAt(index)
+        if (all.size > 1 && index in all.indices) {
+            val removed = all.removeAt(index)
+            val r = repo ?: return
+            scope.launch { r.delete(removed.id) }
+        }
     }
 
     /** Move a bottle from one cell to an empty cell, possibly across racks. */
@@ -81,5 +111,10 @@ object Racks {
             }
         }
         return true
+    }
+
+    private fun persist(r: Rack) {
+        val repo = repo ?: return
+        scope.launch { repo.upsert(r) }
     }
 }
