@@ -9,21 +9,32 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
-// On CI, the google-services.json is provided via an environment variable.
+// Secrets read from local.properties, gradle properties, or environment variables.
+// Key lookup is case-insensitive (checks key and key.lowercase()).
+// Specifically for GEMINI_API_KEY, it also checks for "gemoni_api_key".
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun secret(key: String): String {
+    val keys = mutableListOf(key, key.lowercase(), key.uppercase()).distinct()
+    for (k in keys) {
+        val v = localProps.getProperty(k)
+            ?: project.findProperty(k)?.toString()
+            ?: System.getenv(k)
+        if (!v.isNullOrBlank()) return v
+    }
+    return ""
+}
+
+// On CI, the google-services.json is provided via an environment variable or local.properties.
 // This block writes it to the expected location before the Google Services plugin runs.
-System.getenv("GOOGLE_SERVICES_JSON")?.takeIf { it.isNotBlank() }?.let { json ->
+secret("GOOGLE_SERVICES_JSON").takeIf { it.isNotBlank() }?.let { json ->
     val target = project.file("google-services.json")
     if (!target.exists()) {
         target.writeText(json)
     }
 }
-
-// Secrets read from local.properties (or CI env), surfaced via BuildConfig — never hardcoded.
-val localProps = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}
-fun secret(key: String): String = localProps.getProperty(key) ?: System.getenv(key) ?: ""
 
 // Version is managed in playstore/version.properties (CI env overrides it).
 val versionPropsFile = rootProject.file("playstore/version.properties")
@@ -100,31 +111,33 @@ android {
         }
     }
 
-    // Release signing is driven by env vars (set by the release workflow from
+    // Release signing is driven by local.properties, gradle properties or env vars (set by the release workflow from
     // repository secrets). Absent locally → release stays unsigned, debug is fine.
-    val keystorePath = System.getenv("KEYSTORE_FILE")
+    val keystorePath = secret("KEYSTORE_FILE")
     signingConfigs {
         create("release") {
-            if (keystorePath != null) {
+            if (keystorePath.isNotBlank()) {
                 storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = secret("KEYSTORE_PASSWORD")
+                keyAlias = secret("KEY_ALIAS")
+                keyPassword = secret("KEY_PASSWORD")
             }
         }
     }
 
     buildTypes {
-        // The Gemini key is NEVER embedded in release builds — release AI traffic
-        // goes through the Worker proxy. Debug builds keep an optional direct-key
-        // fallback (BuildConfig.GEMINI_API_KEY) for local testing without the proxy.
+        // The Gemini key is surfaced via BuildConfig.GEMINI_API_KEY.
+        // It can be provided in local.properties, gradle properties, or as an env var.
+        // Also supports "gemoni_api_key" for historical compatibility.
+        val geminiKey = secret("GEMINI_API_KEY").ifBlank { secret("gemoni_api_key") }
+
         getByName("debug") {
-            buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
+            buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
         }
         getByName("release") {
             isMinifyEnabled = false
-            buildConfigField("String", "GEMINI_API_KEY", "\"\"")
-            if (keystorePath != null) {
+            buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+            if (keystorePath.isNotBlank()) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
