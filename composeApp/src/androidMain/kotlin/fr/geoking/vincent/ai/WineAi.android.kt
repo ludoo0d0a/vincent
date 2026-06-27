@@ -25,7 +25,7 @@ import vincent.composeapp.generated.resources.*
 // Gemini key stays server-side and each call carries an App Check token + the user's
 // Firebase ID token. Debug builds without a proxy fall back to a direct Gemini call
 // using BuildConfig.GEMINI_API_KEY (blank in release → no key ever ships in the APK).
-private const val MODEL = "gemini-3.5-flash"
+private const val MODEL = "gemini-flash-latest"
 private const val TAG = "VincentAI"
 
 /** Single Gemini-backed client implementing both seams. */

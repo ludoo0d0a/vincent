@@ -35,7 +35,7 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ ok: true, model: env.GEMINI_MODEL || "gemini-3.5-flash" });
+      return json({ ok: true, model: env.GEMINI_MODEL || "gemini-flash-latest" });
     }
 
     if (request.method !== "POST" || url.pathname !== "/v1/generate") {
@@ -97,7 +97,7 @@ export default {
     // 5. Cache (text-only requests are deterministic enough to reuse).
     const cacheTtl = parseInt(env.CACHE_TTL_SECONDS || "0", 10);
     const cacheable = imageB64 === null && payload.cacheable !== false && cacheTtl > 0;
-    const model = env.GEMINI_MODEL || "gemini-3.5-flash";
+    const model = env.GEMINI_MODEL || "gemini-flash-latest";
     let cacheKey = "";
     if (cacheable) {
       cacheKey = `cache:${model}:${await sha256Hex(`${responseMimeType}\n${prompt}`)}`;

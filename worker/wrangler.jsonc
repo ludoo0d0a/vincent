@@ -13,7 +13,7 @@
     "FIREBASE_PROJECT_ID": "vincent-499318",
     "FIREBASE_PROJECT_NUMBER": "847279428684",
     "WEB_CLIENT_ID": "847279428684-2qlpipcu0a3u0pmrndbahmllgk7hor44.apps.googleusercontent.com",
-    "GEMINI_MODEL": "gemini-3.5-flash",
+    "GEMINI_MODEL": "gemini-flash-latest",
     "DAILY_QUOTA": "50",
     "CACHE_TTL_SECONDS": "86400",
     "ENFORCE_APP_CHECK": "true",
