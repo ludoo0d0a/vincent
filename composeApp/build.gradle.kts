@@ -31,35 +31,6 @@ val versionProps = Properties().apply {
     if (versionPropsFile.exists()) versionPropsFile.inputStream().use { load(it) }
 }
 
-// Auto-bump the semver patch on every local build (assemble/bundle/install).
-// Skipped in CI, where VERSION_NAME/VERSION_CODE are injected via env instead.
-run {
-    val isCi = !System.getenv("VERSION_NAME").isNullOrBlank()
-    val buildRequested = gradle.startParameter.taskNames.any { name ->
-        val task = name.substringAfterLast(':')
-        task.startsWith("assemble") || task.startsWith("bundle") || task.startsWith("install")
-    }
-    if (!isCi && buildRequested && versionPropsFile.exists()) {
-        val current = versionProps.getProperty("versionName")?.removePrefix("v") ?: "1.0.0"
-        val parts = current.split(".").map { it.toIntOrNull() ?: 0 }.toMutableList()
-        while (parts.size < 3) parts.add(0)
-        parts[2] = parts[2] + 1
-        val bumped = "${parts[0]}.${parts[1]}.${parts[2]}"
-        versionProps.setProperty("versionName", bumped)
-        val versionCode = versionProps.getProperty("versionCode") ?: "1"
-        versionPropsFile.writeText(
-            """
-            |# Single source of truth for the app version.
-            |# Read by composeApp/build.gradle.kts. CI overrides via env VERSION_NAME / VERSION_CODE
-            |# (versionCode = github.run_number), so bump versionName here per release.
-            |# Patch is auto-incremented on every local build.
-            |versionName=$bumped
-            |versionCode=$versionCode
-            |""".trimMargin() + "\n"
-        )
-    }
-}
-
 kotlin {
     jvmToolchain(21)
 
