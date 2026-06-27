@@ -31,9 +31,10 @@
     "play": {
       "developerId": "8648842673731499425",
       "appId": "4975982411132001122",
-      "dashboard": "https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/app-dashboard",
-      "integrity": "https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/keymanagement",
-      "integrityHelp": "https://support.google.com/googleplay/android-developer/answer/9842756?hl=fr"
+      "dashboard": "https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/app-dashboard?hl=en",
+      "appContent": "https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/app-content/overview?hl=en",
+      "integrity": "https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/keymanagement?hl=en",
+      "integrityHelp": "https://support.google.com/googleplay/android-developer/answer/9842756?hl=en"
     },
     "gemini": {
       "apiKeys": "https://aistudio.google.com/apikey"
