@@ -165,8 +165,8 @@ Workflows in `.github/workflows/` are thin callers to reusable workflows in publ
 no wrapper jar committed → call `gradle …`):
 
 - **`android-ci.yml`** — on push / PR to `main`: `assembleDebug` + APK artifact.
-- **`release-play.yml`** — **on every push to `main`** (track **internal**), plus on
-  `v*` tags and manual dispatch (track choice): builds a **signed AAB** and uploads
+- **`release-play.yml`** — **on every push to `main`** (tracks **internal**), plus on
+  `v*` tags and manual dispatch (tracks choice): builds a **signed AAB** and uploads
   to Google Play (`r0adkll/upload-google-play`). Deploys are serialized
   (`concurrency: play-release`).
 
