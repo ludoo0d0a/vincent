@@ -23,6 +23,9 @@ worker/.dev.vars
 
 # Generated Play release notes (from playstore/whatsnew.xml)
 playstore/whatsnew/
+
+# Locally bumped release version (managed by release tooling)
+playstore/version.properties
 /secrets/*.json
 /composeApp/release/
 /secrets/upload_certificate.pem
