@@ -8,6 +8,7 @@ composeApp/google-services.json
 .DS_Store
 .kotlin/
 captures/
+node_modules/
 
 # Signing — never commit the keystore or its credentials
 *.keystore
@@ -16,8 +17,7 @@ scripts/.keystore-credentials
 scripts/.play-service-account.json
 scripts/.adb-wireless
 
-# Cloudflare Worker (AI proxy) — deps, local build, and local dev secrets
-worker/node_modules/
+# Cloudflare Worker (AI proxy) — local build and local dev secrets
 .wrangler/
 worker/.dev.vars
 
