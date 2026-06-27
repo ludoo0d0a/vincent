@@ -36,6 +36,7 @@ object ArProjection {
         calibration: RackArCalibration,
         cols: Int,
         rows: Int,
+        staggered: Boolean,
         viewMatrix: FloatArray,
         projMatrix: FloatArray,
         widthPx: Int,
@@ -54,8 +55,9 @@ object ArProjection {
 
         val result = ArrayList<CellScreenPos>(cols * rows)
         for (row in 0 until rows) {
+            val rowShift = if (staggered && row % 2 == 1) 0.5f else 0f
             for (col in 0 until cols) {
-                val fu = (col + 0.5f) / cols
+                val fu = (col + 0.5f + rowShift) / (if (staggered) cols + 0.5f else cols.toFloat())
                 val fv = (row + 0.5f) / rows
                 val p = quadPoint(calibration, fu, fv)
                 // Augmented-image local frame: +X right, +Z down the image, +Y is the normal.
