@@ -40,6 +40,13 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+private val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE racks ADD COLUMN arMode TEXT")
+        db.execSQL("ALTER TABLE racks ADD COLUMN arAnchorData TEXT")
+    }
+}
+
 private val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `racks` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `cols` INTEGER NOT NULL, `rows` INTEGER NOT NULL, `staggered` INTEGER NOT NULL, `cellsData` TEXT NOT NULL, `arImagePath` TEXT, `arCalibrationData` TEXT, PRIMARY KEY(`id`))")
@@ -83,7 +90,7 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             VincentDatabase::class.java,
             "vincent.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
         val repository = RoomCellarRepository(db.bottleDao())
         val rackRepo = RoomRackRepository(db.rackDao())
         val tastingRepo = RoomTastingRepository(db.tastingDao())

@@ -28,6 +28,10 @@
     <string name="sign_out">Se déconnecter</string>
     <string name="sign_in">Se connecter</string>
     <string name="login_error">Erreur de connexion : %s</string>
+    <string name="login_error_generic">La connexion a échoué. Veuillez réessayer.</string>
+    <string name="login_error_network">Connexion impossible. Vérifiez votre connexion internet.</string>
+    <string name="login_error_no_account">Aucun compte Google trouvé sur cet appareil.</string>
+    <string name="login_error_config">Connexion indisponible (configuration manquante).</string>
     <string name="debug_internal_logs">Logs internes</string>
     <string name="my_cellar">Ma cave</string>
     <string name="cellar_subtitle">Cave de l\'appartement · Paris</string>
@@ -400,4 +404,24 @@
     <string name="ar_searching">Pointez la caméra vers le casier…</string>
     <string name="ar_empty_cell">vide</string>
     <string name="ar_low_quality">Photo trop peu détaillée pour un suivi fiable. Reprenez-la avec plus de texture/lumière.</string>
+    <string name="ar_mode_title">Mode de repérage AR</string>
+    <string name="ar_mode_photo">Photo figée</string>
+    <string name="ar_mode_marker">Marqueur</string>
+    <string name="ar_mode_anchor">Plan + ancre</string>
+    <string name="ar_photo_hint">Pincez pour zoomer, glissez pour déplacer.</string>
+    <string name="ar_marker_searching">Pointez la caméra vers le marqueur…</string>
+    <string name="ar_marker_setup_title">Calibrer avec un marqueur</string>
+    <string name="ar_marker_print">Imprimez ce marqueur et collez-le sur la façade du casier.</string>
+    <string name="ar_marker_width">Largeur du marqueur imprimé (cm)</string>
+    <string name="ar_grid_width">Largeur du casier (cm)</string>
+    <string name="ar_grid_height">Hauteur du casier (cm)</string>
+    <string name="ar_offset_x">Décalage horizontal grille (cm)</string>
+    <string name="ar_offset_y">Décalage vertical grille (cm)</string>
+    <string name="ar_anchor_setup_title">Placer la grille</string>
+    <string name="ar_anchor_need_marker">Montrez d\'abord le marqueur pour mémoriser la position.</string>
+    <string name="ar_anchor_tap_origin">Touchez le coin haut-gauche du casier.</string>
+    <string name="ar_anchor_tap_width">Touchez le coin haut-droit du casier.</string>
+    <string name="ar_anchor_tap_height">Touchez le coin bas-gauche du casier.</string>
+    <string name="ar_anchor_reset">Recommencer le placement</string>
+    <string name="ar_invalid_dimensions">Renseignez des dimensions valides.</string>
 </resources>

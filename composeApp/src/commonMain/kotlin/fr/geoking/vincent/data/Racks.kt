@@ -1,7 +1,9 @@
 package fr.geoking.vincent.data
 
 import androidx.compose.runtime.mutableStateListOf
+import fr.geoking.vincent.model.ArMode
 import fr.geoking.vincent.model.Rack
+import fr.geoking.vincent.model.RackArAnchor
 import fr.geoking.vincent.model.RackArCalibration
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.SampleData
@@ -40,6 +42,23 @@ object Racks {
     fun setArCalibration(index: Int, imagePath: String, calibration: RackArCalibration) {
         val rack = all.getOrNull(index) ?: return
         val updated = rack.copy(arImagePath = imagePath, arCalibration = calibration)
+        all[index] = updated
+        persist(updated)
+    }
+
+    /** Set the AR localisation mode for the rack at [index]. */
+    fun setArMode(index: Int, mode: ArMode) {
+        val rack = all.getOrNull(index) ?: return
+        if (rack.arMode == mode) return
+        val updated = rack.copy(arMode = mode)
+        all[index] = updated
+        persist(updated)
+    }
+
+    /** Attach (or update) the marker anchor used by MARKER / PLANE_ANCHOR modes. */
+    fun setArAnchor(index: Int, anchor: RackArAnchor) {
+        val rack = all.getOrNull(index) ?: return
+        val updated = rack.copy(arAnchor = anchor)
         all[index] = updated
         persist(updated)
     }

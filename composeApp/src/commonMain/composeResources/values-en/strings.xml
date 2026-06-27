@@ -27,6 +27,11 @@
     </plurals>
     <string name="sign_out">Sign out</string>
     <string name="sign_in">Sign in</string>
+    <string name="login_error">Sign-in error: %s</string>
+    <string name="login_error_generic">Sign-in failed. Please try again.</string>
+    <string name="login_error_network">Can\'t connect. Please check your internet connection.</string>
+    <string name="login_error_no_account">No Google account found on this device.</string>
+    <string name="login_error_config">Sign-in unavailable (missing configuration).</string>
     <string name="my_cellar">My cellar</string>
     <string name="cellar_subtitle">Apartment cellar · Paris</string>
     <string name="avg_price">Avg price</string>
@@ -398,4 +403,24 @@
     <string name="ar_searching">Point the camera at the rack…</string>
     <string name="ar_empty_cell">empty</string>
     <string name="ar_low_quality">Photo has too little detail for reliable tracking. Retake it with more texture/light.</string>
+    <string name="ar_mode_title">AR tracking mode</string>
+    <string name="ar_mode_photo">Frozen photo</string>
+    <string name="ar_mode_marker">Marker</string>
+    <string name="ar_mode_anchor">Plane + anchor</string>
+    <string name="ar_photo_hint">Pinch to zoom, drag to move.</string>
+    <string name="ar_marker_searching">Point the camera at the marker…</string>
+    <string name="ar_marker_setup_title">Calibrate with a marker</string>
+    <string name="ar_marker_print">Print this marker and stick it on the rack face.</string>
+    <string name="ar_marker_width">Printed marker width (cm)</string>
+    <string name="ar_grid_width">Rack width (cm)</string>
+    <string name="ar_grid_height">Rack height (cm)</string>
+    <string name="ar_offset_x">Grid horizontal offset (cm)</string>
+    <string name="ar_offset_y">Grid vertical offset (cm)</string>
+    <string name="ar_anchor_setup_title">Place the grid</string>
+    <string name="ar_anchor_need_marker">Show the marker first to remember the position.</string>
+    <string name="ar_anchor_tap_origin">Tap the top-left corner of the rack.</string>
+    <string name="ar_anchor_tap_width">Tap the top-right corner of the rack.</string>
+    <string name="ar_anchor_tap_height">Tap the bottom-left corner of the rack.</string>
+    <string name="ar_anchor_reset">Restart placement</string>
+    <string name="ar_invalid_dimensions">Enter valid dimensions.</string>
 </resources>

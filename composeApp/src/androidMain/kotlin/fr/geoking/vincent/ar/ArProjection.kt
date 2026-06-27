@@ -1,20 +1,41 @@
 package fr.geoking.vincent.ar
 
 import android.opengl.Matrix
-import com.google.ar.core.AugmentedImage
 import com.google.ar.core.Pose
 import fr.geoking.vincent.model.NormPoint
+import fr.geoking.vincent.model.RackArAnchor
 import fr.geoking.vincent.model.RackArCalibration
 
 /** Screen-space position (pixels) of a rack cell, plus whether it is in front of the camera. */
 data class CellScreenPos(val cellIndex: Int, val x: Float, val y: Float, val visible: Boolean)
 
 /**
- * Maps each rack cell to a screen position by placing the [cols]x[rows] grid over the
- * tracked [AugmentedImage] face (refined by the calibration quad) and projecting through
- * the ARCore camera matrices. Pure math, no rendering.
+ * Maps each rack cell to a position. Two paths share the same grid layout:
+ * - [cellQuadPoint] for the 2D PHOTO mode (bilinear point inside the calibration quad).
+ * - [cellPositions] for MARKER / PLANE_ANCHOR modes (3D grid frame projected through the camera).
+ * Pure math, no rendering.
  */
 object ArProjection {
+
+    /**
+     * Grid fraction (fu, fv) in 0..1 for the centre of the cell at [col],[row], honouring the
+     * half-cell [staggered] (quinconce) shift on odd rows.
+     */
+    fun gridFraction(col: Int, row: Int, cols: Int, rows: Int, staggered: Boolean): Pair<Float, Float> {
+        val rowShift = if (staggered && row % 2 == 1) 0.5f else 0f
+        val fu = (col + 0.5f + rowShift) / (if (staggered) cols + 0.5f else cols.toFloat())
+        val fv = (row + 0.5f) / rows
+        return fu to fv
+    }
+
+    /** World pose of the grid origin: the tracked marker [markerCenterPose] composed with the stored relative transform. */
+    fun gridFrame(markerCenterPose: Pose, anchor: RackArAnchor): Pose {
+        val relative = Pose(
+            floatArrayOf(anchor.tx, anchor.ty, anchor.tz),
+            floatArrayOf(anchor.qx, anchor.qy, anchor.qz, anchor.qw),
+        )
+        return markerCenterPose.compose(relative)
+    }
 
     /** Bilinear point inside the calibration quad (TL, TR, BR, BL) for grid fraction (fu, fv). */
     private fun quadPoint(cal: RackArCalibration, fu: Float, fv: Float): NormPoint {
@@ -26,14 +47,32 @@ object ArProjection {
         return NormPoint(topX + (botX - topX) * fv, topY + (botY - topY) * fv)
     }
 
+    /** Normalised (0..1) point of a cell centre inside the calibration quad, for the 2D PHOTO overlay. */
+    fun cellQuadPoint(
+        calibration: RackArCalibration,
+        col: Int,
+        row: Int,
+        cols: Int,
+        rows: Int,
+        staggered: Boolean,
+    ): NormPoint {
+        val (fu, fv) = gridFraction(col, row, cols, rows, staggered)
+        return quadPoint(calibration, fu, fv)
+    }
+
     /**
+     * Projects every rack cell of the [cols]x[rows] grid through the ARCore camera, given a
+     * [gridFrame] pose whose local X/Z plane carries the grid (centre at the frame origin),
+     * with physical [gridWidthMeters] x [gridHeightMeters] extents.
+     *
      * @param viewMatrix column-major view matrix from `Camera.getViewMatrix`
      * @param projMatrix column-major projection matrix from `Camera.getProjectionMatrix`
      * @param widthPx / @param heightPx size of the AR view in pixels
      */
     fun cellPositions(
-        image: AugmentedImage,
-        calibration: RackArCalibration,
+        gridFrame: Pose,
+        gridWidthMeters: Float,
+        gridHeightMeters: Float,
         cols: Int,
         rows: Int,
         staggered: Boolean,
@@ -42,28 +81,23 @@ object ArProjection {
         widthPx: Int,
         heightPx: Int,
     ): List<CellScreenPos> {
-        if (!calibration.isValid || cols <= 0 || rows <= 0 || widthPx <= 0 || heightPx <= 0) return emptyList()
+        if (cols <= 0 || rows <= 0 || widthPx <= 0 || heightPx <= 0) return emptyList()
+        if (gridWidthMeters <= 0f || gridHeightMeters <= 0f) return emptyList()
 
         val viewProj = FloatArray(16)
         Matrix.multiplyMM(viewProj, 0, projMatrix, 0, viewMatrix, 0)
 
-        val center = image.centerPose
-        val extentX = image.extentX
-        val extentZ = image.extentZ
         val out = FloatArray(4)
         val point = FloatArray(4)
 
         val result = ArrayList<CellScreenPos>(cols * rows)
         for (row in 0 until rows) {
-            val rowShift = if (staggered && row % 2 == 1) 0.5f else 0f
             for (col in 0 until cols) {
-                val fu = (col + 0.5f + rowShift) / (if (staggered) cols + 0.5f else cols.toFloat())
-                val fv = (row + 0.5f) / rows
-                val p = quadPoint(calibration, fu, fv)
-                // Augmented-image local frame: +X right, +Z down the image, +Y is the normal.
-                val localX = (p.x - 0.5f) * extentX
-                val localZ = (p.y - 0.5f) * extentZ
-                val world: Pose = center.compose(Pose.makeTranslation(localX, 0f, localZ))
+                val (fu, fv) = gridFraction(col, row, cols, rows, staggered)
+                // Grid local frame: +X right across the face, +Z down the face, +Y is the normal.
+                val localX = (fu - 0.5f) * gridWidthMeters
+                val localZ = (fv - 0.5f) * gridHeightMeters
+                val world: Pose = gridFrame.compose(Pose.makeTranslation(localX, 0f, localZ))
 
                 point[0] = world.tx(); point[1] = world.ty(); point[2] = world.tz(); point[3] = 1f
                 Matrix.multiplyMV(out, 0, viewProj, 0, point, 0)

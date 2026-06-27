@@ -14,6 +14,8 @@ data class RackEntity(
     val cellsData: String,
     val arImagePath: String? = null,
     val arCalibrationData: String? = null,
+    val arMode: String? = null,
+    val arAnchorData: String? = null,
 )
 
 private const val CELL_SEP = "" // Record Separator
@@ -28,6 +30,8 @@ fun RackEntity.toRack(): Rack = Rack(
     cells = cellsData.split(CELL_SEP).map { it.toRackCell() },
     arImagePath = arImagePath,
     arCalibration = arCalibrationData?.toArCalibration(),
+    arMode = arMode?.let { runCatching { ArMode.valueOf(it) }.getOrNull() } ?: ArMode.PHOTO,
+    arAnchor = arAnchorData?.toArAnchor(),
 )
 
 fun Rack.toEntity(): RackEntity = RackEntity(
@@ -39,6 +43,8 @@ fun Rack.toEntity(): RackEntity = RackEntity(
     cellsData = cells.joinToString(CELL_SEP) { it.toData() },
     arImagePath = arImagePath,
     arCalibrationData = arCalibration?.toData(),
+    arMode = arMode.name,
+    arAnchorData = arAnchor?.toData(),
 )
 
 private fun String.toRackCell(): RackCell {
@@ -73,3 +79,27 @@ private fun String.toArCalibration(): RackArCalibration {
 
 private fun RackArCalibration.toData(): String =
     corners.joinToString(FIELD_SEP) { "${it.x}${FIELD_SEP}${it.y}" }
+
+private fun String.toArAnchor(): RackArAnchor? {
+    val f = split(FIELD_SEP)
+    val markerId = f.getOrNull(0)?.takeIf { it.isNotEmpty() } ?: return null
+    val nums = (1..10).map { f.getOrNull(it)?.toFloatOrNull() }
+    if (nums.any { it == null }) return null
+    return RackArAnchor(
+        markerId = markerId,
+        markerWidthMeters = nums[0]!!,
+        tx = nums[1]!!, ty = nums[2]!!, tz = nums[3]!!,
+        qx = nums[4]!!, qy = nums[5]!!, qz = nums[6]!!, qw = nums[7]!!,
+        gridWidthMeters = nums[8]!!,
+        gridHeightMeters = nums[9]!!,
+    )
+}
+
+private fun RackArAnchor.toData(): String = listOf(
+    markerId,
+    markerWidthMeters.toString(),
+    tx.toString(), ty.toString(), tz.toString(),
+    qx.toString(), qy.toString(), qz.toString(), qw.toString(),
+    gridWidthMeters.toString(),
+    gridHeightMeters.toString(),
+).joinToString(FIELD_SEP)

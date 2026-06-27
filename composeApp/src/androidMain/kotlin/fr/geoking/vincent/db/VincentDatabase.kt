@@ -11,7 +11,7 @@ import androidx.room.RoomDatabase
         ProducerEntity::class,
         SupplierEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class VincentDatabase : RoomDatabase() {
