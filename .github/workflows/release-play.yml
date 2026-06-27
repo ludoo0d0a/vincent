@@ -26,7 +26,7 @@ jobs:
     with:
       package_name: fr.geoking.vincent
       is_workflow_dispatch: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
-      workflow_dispatch_tracks: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tracks || '' }}
+      workflow_dispatch_track: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tracks || '' }}
       workflow_dispatch_skip_review: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.changesNotSentForReview && 'true' || 'false' }}
       version_name_override: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
     secrets: inherit
