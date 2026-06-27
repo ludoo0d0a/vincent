@@ -38,17 +38,18 @@ data class RackArCalibration(val corners: List<NormPoint>) {
 /**
  * How a rack is localised for the AR overlay:
  * - [PHOTO]: no ARCore; a 2D overlay drawn on the frozen reference photo (works everywhere).
- * - [MARKER]: an Augmented Image marker stuck on the rack provides the coordinate frame; the
- *   grid is placed by a fixed metric offset.
- * - [PLANE_ANCHOR]: the grid is placed interactively (tap on detected planes); the resulting
- *   pose is stored relative to a marker beacon so it re-localises across sessions, offline.
+ * - [MARKERS]: two Augmented Image markers (printed and stuck on the rack's top-left and
+ *   bottom-right corners) are detected live; the rack's physical width/height are derived from
+ *   their 3D positions, and the grid is stored relative to the top-left marker beacon so it
+ *   re-localises across sessions, offline.
  */
-enum class ArMode { PHOTO, MARKER, PLANE_ANCHOR }
+enum class ArMode { PHOTO, MARKERS }
 
 /**
- * Persistent AR anchor shared by [ArMode.MARKER] and [ArMode.PLANE_ANCHOR]: a marker image
- * (the re-localisation beacon) plus the transform from the marker frame to the grid origin and
- * the grid's physical dimensions. The transform is a translation + a unit quaternion.
+ * Persistent AR anchor for [ArMode.MARKERS]: the top-left marker image (the re-localisation
+ * beacon) plus the transform from that marker frame to the grid centre and the grid's physical
+ * dimensions (derived from the two detected markers). The transform is a translation + a unit
+ * quaternion.
  */
 data class RackArAnchor(
     val markerId: String,
@@ -82,14 +83,14 @@ data class Rack(
     val arCalibration: RackArCalibration? = null,
     /** Which AR localisation strategy this rack uses. */
     val arMode: ArMode = ArMode.PHOTO,
-    /** Marker + grid transform for [ArMode.MARKER]/[ArMode.PLANE_ANCHOR]; null until calibrated. */
+    /** Marker + grid transform for [ArMode.MARKERS]; null until calibrated. */
     val arAnchor: RackArAnchor? = null,
 ) {
     /** True when this rack has been calibrated for AR in its current [arMode]. */
     val arReady: Boolean
         get() = when (arMode) {
             ArMode.PHOTO -> arImagePath != null && arCalibration?.isValid == true
-            ArMode.MARKER, ArMode.PLANE_ANCHOR -> arAnchor?.isValid == true
+            ArMode.MARKERS -> arAnchor?.isValid == true
         }
     val capacity: Int get() = cols * rows
     val occupiedCount: Int get() = cells.count { it.occupied }

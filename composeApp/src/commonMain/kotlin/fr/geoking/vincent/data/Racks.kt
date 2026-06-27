@@ -55,7 +55,7 @@ object Racks {
         persist(updated)
     }
 
-    /** Attach (or update) the marker anchor used by MARKER / PLANE_ANCHOR modes. */
+    /** Attach (or update) the marker anchor used by the MARKERS mode. */
     fun setArAnchor(index: Int, anchor: RackArAnchor) {
         val rack = all.getOrNull(index) ?: return
         val updated = rack.copy(arAnchor = anchor)

@@ -8,7 +8,7 @@ import kotlin.random.Random
 
 /**
  * Procedurally generates the Augmented Image marker used as the AR coordinate-frame beacon for
- * the MARKER / PLANE_ANCHOR modes. The pattern is deterministic per [markerId] (so the same image
+ * the MARKERS mode. The pattern is deterministic per [markerId] (so the same image
  * is fed to ARCore on every session) and is feature-rich + asymmetric to score well as an ARCore
  * augmented image target. The same bitmap is shown on screen for the user to print and stick on
  * the rack, so no binary asset needs to be bundled.

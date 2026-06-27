@@ -8,29 +8,23 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.Res
-import vincent.composeapp.generated.resources.ar_anchor_need_marker
-import vincent.composeapp.generated.resources.ar_anchor_reset
-import vincent.composeapp.generated.resources.ar_anchor_setup_title
-import vincent.composeapp.generated.resources.ar_anchor_tap_height
-import vincent.composeapp.generated.resources.ar_anchor_tap_origin
-import vincent.composeapp.generated.resources.ar_anchor_tap_width
-import vincent.composeapp.generated.resources.ar_grid_height
-import vincent.composeapp.generated.resources.ar_grid_width
 import vincent.composeapp.generated.resources.ar_install
 import vincent.composeapp.generated.resources.ar_install_action
-import vincent.composeapp.generated.resources.ar_invalid_dimensions
 import vincent.composeapp.generated.resources.ar_low_quality
+import vincent.composeapp.generated.resources.ar_marker_both_found
+import vincent.composeapp.generated.resources.ar_marker_br
+import vincent.composeapp.generated.resources.ar_marker_measured
+import vincent.composeapp.generated.resources.ar_marker_point_br
+import vincent.composeapp.generated.resources.ar_marker_point_tl
 import vincent.composeapp.generated.resources.ar_marker_print
+import vincent.composeapp.generated.resources.ar_marker_recorded
 import vincent.composeapp.generated.resources.ar_marker_searching
 import vincent.composeapp.generated.resources.ar_marker_setup_title
-import vincent.composeapp.generated.resources.ar_marker_width
-import vincent.composeapp.generated.resources.ar_mode_anchor
+import vincent.composeapp.generated.resources.ar_marker_tl
 import vincent.composeapp.generated.resources.ar_mode_marker
 import vincent.composeapp.generated.resources.ar_mode_photo
 import vincent.composeapp.generated.resources.ar_mode_title
 import vincent.composeapp.generated.resources.ar_no_setup
-import vincent.composeapp.generated.resources.ar_offset_x
-import vincent.composeapp.generated.resources.ar_offset_y
 import vincent.composeapp.generated.resources.ar_permission
 import vincent.composeapp.generated.resources.ar_permission_action
 import vincent.composeapp.generated.resources.ar_photo_hint
@@ -41,13 +35,13 @@ import vincent.composeapp.generated.resources.ar_setup_save
 import vincent.composeapp.generated.resources.ar_setup_start
 import vincent.composeapp.generated.resources.ar_setup_title
 import vincent.composeapp.generated.resources.ar_unsupported
+import vincent.composeapp.generated.resources.cellar_spot_label
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,15 +55,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -85,7 +77,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -93,7 +87,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -122,11 +116,12 @@ import fr.geoking.vincent.model.RackArCalibration
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.VCard
+import fr.geoking.vincent.ui.WineBottle
 import io.github.sceneview.ar.ARSceneView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /** Per-frame AR tracking state, mutated in `onSessionUpdated` without reallocation. */
 private class ArFrameHolder {
@@ -175,7 +170,7 @@ actual fun ArScreen(rackIndex: Int, onBack: () -> Unit) {
                 onBack = onBack,
             )
 
-            // Live overlay. PHOTO needs no ARCore; MARKER / PLANE_ANCHOR are gated behind it.
+            // Live overlay. PHOTO needs no ARCore; MARKERS is gated behind it.
             rack.arMode == ArMode.PHOTO -> ArPhotoView(
                 rack = rack,
                 onReconfigure = { setupMode = true },
@@ -275,9 +270,8 @@ private fun ArConfigure(rackIndex: Int, rack: Rack, onDone: () -> Unit, onBack: 
         Box(Modifier.fillMaxWidth().weight(1f)) {
             when (rack.arMode) {
                 ArMode.PHOTO -> ArPhotoSetup(rackIndex, rack, onDone)
-                ArMode.MARKER -> ArMarkerSetup(rackIndex, rack, onDone)
-                ArMode.PLANE_ANCHOR -> ArCoreGate(onBack = onBack) {
-                    ArAnchorSetup(rackIndex, rack, onDone)
+                ArMode.MARKERS -> ArCoreGate(onBack = onBack) {
+                    ArMarkerSetup(rackIndex, rack, onDone)
                 }
             }
         }
@@ -288,8 +282,7 @@ private fun ArConfigure(rackIndex: Int, rack: Rack, onDone: () -> Unit, onBack: 
 private fun ArModeSelector(current: ArMode, onSelect: (ArMode) -> Unit) {
     val options = listOf(
         ArMode.PHOTO to Res.string.ar_mode_photo,
-        ArMode.MARKER to Res.string.ar_mode_marker,
-        ArMode.PLANE_ANCHOR to Res.string.ar_mode_anchor,
+        ArMode.MARKERS to Res.string.ar_mode_marker,
     )
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
@@ -501,7 +494,7 @@ private fun ArPhotoSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
     }
 }
 
-/** MARKER / PLANE_ANCHOR live overlay: tracks the marker beacon and projects the grid onto it. */
+/** MARKERS live overlay: tracks the top-left marker beacon and projects the grid onto it. */
 @Composable
 private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
     val anchor = rack.arAnchor
@@ -641,16 +634,21 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
                         for (col in 0 until rack.cols) {
                             val idx = row * rack.cols + col
                             val cell = rack.cells.getOrNull(idx) ?: continue
-                            if (!cell.occupied) continue
                             val p = ArProjection.cellQuadPoint(calibration, col, row, rack.cols, rack.rows, rack.staggered)
-                            CellSquare(
-                                rack = rack,
-                                cellIndex = idx,
-                                x = p.x * w,
-                                y = p.y * h,
-                                selected = selected == idx,
-                                onClick = { selected = if (selected == idx) -1 else idx },
-                            )
+                            if (cell.occupied) {
+                                CellSquare(
+                                    rack = rack,
+                                    cellIndex = idx,
+                                    x = p.x * w,
+                                    y = p.y * h,
+                                    selected = selected == idx,
+                                    onClick = { selected = if (selected == idx) -1 else idx },
+                                )
+                            } else {
+                                // Thin ring marking a free slot, so the user can check the
+                                // grid alignment against the real (empty) holes on the photo.
+                                EmptySlotMarker(x = p.x * w, y = p.y * h)
+                            }
                         }
                     }
                 }
@@ -658,7 +656,95 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
         }
 
         ArTopBar(onBack = onBack, onReconfigure = onReconfigure)
-        ArHint(stringResource(Res.string.ar_photo_hint))
+        if (selected >= 0) {
+            ArSelectedCard(
+                rack = rack,
+                cellIndex = selected,
+                onDismiss = { selected = -1 },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+            )
+        } else {
+            ArHint(stringResource(Res.string.ar_photo_hint))
+        }
+    }
+}
+
+/** Thin empty ring drawn over a free rack slot in PHOTO mode to verify grid alignment. */
+@Composable
+private fun EmptySlotMarker(x: Float, y: Float) {
+    val density = LocalDensity.current
+    val sizeDp = 22.dp
+    val halfPx = with(density) { sizeDp.toPx() / 2f }
+    Box(
+        Modifier
+            .offset { IntOffset((x - halfPx).roundToInt(), (y - halfPx).roundToInt()) }
+            .size(sizeDp)
+            .clip(CircleShape)
+            .border(1.dp, Color.White.copy(alpha = 0.7f), CircleShape),
+    )
+}
+
+/** Detail card for the tapped bottle in PHOTO mode, mirroring the cellar screen's peek card. */
+@Composable
+private fun ArSelectedCard(
+    rack: Rack,
+    cellIndex: Int,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val cell = rack.cells.getOrNull(cellIndex) ?: return
+    val spot = cellSpotLabel(cellIndex, rack.cols)
+    val bottle = Cellar.bottles.firstOrNull { it.cellarSpot == spot }
+    val categoryLabel = cell.category?.let { stringResource(it.label) }
+    val colorLabel = cell.color?.let { stringResource(it.label) }
+    val title = bottle?.domain ?: categoryLabel ?: colorLabel
+        ?: stringResource(Res.string.cellar_spot_label, spot)
+    val subtitle = buildString {
+        append(spot)
+        (bottle?.vintage ?: cell.vintage)?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+        (bottle?.price ?: cell.price)?.let { append(" · $it €") }
+    }
+    VCard(modifier.fillMaxWidth()) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            WineBottle(
+                cell.color ?: bottle?.color ?: WineColor.RED,
+                Modifier.size(width = 26.dp, height = 40.dp),
+            )
+            Spacer(Modifier.width(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.W800,
+                    color = VincentColors.Fg,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    subtitle,
+                    fontSize = 11.sp,
+                    color = VincentColors.Muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onDismiss),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "\u2715",
+                    color = VincentColors.Muted,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.W700,
+                )
+            }
+        }
     }
 }
 
@@ -695,39 +781,55 @@ private fun CenterPrompt(message: String, actionLabel: String, onAction: () -> U
     }
 }
 
-@Composable
-private fun ArNumberField(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            focusedBorderColor = VincentColors.Accent,
-            unfocusedBorderColor = Color.White.copy(alpha = 0.4f),
-            focusedLabelColor = VincentColors.Accent,
-            unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-            cursorColor = VincentColors.Accent,
-        ),
-    )
+private const val MARKER_WIDTH_METERS = 0.10f
+
+private fun tlMarkerId(rackId: String) = "$rackId-tl"
+private fun brMarkerId(rackId: String) = "$rackId-br"
+
+/** Per-frame state for the two-marker capture, mutated in `onSessionUpdated` without reallocation. */
+private class ArMarkerSetupHolder {
+    var tlPose: Pose? = null
+    var brPose: Pose? = null
+    val view = FloatArray(16)
+    val proj = FloatArray(16)
 }
 
-/** MARKER setup: print the marker, enter its size and the rack dimensions / offset. */
 @Composable
-private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
-    val markerBitmap = remember(rack.id) { MarkerImages.bitmap(rack.id).asImageBitmap() }
-    val existing = rack.arAnchor
-    var markerW by remember { mutableStateOf(existing?.let { (it.markerWidthMeters * 100f).toCmString() } ?: "10") }
-    var gridW by remember { mutableStateOf(existing?.let { (it.gridWidthMeters * 100f).toCmString() } ?: "") }
-    var gridH by remember { mutableStateOf(existing?.let { (it.gridHeightMeters * 100f).toCmString() } ?: "") }
-    var offX by remember { mutableStateOf(existing?.let { (it.tx * 100f).toCmString() } ?: "0") }
-    var offY by remember { mutableStateOf(existing?.let { (it.tz * 100f).toCmString() } ?: "0") }
-    var error by remember { mutableStateOf(false) }
+private fun MarkerStatusChip(label: String, recorded: Boolean) {
+    val bg = if (recorded) Color(0xFF35C46B) else Color.Black.copy(alpha = 0.55f)
+    Box(
+        Modifier.clip(RoundedCornerShape(20.dp)).background(bg).padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            (if (recorded) "\u2713 " else "") + label,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.W700,
+        )
+    }
+}
 
+@Composable
+private fun MarkerPrintTile(label: String, bitmap: androidx.compose.ui.graphics.ImageBitmap, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700)
+        Spacer(Modifier.height(6.dp))
+        Image(
+            bitmap = bitmap,
+            contentDescription = null,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+/** Pre-capture screen: shows the two markers to print before launching the live camera. */
+@Composable
+private fun ArMarkerPrint(
+    tl: androidx.compose.ui.graphics.ImageBitmap,
+    br: androidx.compose.ui.graphics.ImageBitmap,
+    onStart: () -> Unit,
+) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
@@ -743,179 +845,191 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
             color = Color.White.copy(alpha = 0.8f),
             fontSize = 12.sp,
         )
-        Spacer(Modifier.height(10.dp))
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Image(
-                bitmap = markerBitmap,
-                contentDescription = null,
-                modifier = Modifier.size(170.dp).clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Fit,
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        ArNumberField(stringResource(Res.string.ar_marker_width), markerW) { markerW = it }
-        ArNumberField(stringResource(Res.string.ar_grid_width), gridW) { gridW = it }
-        ArNumberField(stringResource(Res.string.ar_grid_height), gridH) { gridH = it }
-        ArNumberField(stringResource(Res.string.ar_offset_x), offX) { offX = it }
-        ArNumberField(stringResource(Res.string.ar_offset_y), offY) { offY = it }
-        if (error) {
-            Text(
-                stringResource(Res.string.ar_invalid_dimensions),
-                color = VincentColors.Accent,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
         Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MarkerPrintTile(stringResource(Res.string.ar_marker_tl), tl, Modifier.weight(1f))
+            MarkerPrintTile(stringResource(Res.string.ar_marker_br), br, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(16.dp))
         Button(
-            onClick = {
-                val mw = markerW.cmToMeters()
-                val gw = gridW.cmToMeters()
-                val gh = gridH.cmToMeters()
-                val ox = offX.cmToMetersSigned()
-                val oy = offY.cmToMetersSigned()
-                if (mw == null || gw == null || gh == null || mw <= 0f || gw <= 0f || gh <= 0f) {
-                    error = true
-                } else {
-                    Racks.setArAnchor(
-                        rackIndex,
-                        RackArAnchor(
-                            markerId = rack.id,
-                            markerWidthMeters = mw,
-                            tx = ox, ty = 0f, tz = oy,
-                            qx = 0f, qy = 0f, qz = 0f, qw = 1f,
-                            gridWidthMeters = gw,
-                            gridHeightMeters = gh,
-                        ),
-                    )
-                    onDone()
-                }
-            },
+            onClick = onStart,
             colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent),
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(Res.string.ar_setup_save), fontWeight = FontWeight.W700) }
+        ) { Text(stringResource(Res.string.ar_setup_start), fontWeight = FontWeight.W700) }
     }
 }
 
-/** Per-frame state for the anchor placement, mutated in `onSessionUpdated`. */
-private class AnchorSetupHolder {
-    var pendingX = -1f
-    var pendingY = -1f
-    val points = ArrayList<FloatArray>(3)
-    var markerPose: Pose? = null
-    var markerVisible = false
-}
-
 /**
- * PLANE_ANCHOR setup: while the marker beacon is visible, the user taps the rack's top-left,
- * top-right and bottom-left corners on detected planes. The resulting grid frame is stored
- * relative to the marker so it re-localises across sessions.
+ * MARKERS setup. The user prints two markers, sticks them on the rack's top-left and bottom-right
+ * corners, then sweeps the camera over them. ARCore tracks both Augmented Images; their 3D
+ * positions give the rack's physical width/height (no measurement is typed). Each marker is
+ * confirmed when first detected and the spanned zone is highlighted live.
  */
 @Composable
-private fun ArAnchorSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
-    val markerBitmap = remember(rack.id) { MarkerImages.bitmap(rack.id) }
-    var markerW by remember { mutableStateOf("10") }
-    val markerWMeters = markerW.cmToMeters()?.takeIf { it > 0f } ?: 0.1f
+private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
+    val tlId = remember(rack.id) { tlMarkerId(rack.id) }
+    val brId = remember(rack.id) { brMarkerId(rack.id) }
+    val tlBitmap = remember(tlId) { MarkerImages.bitmap(tlId) }
+    val brBitmap = remember(brId) { MarkerImages.bitmap(brId) }
 
-    val holder = remember { AnchorSetupHolder() }
+    var started by remember { mutableStateOf(false) }
+    if (!started) {
+        ArMarkerPrint(
+            tl = tlBitmap.asImageBitmap(),
+            br = brBitmap.asImageBitmap(),
+            onStart = { started = true },
+        )
+        return
+    }
+
+    val holder = remember { ArMarkerSetupHolder() }
     var tick by remember { mutableIntStateOf(0) }
+    var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var lowQuality by remember { mutableStateOf(false) }
 
-    Box(Modifier.fillMaxSize()) {
+    var tlRecorded by remember { mutableStateOf(false) }
+    var brRecorded by remember { mutableStateOf(false) }
+    var toast by remember { mutableStateOf<String?>(null) }
+
+    Box(Modifier.fillMaxSize().onSizeChanged { viewSize = it }) {
         ARSceneView(
             modifier = Modifier.fillMaxSize(),
-            planeRenderer = true,
+            planeRenderer = false,
             sessionConfiguration = { session, config ->
                 try {
                     val db = AugmentedImageDatabase(session)
-                    db.addImage(rack.id, markerBitmap, markerWMeters)
+                    db.addImage(tlId, tlBitmap, MARKER_WIDTH_METERS)
+                    db.addImage(brId, brBitmap, MARKER_WIDTH_METERS)
                     config.augmentedImageDatabase = db
                 } catch (_: Exception) {
                     lowQuality = true
                 }
-                config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                 config.focusMode = Config.FocusMode.AUTO
                 config.lightEstimationMode = Config.LightEstimationMode.DISABLED
             },
             onSessionUpdated = { _, frame ->
                 val cam = frame.camera
                 if (cam.trackingState == TrackingState.TRACKING) {
-                    val mk = frame.getUpdatedTrackables(AugmentedImage::class.java)
-                        .firstOrNull { it.name == rack.id && it.trackingState == TrackingState.TRACKING }
-                    holder.markerVisible = mk != null
-                    if (mk != null) holder.markerPose = mk.centerPose
-
-                    if (holder.pendingX >= 0f && holder.points.size < 3) {
-                        try {
-                            val hit = frame.hitTest(holder.pendingX, holder.pendingY).firstOrNull()
-                            if (hit != null) {
-                                val p = hit.hitPose
-                                holder.points.add(floatArrayOf(p.tx(), p.ty(), p.tz()))
+                    cam.getViewMatrix(holder.view, 0)
+                    cam.getProjectionMatrix(holder.proj, 0, 0.1f, 100f)
+                    frame.getUpdatedTrackables(AugmentedImage::class.java).forEach { img ->
+                        if (img.trackingState == TrackingState.TRACKING) {
+                            when (img.name) {
+                                tlId -> holder.tlPose = img.centerPose
+                                brId -> holder.brPose = img.centerPose
                             }
-                        } catch (_: Exception) {
                         }
-                        holder.pendingX = -1f
-                        holder.pendingY = -1f
                     }
                     tick++
                 }
             },
         )
 
-        // Tap capture overlay (same bounds as the AR view, so offsets map to hit-test pixels).
-        Box(
-            Modifier.fillMaxSize().pointerInput(Unit) {
-                detectTapGestures { off -> holder.pendingX = off.x; holder.pendingY = off.y }
-            },
-        )
+        val tlPose = if (tick >= 0) holder.tlPose else null
+        val brPose = if (tick >= 0) holder.brPose else null
+        val tlSeen = tlPose != null
+        val brSeen = brPose != null
+        val measure = if (tlPose != null && brPose != null) measureFromMarkers(tlPose, brPose) else null
 
-        val step = if (tick >= 0) holder.points.size else 0
+        val tlLabel = stringResource(Res.string.ar_marker_tl)
+        val brLabel = stringResource(Res.string.ar_marker_br)
+        val tlMsg = stringResource(Res.string.ar_marker_recorded, tlLabel)
+        val brMsg = stringResource(Res.string.ar_marker_recorded, brLabel)
+        LaunchedEffect(tlSeen) { if (tlSeen && !tlRecorded) { tlRecorded = true; toast = tlMsg } }
+        LaunchedEffect(brSeen) { if (brSeen && !brRecorded) { brRecorded = true; toast = brMsg } }
+        LaunchedEffect(toast) { if (toast != null) { delay(1800); toast = null } }
+
+        if (viewSize.width > 0 && viewSize.height > 0) {
+            Canvas(Modifier.fillMaxSize()) {
+                if (measure != null) {
+                    val pts = measure.corners.map {
+                        ArProjection.projectWorldPoint(it, holder.view, holder.proj, viewSize.width, viewSize.height)
+                    }
+                    if (pts.all { it.visible }) {
+                        val path = Path().apply {
+                            moveTo(pts[0].x, pts[0].y)
+                            for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
+                            close()
+                        }
+                        drawPath(path, Color(0x4635C46B))
+                        drawPath(path, Color(0xFF35C46B), style = Stroke(width = 5f))
+                    }
+                }
+                listOf(tlPose, brPose).forEach { pose ->
+                    if (pose != null) {
+                        val sp = ArProjection.projectWorldPoint(
+                            floatArrayOf(pose.tx(), pose.ty(), pose.tz()),
+                            holder.view, holder.proj, viewSize.width, viewSize.height,
+                        )
+                        if (sp.visible) drawCircle(Color(0xFF35C46B), 9.dp.toPx(), Offset(sp.x, sp.y))
+                    }
+                }
+            }
+        }
+
         val instruction = when {
-            !holder.markerVisible -> stringResource(Res.string.ar_anchor_need_marker)
-            step == 0 -> stringResource(Res.string.ar_anchor_tap_origin)
-            step == 1 -> stringResource(Res.string.ar_anchor_tap_width)
-            step == 2 -> stringResource(Res.string.ar_anchor_tap_height)
-            else -> stringResource(Res.string.ar_anchor_setup_title)
+            tlSeen && brSeen -> stringResource(Res.string.ar_marker_both_found)
+            tlSeen -> stringResource(Res.string.ar_marker_point_br)
+            else -> stringResource(Res.string.ar_marker_point_tl)
         }
 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().padding(top = 56.dp), contentAlignment = Alignment.TopCenter) {
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                ) { Text(instruction, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W600) }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    ) { Text(instruction, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W600) }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MarkerStatusChip(tlLabel, tlSeen)
+                        MarkerStatusChip(brLabel, brSeen)
+                    }
+                    val t = toast
+                    if (t != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF35C46B).copy(alpha = 0.92f))
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                        ) { Text(t, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700) }
+                    }
+                }
             }
             Spacer(Modifier.weight(1f))
-            Row(
-                Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.weight(1f)) {
-                    ArNumberField(stringResource(Res.string.ar_marker_width), markerW) { markerW = it }
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                if (measure != null) {
+                    Text(
+                        stringResource(
+                            Res.string.ar_marker_measured,
+                            (measure.widthM * 100f).roundToInt(),
+                            (measure.heightM * 100f).roundToInt(),
+                        ),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.W700,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
                 }
-                if (step > 0) {
-                    Button(
-                        onClick = { holder.points.clear(); tick++ },
-                        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
-                    ) { Text(stringResource(Res.string.ar_anchor_reset), color = Color.White, fontSize = 12.sp) }
-                }
-                if (step >= 3) {
-                    Button(
-                        onClick = {
-                            val anchor = buildAnchorFromTaps(rack.id, markerWMeters, holder)
+                Button(
+                    onClick = {
+                        val tp = holder.tlPose
+                        val bp = holder.brPose
+                        if (tp != null && bp != null) {
+                            val anchor = buildAnchorFromMarkers(tlId, tp, bp)
                             if (anchor != null) {
                                 Racks.setArAnchor(rackIndex, anchor)
                                 onDone()
-                            } else {
-                                holder.points.clear(); tick++
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent),
-                    ) { Text(stringResource(Res.string.ar_setup_save), fontWeight = FontWeight.W700) }
-                }
+                        }
+                    },
+                    enabled = measure != null,
+                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(Res.string.ar_setup_save), fontWeight = FontWeight.W700) }
             }
         }
 
@@ -923,88 +1037,62 @@ private fun ArAnchorSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
     }
 }
 
-private fun buildAnchorFromTaps(markerId: String, markerWidthMeters: Float, holder: AnchorSetupHolder): RackArAnchor? {
-    val mk = holder.markerPose ?: return null
-    if (holder.points.size < 3) return null
-    val o = holder.points[0]
-    val wEnd = holder.points[1]
-    val hEnd = holder.points[2]
-    val widthVec = vSub(wEnd, o)
-    val heightVec = vSub(hEnd, o)
-    val gw = vLen(widthVec)
-    val gh = vLen(heightVec)
-    if (gw < 0.02f || gh < 0.02f) return null
+private class MarkerMeasure(val widthM: Float, val heightM: Float, val corners: List<FloatArray>)
 
-    val ex = vNorm(widthVec)
-    val hProj = vSub(heightVec, vScale(ex, vDot(heightVec, ex)))
-    val ez = vNorm(hProj)
-    if (vLen(ez) < 1e-3f) return null
-    val ey = vCross(ez, ex)
+/** Derives the rack rectangle from the two marker centre poses, in the top-left marker's plane. */
+private fun measureFromMarkers(tlPose: Pose, brPose: Pose): MarkerMeasure? {
+    val pTl = floatArrayOf(tlPose.tx(), tlPose.ty(), tlPose.tz())
+    val pBr = floatArrayOf(brPose.tx(), brPose.ty(), brPose.tz())
+    val ex = tlPose.axis(1f, 0f, 0f) // +X right across the rack face
+    val ez = tlPose.axis(0f, 0f, 1f) // +Z down the rack face
+    val d = vSub(pBr, pTl)
+    val width = kotlin.math.abs(vDot(d, ex))
+    val height = kotlin.math.abs(vDot(d, ez))
+    if (width < 0.02f || height < 0.02f) return null
+    val exW = vScale(ex, width)
+    val ezH = vScale(ez, height)
+    val corners = listOf(
+        pTl,
+        vAdd(pTl, exW),
+        vAdd(vAdd(pTl, exW), ezH),
+        vAdd(pTl, ezH),
+    )
+    return MarkerMeasure(width, height, corners)
+}
 
-    val center = vAdd(o, vAdd(vScale(widthVec, 0.5f), vScale(heightVec, 0.5f)))
-    val quat = quaternionFromAxes(ex, ey, ez)
-    val anchorPose = Pose(center, quat)
-    val relative = mk.inverse().compose(anchorPose)
-
-    val rt = FloatArray(3)
-    relative.getTranslation(rt, 0)
+/**
+ * Builds the persistent anchor from the two markers: the grid frame is centred on the rectangle
+ * and shares the top-left marker's orientation, stored relative to that marker (the live beacon).
+ */
+private fun buildAnchorFromMarkers(markerId: String, tlPose: Pose, brPose: Pose): RackArAnchor? {
+    val measure = measureFromMarkers(tlPose, brPose) ?: return null
+    val center = vScale(vAdd(measure.corners[0], measure.corners[2]), 0.5f)
     val rq = FloatArray(4)
-    relative.getRotationQuaternion(rq, 0)
-
+    tlPose.getRotationQuaternion(rq, 0)
+    val gridCenterPose = Pose(center, rq)
+    val relative = tlPose.inverse().compose(gridCenterPose)
+    val rt = FloatArray(3); relative.getTranslation(rt, 0)
+    val rrq = FloatArray(4); relative.getRotationQuaternion(rrq, 0)
     return RackArAnchor(
         markerId = markerId,
-        markerWidthMeters = markerWidthMeters,
+        markerWidthMeters = MARKER_WIDTH_METERS,
         tx = rt[0], ty = rt[1], tz = rt[2],
-        qx = rq[0], qy = rq[1], qz = rq[2], qw = rq[3],
-        gridWidthMeters = gw,
-        gridHeightMeters = gh,
+        qx = rrq[0], qy = rrq[1], qz = rrq[2], qw = rrq[3],
+        gridWidthMeters = measure.widthM,
+        gridHeightMeters = measure.heightM,
     )
 }
 
-private fun String.cmToMeters(): Float? = trim().replace(',', '.').toFloatOrNull()?.let { it / 100f }
-private fun String.cmToMetersSigned(): Float = cmToMeters() ?: 0f
-private fun Float.toCmString(): String = this.roundToInt().toString()
+private fun Pose.axis(x: Float, y: Float, z: Float): FloatArray {
+    val out = FloatArray(3)
+    rotateVector(floatArrayOf(x, y, z), 0, out, 0)
+    return out
+}
 
 private fun vSub(a: FloatArray, b: FloatArray) = floatArrayOf(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 private fun vAdd(a: FloatArray, b: FloatArray) = floatArrayOf(a[0] + b[0], a[1] + b[1], a[2] + b[2])
 private fun vScale(a: FloatArray, s: Float) = floatArrayOf(a[0] * s, a[1] * s, a[2] * s)
 private fun vDot(a: FloatArray, b: FloatArray) = a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-private fun vLen(a: FloatArray) = sqrt(vDot(a, a))
-private fun vNorm(a: FloatArray): FloatArray {
-    val l = vLen(a)
-    return if (l > 1e-6f) floatArrayOf(a[0] / l, a[1] / l, a[2] / l) else floatArrayOf(0f, 0f, 0f)
-}
-private fun vCross(a: FloatArray, b: FloatArray) = floatArrayOf(
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-)
-
-/** Quaternion (x, y, z, w) from a rotation whose columns are the world directions of the local axes. */
-private fun quaternionFromAxes(ex: FloatArray, ey: FloatArray, ez: FloatArray): FloatArray {
-    val m00 = ex[0]; val m10 = ex[1]; val m20 = ex[2]
-    val m01 = ey[0]; val m11 = ey[1]; val m21 = ey[2]
-    val m02 = ez[0]; val m12 = ez[1]; val m22 = ez[2]
-    val trace = m00 + m11 + m22
-    return when {
-        trace > 0f -> {
-            val s = sqrt(trace + 1f) * 2f
-            floatArrayOf((m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s, 0.25f * s)
-        }
-        m00 > m11 && m00 > m22 -> {
-            val s = sqrt(1f + m00 - m11 - m22) * 2f
-            floatArrayOf(0.25f * s, (m01 + m10) / s, (m02 + m20) / s, (m21 - m12) / s)
-        }
-        m11 > m22 -> {
-            val s = sqrt(1f + m11 - m00 - m22) * 2f
-            floatArrayOf((m01 + m10) / s, 0.25f * s, (m12 + m21) / s, (m02 - m20) / s)
-        }
-        else -> {
-            val s = sqrt(1f + m22 - m00 - m11) * 2f
-            floatArrayOf((m02 + m20) / s, (m12 + m21) / s, 0.25f * s, (m10 - m01) / s)
-        }
-    }
-}
 
 /** PHOTO mode marker: a fixed-size square showing only the bottle's position (no text, no image). */
 @Composable

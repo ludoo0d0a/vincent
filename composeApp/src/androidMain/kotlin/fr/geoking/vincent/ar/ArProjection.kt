@@ -12,10 +12,38 @@ data class CellScreenPos(val cellIndex: Int, val x: Float, val y: Float, val vis
 /**
  * Maps each rack cell to a position. Two paths share the same grid layout:
  * - [cellQuadPoint] for the 2D PHOTO mode (bilinear point inside the calibration quad).
- * - [cellPositions] for MARKER / PLANE_ANCHOR modes (3D grid frame projected through the camera).
+ * - [cellPositions] for MARKERS mode (3D grid frame projected through the camera).
  * Pure math, no rendering.
  */
 object ArProjection {
+
+    /**
+     * Projects a single world-space [point] (x, y, z, in metres) through the camera, returning its
+     * pixel position and whether it is in front of and roughly within the viewport. Shares the
+     * NDC->screen logic with [cellPositions]; used to draw the marked zone overlay during setup.
+     */
+    fun projectWorldPoint(
+        point: FloatArray,
+        viewMatrix: FloatArray,
+        projMatrix: FloatArray,
+        widthPx: Int,
+        heightPx: Int,
+    ): CellScreenPos {
+        if (widthPx <= 0 || heightPx <= 0) return CellScreenPos(-1, 0f, 0f, false)
+        val viewProj = FloatArray(16)
+        Matrix.multiplyMM(viewProj, 0, projMatrix, 0, viewMatrix, 0)
+        val out = FloatArray(4)
+        val p = floatArrayOf(point[0], point[1], point[2], 1f)
+        Matrix.multiplyMV(out, 0, viewProj, 0, p, 0)
+        val w = out[3]
+        if (w <= 0f) return CellScreenPos(-1, 0f, 0f, false)
+        val ndcX = out[0] / w
+        val ndcY = out[1] / w
+        val sx = (ndcX * 0.5f + 0.5f) * widthPx
+        val sy = (1f - (ndcY * 0.5f + 0.5f)) * heightPx
+        val onScreen = ndcX in -1.2f..1.2f && ndcY in -1.2f..1.2f
+        return CellScreenPos(-1, sx, sy, onScreen)
+    }
 
     /**
      * Grid fraction (fu, fv) in 0..1 for the centre of the cell at [col],[row], honouring the
