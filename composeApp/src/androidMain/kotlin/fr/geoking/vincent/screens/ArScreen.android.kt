@@ -442,11 +442,24 @@ private fun ArLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit
                     calibration = calibration,
                     cols = rack.cols,
                     rows = rack.rows,
+                    staggered = rack.staggered,
                     viewMatrix = holder.view,
                     projMatrix = holder.proj,
                     widthPx = viewSize.width,
                     heightPx = viewSize.height,
                 )
+                // Draw matrix: small dots for all visible cells.
+                Canvas(Modifier.fillMaxSize()) {
+                    positions.forEach { pos ->
+                        if (pos.visible) {
+                            drawCircle(
+                                color = Color.White.copy(alpha = 0.45f),
+                                radius = 4.dp.toPx(),
+                                center = Offset(pos.x, pos.y),
+                            )
+                        }
+                    }
+                }
                 positions.forEach { pos ->
                     val cell = rack.cells.getOrNull(pos.cellIndex)
                     if (pos.visible && cell != null && cell.occupied) {
@@ -487,32 +500,47 @@ private fun CellChip(rack: Rack, cellIndex: Int, x: Float, y: Float) {
     val color: WineColor? = cell.color ?: bottle?.color
     val chipColor = color?.glass ?: VincentColors.Accent
 
-    val halfW = with(density) { 46.dp.toPx() }
-    val halfH = with(density) { 16.dp.toPx() }
+    val halfW = with(density) { 62.dp.toPx() }
+    val halfH = with(density) { 24.dp.toPx() }
 
     Box(
         Modifier
             .offset { IntOffset((x - halfW).roundToInt(), (y - halfH).roundToInt()) }
-            .width(92.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.Black.copy(alpha = 0.62f))
-            .border(1.5.dp, chipColor, RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .width(124.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.Black.copy(alpha = 0.68f))
+            .border(1.5.dp, chipColor, RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
-        Column {
-            Text(spot, color = chipColor, fontSize = 11.sp, fontWeight = FontWeight.W800)
-            if (name != null) {
-                Text(name, color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            val sub = buildString {
-                if (vintage != null) append(vintage)
-                if (price != null) {
-                    if (isNotEmpty()) append(" \u00B7 ")
-                    append("$price\u20AC")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            fr.geoking.vincent.ui.WineBottle(
+                color = color ?: WineColor.RED,
+                modifier = Modifier.size(width = 18.dp, height = 28.dp),
+                showLabel = true,
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(spot, color = chipColor, fontSize = 11.sp, fontWeight = FontWeight.W900)
+                if (name != null) {
+                    Text(
+                        name,
+                        color = Color.White,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.W600,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-            }
-            if (sub.isNotEmpty()) {
-                Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 10.sp)
+                val sub = buildString {
+                    if (vintage != null) append(vintage)
+                    if (price != null) {
+                        if (isNotEmpty()) append(" \u00B7 ")
+                        append("$price\u20AC")
+                    }
+                }
+                if (sub.isNotEmpty()) {
+                    Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 10.sp)
+                }
             }
         }
     }
