@@ -61,7 +61,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,7 +94,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -571,7 +569,7 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
                 positions.forEach { pos ->
                     val cell = rack.cells.getOrNull(pos.cellIndex)
                     if (pos.visible && cell != null && cell.occupied) {
-                        CellChip(rack, pos.cellIndex, pos.x, pos.y)
+                        CellSquare(rack, pos.cellIndex, pos.x, pos.y)
                     }
                 }
             } else {
@@ -1032,74 +1030,9 @@ private fun CellSquare(
         Modifier
             .offset { IntOffset((x - halfPx).roundToInt(), (y - halfPx).roundToInt()) }
             .size(sizeDp)
+            .clip(RoundedCornerShape(7.dp))
             .background(squareColor.copy(alpha = if (selected) 0.85f else 0.5f))
-            .border(if (selected) 2.5.dp else 1.5.dp, squareColor)
+            .border(if (selected) 2.5.dp else 1.5.dp, squareColor, RoundedCornerShape(7.dp))
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
     )
-}
-
-@Composable
-private fun CellChip(
-    rack: Rack,
-    cellIndex: Int,
-    x: Float,
-    y: Float,
-    selected: Boolean = false,
-    onClick: (() -> Unit)? = null,
-) {
-    val density = LocalDensity.current
-    val cell = rack.cells.getOrNull(cellIndex) ?: return
-    val spot = cellSpotLabel(cellIndex, rack.cols)
-    val bottle = Cellar.bottles.firstOrNull { it.cellarSpot == spot }
-    val name = bottle?.domain
-    val vintage = cell.vintage ?: bottle?.vintage
-    val price = cell.price ?: bottle?.price
-    val color: WineColor? = cell.color ?: bottle?.color
-    val chipColor = color?.glass ?: VincentColors.Accent
-
-    val halfW = with(density) { 62.dp.toPx() }
-    val halfH = with(density) { 24.dp.toPx() }
-
-    Box(
-        Modifier
-            .offset { IntOffset((x - halfW).roundToInt(), (y - halfH).roundToInt()) }
-            .width(124.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color.Black.copy(alpha = if (selected) 0.85f else 0.68f))
-            .border(if (selected) 2.5.dp else 1.5.dp, chipColor, RoundedCornerShape(10.dp))
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            fr.geoking.vincent.ui.WineBottle(
-                color = color ?: WineColor.RED,
-                modifier = Modifier.size(width = 18.dp, height = 28.dp),
-                showLabel = true,
-            )
-            Spacer(Modifier.width(8.dp))
-            Column {
-                Text(spot, color = chipColor, fontSize = 11.sp, fontWeight = FontWeight.W900)
-                if (name != null) {
-                    Text(
-                        name,
-                        color = Color.White,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.W600,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                val sub = buildString {
-                    if (vintage != null) append(vintage)
-                    if (price != null) {
-                        if (isNotEmpty()) append(" \u00B7 ")
-                        append("$price\u20AC")
-                    }
-                }
-                if (sub.isNotEmpty()) {
-                    Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 10.sp)
-                }
-            }
-        }
-    }
 }
