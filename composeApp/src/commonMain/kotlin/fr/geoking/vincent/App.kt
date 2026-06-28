@@ -61,6 +61,7 @@ import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SettingsScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
+import fr.geoking.vincent.screens.RackEditScreen
 import fr.geoking.vincent.screens.SuppliersScreen
 import fr.geoking.vincent.debug.HttpDebugBar
 import fr.geoking.vincent.debug.initHttpDebug
@@ -89,6 +90,8 @@ private sealed interface Dest {
     data object Logcat : Dest
     /** AR view of the rack at [rackIndex]. */
     data class Ar(val rackIndex: Int) : Dest
+    /** Edit the rack at [rackIndex]. */
+    data class RackEdit(val rackIndex: Int) : Dest
 }
 
 @Composable
@@ -97,6 +100,7 @@ fun App() = VincentTheme {
     var guest by remember { mutableStateOf(false) }
     val loggedIn = Auth.account != null || guest
     var tab by remember { mutableStateOf(Tab.HOME) }
+    var cellarRackIdx by remember { mutableStateOf(0) }
     // Real navigation stack above the tabbed home; back pops one level.
     val stack = remember { mutableStateListOf<Dest>() }
     fun pop() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
@@ -124,6 +128,8 @@ fun App() = VincentTheme {
                 null -> MainScaffold(
                     tab = tab,
                     onTab = { tab = it },
+                    cellarRackIdx = cellarRackIdx,
+                    onCellarRackIdxChange = { cellarRackIdx = it },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                     onOpenRecent = { stack.add(Dest.Recent) },
                     onOpenFavorites = { stack.add(Dest.Favorites) },
@@ -131,6 +137,7 @@ fun App() = VincentTheme {
                     onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
                     onOpenAr = { stack.add(Dest.Ar(it)) },
+                    onEditRack = { stack.add(Dest.RackEdit(it)) },
                 )
 
                 is Dest.Detail -> BottleDetailScreen(
@@ -169,6 +176,15 @@ fun App() = VincentTheme {
                 Dest.Logcat -> LogcatScreen(onBack = ::pop)
 
                 is Dest.Ar -> ArScreen(rackIndex = top.rackIndex, onBack = ::pop)
+
+                is Dest.RackEdit -> RackEditScreen(
+                    rackIndex = top.rackIndex,
+                    onBack = ::pop,
+                    onSwitchedToRack = { index ->
+                        cellarRackIdx = index
+                        tab = Tab.CELLAR
+                    }
+                )
 
                 Dest.Recent -> RecentScreen(
                     onBack = ::pop,
@@ -246,6 +262,8 @@ private fun UpdateDownloadBanner(progress: Float?, modifier: Modifier = Modifier
 private fun MainScaffold(
     tab: Tab,
     onTab: (Tab) -> Unit,
+    cellarRackIdx: Int,
+    onCellarRackIdxChange: (Int) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
     onOpenRecent: () -> Unit,
     onOpenFavorites: () -> Unit,
@@ -253,6 +271,7 @@ private fun MainScaffold(
     onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
     onOpenAr: (Int) -> Unit,
+    onEditRack: (Int) -> Unit,
 ) {
     Scaffold(
         containerColor = VincentColors.Bg,
@@ -293,7 +312,15 @@ private fun MainScaffold(
         val content = Modifier.padding(inner)
         when (tab) {
             Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onOpenRecent = onOpenRecent, onAccount = onAccount)
-            Tab.CELLAR -> CellarScreen(content, onOpenBottle = onOpenBottle, onAddToCell = onAddToCell, onOpenAr = onOpenAr)
+            Tab.CELLAR -> CellarScreen(
+                content,
+                rackIdx = cellarRackIdx,
+                onRackIdxChange = onCellarRackIdxChange,
+                onOpenBottle = onOpenBottle,
+                onAddToCell = onAddToCell,
+                onOpenAr = onOpenAr,
+                onEditRack = onEditRack
+            )
             Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, onOpenFavorites = onOpenFavorites)
         }
     }
