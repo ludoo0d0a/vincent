@@ -100,9 +100,9 @@ private sealed interface ScanMessage {
 }
 
 @Composable
-fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
+fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, editingBottle: Bottle? = null) {
     // Opened from an empty rack cell → start on the manual form with the spot pre-filled.
-    var mode by remember { mutableStateOf(if (initialPlacement != null) AddMode.MANUAL else AddMode.IDENTIFY) }
+    var mode by remember { mutableStateOf(if (initialPlacement != null || editingBottle != null) AddMode.MANUAL else AddMode.IDENTIFY) }
     val recognizer = wineRecognizer()
     val estimator = priceEstimator()
     val scope = rememberCoroutineScope()
@@ -113,14 +113,40 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
     // Optional placement chosen in the manual wizard: (rackIndex, cellIndex).
     var manualPlacement by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var manualSeed by remember {
-        mutableStateOf(initialPlacement?.let { p ->
-            val rack = Racks.all.getOrNull(p.rackIndex)
-            ManualSeed(
-                spot = rack?.let { p.spotLabel(it.cols) }.orEmpty(),
-                placeRack = p.rackIndex,
-                placeCell = p.cellIndex,
-            )
-        })
+        mutableStateOf(
+            editingBottle?.let { b ->
+                var foundRack: Int? = null
+                var foundCell: Int? = null
+                if (b.cellarSpot.isNotBlank()) {
+                    for ((ri, rack) in Racks.all.withIndex()) {
+                        val ci = cellIndexFromSpot(b.cellarSpot, rack.cols)
+                        if (ci != null && ci in rack.cells.indices && rack.cells[ci].occupied) {
+                            foundRack = ri
+                            foundCell = ci
+                            break
+                        }
+                    }
+                }
+                ManualSeed(
+                    domain = b.domain,
+                    appellation = b.appellation,
+                    color = b.color,
+                    category = b.category,
+                    vintage = if (b.vintage == "NM") "" else b.vintage,
+                    price = if (b.price > 0) b.price.toString() else "",
+                    spot = b.cellarSpot,
+                    placeRack = foundRack,
+                    placeCell = foundCell,
+                )
+            } ?: initialPlacement?.let { p ->
+                val rack = Racks.all.getOrNull(p.rackIndex)
+                ManualSeed(
+                    spot = rack?.let { p.spotLabel(it.cols) }.orEmpty(),
+                    placeRack = p.rackIndex,
+                    placeCell = p.cellIndex,
+                )
+            }
+        )
     }
     var scanMsg by remember { mutableStateOf<ScanMessage?>(null) }
     var aiError by remember { mutableStateOf<String?>(null) }
@@ -286,10 +312,14 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
 
         // Only enabled once we have a real bottle: AI-recognised (scan/photo/voice)
         // or a manually filled form. No more hardcoded fallback.
-        val ready: Bottle? = if (mode == AddMode.MANUAL) manualBottle
+        val ready: Bottle? = if (mode == AddMode.MANUAL) manualBottle?.let { if (editingBottle != null) it.copy(id = editingBottle.id) else it }
             else aiBottle?.let { it.copy(price = aiPrice?.amountEur ?: it.price, photoLabel = capturedLabelUri ?: it.photoLabel) }
         val buttonLabel = when {
-            ready != null -> if (mode == AddMode.MANUAL) stringResource(Res.string.add_to_cellar) else stringResource(Res.string.add_confirm)
+            ready != null -> when {
+                editingBottle != null -> stringResource(Res.string.save_changes)
+                mode == AddMode.MANUAL -> stringResource(Res.string.add_to_cellar)
+                else -> stringResource(Res.string.add_confirm)
+            }
             busy -> stringResource(Res.string.add_analyzing)
             mode == AddMode.IDENTIFY -> stringResource(Res.string.add_barcode_required)
             mode == AddMode.VOICE -> stringResource(Res.string.add_dictate_required)
@@ -298,7 +328,11 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null) {
         Button(
             onClick = {
                 ready?.let { b ->
-                    Cellar.addBottle(b)
+                    if (editingBottle != null) {
+                        Cellar.updateBottle(b)
+                    } else {
+                        Cellar.addBottle(b)
+                    }
                     // Place into the chosen empty rack cell, if any.
                     if (mode == AddMode.MANUAL) manualPlacement?.let { (ri, ci) ->
                         Racks.all.getOrNull(ri)?.let { r ->

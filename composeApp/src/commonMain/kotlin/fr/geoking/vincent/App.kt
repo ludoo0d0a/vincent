@@ -78,6 +78,7 @@ private sealed interface Dest {
     data class Detail(val bottle: Bottle) : Dest
     /** [placement] pre-fills the rack cell when adding from the cellar grid. */
     data class Add(val placement: RackPlacement? = null) : Dest
+    data class Edit(val bottle: Bottle) : Dest
     data object Account : Dest
     data object Settings : Dest
     data object Recent : Dest
@@ -136,9 +137,12 @@ fun App() = VincentTheme {
                 is Dest.Detail -> BottleDetailScreen(
                     bottle = top.bottle,
                     onBack = ::pop,
+                    onEdit = { stack.add(Dest.Edit(it)) },
                 )
 
                 is Dest.Add -> AddScreen(onClose = ::pop, initialPlacement = top.placement)
+
+                is Dest.Edit -> AddScreen(onClose = ::pop, editingBottle = top.bottle)
 
                 Dest.Account -> AccountScreen(
                     onBack = ::pop,

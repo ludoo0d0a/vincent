@@ -40,7 +40,8 @@ private const val TAG = "VincentSignIn"
 // WEB_CLIENT_ID (local.properties / CI) is a fallback when default_web_client_id is absent.
 
 private fun resolveWebClientId(context: Context): String {
-    val fromFirebase = runCatching { context.getString(R.string.default_web_client_id) }.getOrDefault("")
+    val id = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+    val fromFirebase = if (id != 0) context.getString(id) else ""
     return fromFirebase.takeIf { it.isNotBlank() } ?: BuildConfig.WEB_CLIENT_ID
 }
 

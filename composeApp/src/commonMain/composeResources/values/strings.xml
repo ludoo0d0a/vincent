@@ -308,6 +308,8 @@
     <string name="add_frame_barcode">Alignez le code-barres — détection automatique</string>
     <string name="add_identified_ai">IDENTIFIÉ PAR L\'IA</string>
     <string name="add_to_cellar">Ajouter à la cave</string>
+    <string name="save_changes">Enregistrer les modifications</string>
+    <string name="edit_bottle">Éditer la bouteille</string>
     <string name="add_analyzing">Analyse en cours…</string>
     <string name="add_barcode_required">Photo ou code-barres requis</string>
     <string name="add_dictate_required">Dictez une bouteille</string>
