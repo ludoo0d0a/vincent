@@ -366,7 +366,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         )
     }
 
-    private fun colorOf(raw: String): WineColor {
+    internal fun colorOf(raw: String): WineColor {
         val v = raw.lowercase()
         return when {
             "ros" in v -> WineColor.ROSE
@@ -376,7 +376,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         }
     }
 
-    private fun categoryOf(text: String): WineCategory {
+    internal fun categoryOf(text: String): WineCategory {
         val v = text.lowercase()
         return when {
             "bourgogne" in v || "burgundy" in v || "chablis" in v -> WineCategory.BOURGOGNE
@@ -389,6 +389,138 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     }
 }
 
-actual fun wineRecognizer(): WineRecognizer = GeminiClient
-actual fun priceEstimator(): PriceEstimator = GeminiClient
-actual fun foodPairer(): FoodPairer = GeminiClient
+/** Grapeminds-backed client. */
+object GrapemindsClient : WineRecognizer, PriceEstimator, FoodPairer {
+    override suspend fun pairings(bottle: Bottle): List<String> = withContext(Dispatchers.IO) {
+        val q = "${bottle.domain} ${bottle.vintage} — ${bottle.color.label}, ${bottle.appellation}"
+        val json = generate("pairings for $q") ?: return@withContext emptyList()
+        val arr = json.optJSONArray("pairings") ?: return@withContext emptyList()
+        (0 until arr.length()).mapNotNull { i -> arr.optString(i).trim().takeIf { it.isNotEmpty() } }
+    }
+
+    override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
+        val json = generate("identify text: $title") ?: return@withContext RecognizeOutcome(error = lastError)
+        val bottle = toBottle(json, "gm-${title.hashCode()}")
+        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
+        else RecognizeOutcome(bottle = bottle)
+    }
+
+    override suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome = withContext(Dispatchers.IO) {
+        val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
+        val json = generate("identify image", b64) ?: return@withContext RecognizeOutcome(error = lastError)
+        val bottle = toBottle(json, "gm-img-${jpeg.size}")
+        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_no_label))
+        else RecognizeOutcome(bottle = bottle)
+    }
+
+    override suspend fun estimate(bottle: Bottle): PriceEstimate? = withContext(Dispatchers.IO) {
+        val q = "${bottle.domain} ${bottle.vintage} ${bottle.appellation}".trim()
+        val json = generate("price for $q") ?: return@withContext null
+        val price = json.optInt("price", 0)
+        if (price <= 0) null
+        else PriceEstimate(price, json.optString("source", "grapeminds"), "estimation Grapeminds")
+    }
+
+    private var lastError: String? = null
+
+    private fun fail(msg: String): JSONObject? {
+        lastError = msg
+        Log.e(TAG, "Grapeminds: $msg")
+        return null
+    }
+
+    private suspend fun generate(prompt: String, imageB64: String? = null): JSONObject? {
+        lastError = null
+        val proxyUrl = BuildConfig.AI_PROXY_URL
+        return if (proxyUrl.isNotBlank()) {
+            val url = if (proxyUrl.endsWith("/")) proxyUrl + "v1/grapeminds" else proxyUrl.replace("/v1/generate", "/v1/grapeminds")
+            generateViaProxy(url, prompt, imageB64)
+        } else {
+            generateDirect(prompt, imageB64)
+        }
+    }
+
+    private suspend fun generateViaProxy(url: String, prompt: String, imageB64: String?): JSONObject? {
+        val idToken = try {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+        } catch (e: Exception) {
+            null
+        }
+        if (idToken.isNullOrBlank()) return fail(getString(Res.string.ai_error_sign_in))
+
+        val appCheckToken = try {
+            FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
+        } catch (e: Exception) {
+            ""
+        }
+
+        return try {
+            val body = JSONObject().put("prompt", prompt).put("imageB64", imageB64)
+            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $idToken")
+                setRequestProperty("X-Firebase-AppCheck", appCheckToken)
+            }
+            conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
+            if (conn.responseCode !in 200..299) return fail("HTTP ${conn.responseCode}")
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            JSONObject(resp)
+        } catch (e: Exception) {
+            fail(e.message ?: "Unknown error")
+        }
+    }
+
+    private suspend fun generateDirect(prompt: String, imageB64: String?): JSONObject? {
+        val apiKey = BuildConfig.GRAPEMINDS_API_KEY
+        val apiUrl = BuildConfig.GRAPEMINDS_API_URL
+        if (apiKey.isBlank() || apiUrl.isBlank()) return fail("Grapeminds not configured")
+
+        return try {
+            val body = JSONObject().put("prompt", prompt).put("imageB64", imageB64)
+            val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("X-Api-Key", apiKey)
+                setRequestProperty("Authorization", "Bearer $apiKey")
+            }
+            conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
+            if (conn.responseCode !in 200..299) return fail("HTTP ${conn.responseCode}")
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            JSONObject(resp)
+        } catch (e: Exception) {
+            fail(e.message ?: "Unknown error")
+        }
+    }
+
+    private suspend fun toBottle(j: JSONObject, id: String): Bottle? {
+        val domain = j.optString("domain").ifBlank { j.optString("name") }.trim()
+        if (domain.isEmpty()) return null
+        val region = j.optString("region")
+        val appellation = j.optString("appellation").ifBlank { region }
+        return Bottle(
+            id = id,
+            domain = domain,
+            appellation = appellation,
+            color = GeminiClient.colorOf(j.optString("color")),
+            category = GeminiClient.categoryOf("${j.optString("region")} ${j.optString("appellation")}"),
+            vintage = j.optString("vintage").ifBlank { "NM" },
+            price = 0,
+            quantity = 1,
+            rating = 0.0,
+            cellarSpot = "—",
+            provenance = region.ifBlank { appellation },
+            merchant = "—",
+            purchaseDate = getString(Res.string.add_today),
+            occasion = "—",
+            source = AddSource.SCAN,
+            addedLabel = getString(Res.string.ai_added_label),
+        )
+    }
+}
+
+actual fun wineRecognizer(): WineRecognizer = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsClient else GeminiClient
+actual fun priceEstimator(): PriceEstimator = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsClient else GeminiClient
+actual fun foodPairer(): FoodPairer = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsClient else GeminiClient

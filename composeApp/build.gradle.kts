@@ -96,6 +96,11 @@ android {
         // AI calls go through the Cloudflare Worker proxy (key held server-side).
         // Set by ./scripts/setup-ai-proxy.sh (local.properties) or the CI secret.
         buildConfigField("String", "AI_PROXY_URL", "\"${secret("AI_PROXY_URL")}\"")
+        // Provider used for AI features (gemini | grapeminds).
+        buildConfigField("String", "AI_PROVIDER", "\"${secret("AI_PROVIDER").ifBlank { "gemini" }}\"")
+        // Direct API key and URL for Grapeminds (dev/debug only, like Gemini).
+        buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY")}\"")
+        buildConfigField("String", "GRAPEMINDS_API_URL", "\"${secret("GRAPEMINDS_API_URL")}\"")
         // Feature flag for the ARCore "AR cellar" screen. Optional AR_ENABLED in
         // local.properties / CI env (true|false) flips it; defaults to enabled.
         buildConfigField("Boolean", "AR_ENABLED", secret("AR_ENABLED").ifBlank { "true" })

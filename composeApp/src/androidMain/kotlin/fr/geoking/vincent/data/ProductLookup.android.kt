@@ -1,7 +1,11 @@
 package fr.geoking.vincent.data
 
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.auth.FirebaseAuth
+import fr.geoking.vincent.BuildConfig
 import fr.geoking.vincent.debug.HttpDebug
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -95,4 +99,80 @@ private fun JSONObject.frontImageUrl(): String? {
     return null
 }
 
-actual fun barcodeLookup(): BarcodeLookup = OpenFoodFacts
+/** Grapeminds-backed barcode lookup. */
+private object GrapemindsBarcodeLookup : BarcodeLookup {
+    override suspend fun byBarcode(code: String): ProductInfo? = withContext(Dispatchers.IO) {
+        val prompt = "identify barcode: $code"
+        val proxyUrl = BuildConfig.AI_PROXY_URL
+        val json = if (proxyUrl.isNotBlank()) {
+            val url = if (proxyUrl.endsWith("/")) proxyUrl + "v1/grapeminds" else proxyUrl.replace("/v1/generate", "/v1/grapeminds")
+            generateViaProxy(url, prompt)
+        } else {
+            generateDirect(prompt)
+        } ?: return@withContext null
+
+        ProductInfo(
+            name = json.optString("name").ifBlank { json.optString("domain") },
+            brand = json.optString("brand").ifBlank { json.optString("domain") },
+            country = json.optString("country").ifBlank { json.optString("region") },
+            category = json.optString("category"),
+            imageUrl = json.optString("imageUrl").takeIf { it.isNotBlank() },
+        )
+    }
+
+    private suspend fun generateViaProxy(url: String, prompt: String): JSONObject? {
+        val idToken = try {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+        } catch (e: Exception) {
+            null
+        } ?: return null
+
+        val appCheckToken = try {
+            FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
+        } catch (e: Exception) {
+            ""
+        }
+
+        return try {
+            val body = JSONObject().put("prompt", prompt)
+            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $idToken")
+                setRequestProperty("X-Firebase-AppCheck", appCheckToken)
+            }
+            conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
+            if (conn.responseCode !in 200..299) return null
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            JSONObject(resp)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private suspend fun generateDirect(prompt: String): JSONObject? {
+        val apiKey = BuildConfig.GRAPEMINDS_API_KEY
+        val apiUrl = BuildConfig.GRAPEMINDS_API_URL
+        if (apiKey.isBlank() || apiUrl.isBlank()) return null
+
+        return try {
+            val body = JSONObject().put("prompt", prompt)
+            val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("X-Api-Key", apiKey)
+                setRequestProperty("Authorization", "Bearer $apiKey")
+            }
+            conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
+            if (conn.responseCode !in 200..299) return null
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            JSONObject(resp)
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
+actual fun barcodeLookup(): BarcodeLookup = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsBarcodeLookup else OpenFoodFacts

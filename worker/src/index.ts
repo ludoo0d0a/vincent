@@ -11,6 +11,8 @@
 export interface Env {
   AI_KV: KVNamespace;
   GEMINI_API_KEY: string;
+  GRAPEMINDS_API_KEY: string;
+  GRAPEMINDS_API_URL: string;
   FIREBASE_PROJECT_ID: string;
   FIREBASE_PROJECT_NUMBER: string;
   WEB_CLIENT_ID: string;
@@ -41,12 +43,17 @@ export default {
       return json({ ok: true, model: env.GEMINI_MODEL || "gemini-flash-latest" });
     }
 
-    if (request.method !== "POST" || url.pathname !== "/v1/generate") {
+    if (request.method !== "POST" || (url.pathname !== "/v1/generate" && url.pathname !== "/v1/grapeminds")) {
       return json({ error: { message: "Not found", status: "NOT_FOUND" } }, 404);
     }
 
-    if (!env.GEMINI_API_KEY) {
+    const isGrapeminds = url.pathname === "/v1/grapeminds";
+
+    if (!isGrapeminds && !env.GEMINI_API_KEY) {
       return json({ error: { message: "Server missing GEMINI_API_KEY", status: "FAILED_PRECONDITION" } }, 500);
+    }
+    if (isGrapeminds && (!env.GRAPEMINDS_API_KEY || !env.GRAPEMINDS_API_URL)) {
+      return json({ error: { message: "Server missing Grapeminds config", status: "FAILED_PRECONDITION" } }, 500);
     }
 
     // 1. App Check — proves the call comes from a genuine, unmodified app build.
@@ -148,7 +155,7 @@ export default {
     // 5. Cache (text-only requests are deterministic enough to reuse).
     const cacheTtl = parseInt(env.CACHE_TTL_SECONDS || "0", 10);
     const cacheable = imageB64 === null && payload.cacheable !== false && cacheTtl > 0;
-    const model = env.GEMINI_MODEL || "gemini-flash-latest";
+    const model = isGrapeminds ? "grapeminds" : (env.GEMINI_MODEL || "gemini-flash-latest");
     let cacheKey = "";
     if (cacheable) {
       cacheKey = `cache:${model}:${await sha256Hex(`${responseMimeType}\n${prompt}`)}`;
@@ -156,31 +163,41 @@ export default {
       if (hit) return new Response(hit, { headers: { ...JSON_HEADERS, ...quotaHeaders, "x-cache": "HIT" } });
     }
 
-    // 6. Forward to Gemini.
-    const parts: unknown[] = [{ text: prompt }];
-    if (imageB64) parts.push({ inline_data: { mime_type: "image/jpeg", data: imageB64 } });
-    const geminiBody = JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: { responseMimeType },
-    });
-    const endpoint =
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
-      `?key=${env.GEMINI_API_KEY}`;
+    // 6. Forward to Upstream.
+    let endpoint: string;
+    let upstreamBody: string;
+    let upstreamHeaders: Record<string, string> = { ...JSON_HEADERS };
+
+    if (isGrapeminds) {
+      endpoint = env.GRAPEMINDS_API_URL;
+      upstreamHeaders["Authorization"] = `Bearer ${env.GRAPEMINDS_API_KEY}`;
+      upstreamHeaders["X-Api-Key"] = env.GRAPEMINDS_API_KEY;
+      upstreamBody = JSON.stringify({ prompt, imageB64, responseMimeType });
+    } else {
+      const parts: unknown[] = [{ text: prompt }];
+      if (imageB64) parts.push({ inline_data: { mime_type: "image/jpeg", data: imageB64 } });
+      upstreamBody = JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { responseMimeType },
+      });
+      endpoint =
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
+        `?key=${env.GEMINI_API_KEY}`;
+    }
 
     let upstream: Response;
     try {
       upstream = await fetch(endpoint, {
         method: "POST",
-        headers: JSON_HEADERS,
-        body: geminiBody,
+        headers: upstreamHeaders,
+        body: upstreamBody,
       });
     } catch (e) {
       return json({ error: { message: `Upstream fetch failed: ${msg(e)}`, status: "UNAVAILABLE" } }, 502);
     }
 
     const text = await upstream.text();
-    // 7. Forward Gemini's status + body verbatim so the client's existing
-    //    httpFailMessage(code, body) mapping (403/404/429/4xx) keeps working.
+    // 7. Forward Upstream's status + body verbatim.
     if (!upstream.ok) {
       return new Response(text, { status: upstream.status, headers: { ...JSON_HEADERS, ...quotaHeaders } });
     }
