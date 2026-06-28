@@ -1,5 +1,6 @@
 package fr.geoking.vincent.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -36,6 +39,7 @@ import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.model.Rack
 import fr.geoking.vincent.model.RackCell
+import fr.geoking.vincent.model.RackFormat
 import fr.geoking.vincent.model.RackMode
 import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.rowLabel
@@ -83,6 +87,75 @@ internal fun rackInteriorBase(cell: RackCell, mode: RackMode): Color = when (mod
     RackMode.CATEGORY -> cell.category?.let { rackCategoryPalette[it.ordinal % rackCategoryPalette.size] } ?: VincentColors.Muted
 }
 
+/** Whether [rowIndex] is shifted right for the quinconce, honouring [Rack.staggerOffset]. */
+internal fun Rack.rowShifted(rowIndex: Int): Boolean =
+    staggered && rowIndex % 2 == (if (staggerOffset) 0 else 1)
+
+/**
+ * Lays out a [RackFormat.X] rack as [Rack.squareRows]×[Rack.squareCols] X-bins. Each square
+ * groups the matching 2×2 block of cells, drawn with a diagonal cross, the four [cellSlot]s
+ * placed en quinconce (top / right / bottom / left). [cellSlot] receives the flat cell index,
+ * the cell, and a ready-positioned modifier it must apply (callers reuse their own cell UI).
+ */
+@Composable
+fun XBinGrid(
+    rack: Rack,
+    modifier: Modifier = Modifier,
+    cellSlot: @Composable (gi: Int, cell: RackCell, modifier: Modifier) -> Unit,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (sr in 0 until rack.squareRows) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "${rowLabel(2 * sr)}${rowLabel(2 * sr + 1)}",
+                    fontSize = 10.sp,
+                    color = VincentColors.Faint,
+                    modifier = Modifier.width(16.dp),
+                )
+                for (sc in 0 until rack.squareCols) {
+                    XBinSquare(rack, sr, sc, Modifier.weight(1f), cellSlot)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun XBinSquare(
+    rack: Rack,
+    squareRow: Int,
+    squareCol: Int,
+    modifier: Modifier = Modifier,
+    cellSlot: @Composable (gi: Int, cell: RackCell, modifier: Modifier) -> Unit,
+) {
+    val topRow = squareRow * 2
+    val bottomRow = squareRow * 2 + 1
+    val leftCol = squareCol * 2
+    val rightCol = squareCol * 2 + 1
+    fun gi(row: Int, col: Int) = row * rack.cols + col
+
+    Box(modifier.aspectRatio(1f)) {
+        Canvas(Modifier.matchParentSize()) {
+            val stroke = Stroke(width = 1.4.dp.toPx())
+            drawRect(color = VincentColors.Border, style = stroke)
+            drawLine(VincentColors.Border, Offset(0f, 0f), Offset(size.width, size.height), strokeWidth = stroke.width)
+            drawLine(VincentColors.Border, Offset(size.width, 0f), Offset(0f, size.height), strokeWidth = stroke.width)
+        }
+        // Four bottles arranged en quinconce inside the X.
+        val frac = 0.42f
+        @Composable
+        fun slot(gi: Int, align: Alignment) =
+            cellSlot(gi, rack.cells[gi], Modifier.align(align).fillMaxWidth(frac))
+        slot(gi(topRow, leftCol), Alignment.TopCenter)
+        slot(gi(topRow, rightCol), Alignment.CenterEnd)
+        slot(gi(bottomRow, rightCol), Alignment.BottomCenter)
+        slot(gi(bottomRow, leftCol), Alignment.CenterStart)
+    }
+}
+
 /**
  * Read-only rendering of a [Rack] grid, reusing the cellar's visual language
  * (staggered rows, wine-colour borders, mode-tinted interiors). Occupied cells
@@ -99,6 +172,18 @@ fun RackGridView(
 ) {
     VCard(modifier.fillMaxWidth()) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            if (rack.format == RackFormat.X) {
+                XBinGrid(rack) { gi, cell, m ->
+                    ReadOnlyCell(
+                        cell = cell,
+                        mode = mode,
+                        highlighted = highlight(cell),
+                        onClick = { onCellClick(gi, cell) },
+                        modifier = m,
+                    )
+                }
+                return@Column
+            }
             rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -107,7 +192,7 @@ fun RackGridView(
                         color = VincentColors.Faint,
                         modifier = Modifier.width(14.dp),
                     )
-                    val shiftRight = rack.staggered && rowIndex % 2 == 1
+                    val shiftRight = rack.rowShifted(rowIndex)
                     if (shiftRight) Spacer(Modifier.weight(0.5f))
                     rowCells.forEachIndexed { colIndex, cell ->
                         val gi = rowIndex * rack.cols + colIndex
@@ -140,36 +225,54 @@ fun PlacementRackGrid(
 ) {
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        rowLabel(rowIndex),
-                        fontSize = 10.sp,
-                        color = VincentColors.Faint,
-                        modifier = Modifier.width(14.dp),
-                    )
-                    val shiftRight = rack.staggered && rowIndex % 2 == 1
-                    if (shiftRight) Spacer(Modifier.weight(0.5f))
-                    rowCells.forEachIndexed { colIndex, cell ->
-                        val gi = rowIndex * rack.cols + colIndex
-                        val highlight = when {
-                            gi == selectedCell && !cell.occupied -> PlacementCellHighlight.Selected
-                            gi == currentCell && cell.occupied -> PlacementCellHighlight.Current
-                            !cell.occupied -> PlacementCellHighlight.Available
-                            else -> PlacementCellHighlight.Occupied
-                        }
-                        PlacementGridCell(
-                            cell = cell,
-                            spotLabel = cellSpotLabel(gi, rack.cols),
-                            highlight = highlight,
-                            onClick = { if (!cell.occupied) onPick(gi) },
-                            modifier = Modifier.weight(1f),
-                        )
+            if (rack.format == RackFormat.X) {
+                XBinGrid(rack) { gi, cell, m ->
+                    val highlight = when {
+                        gi == selectedCell && !cell.occupied -> PlacementCellHighlight.Selected
+                        gi == currentCell && cell.occupied -> PlacementCellHighlight.Current
+                        !cell.occupied -> PlacementCellHighlight.Available
+                        else -> PlacementCellHighlight.Occupied
                     }
-                    if (rack.staggered && !shiftRight) Spacer(Modifier.weight(0.5f))
+                    PlacementGridCell(
+                        cell = cell,
+                        spotLabel = cellSpotLabel(gi, rack.cols),
+                        highlight = highlight,
+                        onClick = { if (!cell.occupied) onPick(gi) },
+                        modifier = m,
+                    )
+                }
+            } else {
+                rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            rowLabel(rowIndex),
+                            fontSize = 10.sp,
+                            color = VincentColors.Faint,
+                            modifier = Modifier.width(14.dp),
+                        )
+                        val shiftRight = rack.rowShifted(rowIndex)
+                        if (shiftRight) Spacer(Modifier.weight(0.5f))
+                        rowCells.forEachIndexed { colIndex, cell ->
+                            val gi = rowIndex * rack.cols + colIndex
+                            val highlight = when {
+                                gi == selectedCell && !cell.occupied -> PlacementCellHighlight.Selected
+                                gi == currentCell && cell.occupied -> PlacementCellHighlight.Current
+                                !cell.occupied -> PlacementCellHighlight.Available
+                                else -> PlacementCellHighlight.Occupied
+                            }
+                            PlacementGridCell(
+                                cell = cell,
+                                spotLabel = cellSpotLabel(gi, rack.cols),
+                                highlight = highlight,
+                                onClick = { if (!cell.occupied) onPick(gi) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rack.staggered && !shiftRight) Spacer(Modifier.weight(0.5f))
+                    }
                 }
             }
             if (showHint) {

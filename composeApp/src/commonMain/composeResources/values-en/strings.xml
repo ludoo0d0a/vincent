@@ -172,7 +172,15 @@
     <string name="cellar_edit_rows">Rows</string>
     <string name="cellar_edit_staggered">Staggered</string>
     <string name="cellar_edit_staggered_desc">Rows shifted by half a spot</string>
+    <string name="cellar_edit_stagger_offset">Shift first row</string>
+    <string name="cellar_edit_stagger_offset_desc">Otherwise it starts in the corner</string>
+    <string name="cellar_edit_format">Format</string>
+    <string name="cellar_edit_format_grid">Grid</string>
+    <string name="cellar_edit_format_x">X-bin rack</string>
+    <string name="cellar_edit_square_cols">Squares (columns)</string>
+    <string name="cellar_edit_square_rows">Squares (rows)</string>
     <string name="cellar_edit_capacity">Capacity: %d spots</string>
+    <string name="cellar_edit_capacity_x">Capacity: %1$d squares × 4 = %2$d bottles</string>
     <string name="cellar_edit_duplicate">Duplicate</string>
     <string name="cellar_edit_delete">Delete</string>
     <string name="cellar_edit_cancel">Cancel</string>

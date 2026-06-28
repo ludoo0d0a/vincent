@@ -173,7 +173,15 @@
     <string name="cellar_edit_rows">Rangées</string>
     <string name="cellar_edit_staggered">Quinconce</string>
     <string name="cellar_edit_staggered_desc">Rangées décalées d\'une demi-case</string>
+    <string name="cellar_edit_stagger_offset">Première rangée décalée</string>
+    <string name="cellar_edit_stagger_offset_desc">Sinon elle démarre dans le coin</string>
+    <string name="cellar_edit_format">Format</string>
+    <string name="cellar_edit_format_grid">Grille</string>
+    <string name="cellar_edit_format_x">Casier en X</string>
+    <string name="cellar_edit_square_cols">Carrés (colonnes)</string>
+    <string name="cellar_edit_square_rows">Carrés (rangées)</string>
     <string name="cellar_edit_capacity">Capacité : %d emplacements</string>
+    <string name="cellar_edit_capacity_x">Capacité : %1$d carrés × 4 = %2$d bouteilles</string>
     <string name="cellar_edit_duplicate">Dupliquer</string>
     <string name="cellar_edit_delete">Supprimer</string>
     <string name="cellar_edit_cancel">Annuler</string>

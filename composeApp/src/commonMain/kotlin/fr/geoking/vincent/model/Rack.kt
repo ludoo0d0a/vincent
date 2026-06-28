@@ -77,6 +77,19 @@ data class RackArAnchor(
             tlFiducialId >= 0 && brFiducialId >= 0
 }
 
+/** Physical layout of a rack. */
+enum class RackFormat {
+    /** Regular [cols]×[rows] grid of single-bottle cells (optionally staggered). */
+    GRID,
+
+    /**
+     * "Casier en X": [cols]/2 × [rows]/2 squares, each grouping a 2×2 block of single-bottle
+     * cells drawn with a diagonal cross, the four bottles arranged en quinconce.
+     * [cols] and [rows] are therefore always even.
+     */
+    X,
+}
+
 /** A named rack: a [cols]×[rows] grid of [RackCell], optionally staggered (quinconce). */
 data class Rack(
     val name: String,
@@ -84,6 +97,13 @@ data class Rack(
     val rows: Int,
     val staggered: Boolean,
     val cells: List<RackCell>,
+    /** Physical layout; [RackFormat.X] groups cells into 2×2 X-bins. */
+    val format: RackFormat = RackFormat.GRID,
+    /**
+     * Parity of the quinconce shift (only meaningful when [staggered]). false ⇒ first row (A)
+     * sits flush in the corner; true ⇒ first row is shifted half a cell.
+     */
+    val staggerOffset: Boolean = false,
     val id: String = "rack-${kotlin.math.abs(name.hashCode())}-${cols}x${rows}",
     /** Absolute path to the photo of this physical rack, used as the AR image target. */
     val arImagePath: String? = null,
@@ -103,14 +123,33 @@ data class Rack(
     val capacity: Int get() = cols * rows
     val occupiedCount: Int get() = cells.count { it.occupied }
 
+    /** Number of X-bin squares across; only meaningful when [format] is [RackFormat.X]. */
+    val squareCols: Int get() = cols / 2
+
+    /** Number of X-bin squares down; only meaningful when [format] is [RackFormat.X]. */
+    val squareRows: Int get() = rows / 2
+
     /** Resize to [newCols]×[newRows], keeping existing cells by position, padding empties. */
-    fun resized(newCols: Int, newRows: Int, newStaggered: Boolean): Rack {
+    fun resized(
+        newCols: Int,
+        newRows: Int,
+        newStaggered: Boolean,
+        newFormat: RackFormat = format,
+        newStaggerOffset: Boolean = staggerOffset,
+    ): Rack {
         val out = ArrayList<RackCell>(newCols * newRows)
         for (r in 0 until newRows) for (c in 0 until newCols) {
             val old = if (c < cols && r < rows) cells.getOrNull(r * cols + c) else null
             out += old ?: RackCell(rowLabel(r), false)
         }
-        return copy(cols = newCols, rows = newRows, staggered = newStaggered, cells = out)
+        return copy(
+            cols = newCols,
+            rows = newRows,
+            staggered = newStaggered,
+            format = newFormat,
+            staggerOffset = newStaggerOffset,
+            cells = out,
+        )
     }
 
     /** Replace one cell (e.g. empty it after consuming the bottle). */

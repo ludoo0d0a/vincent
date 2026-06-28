@@ -16,6 +16,8 @@ data class RackEntity(
     val arCalibrationData: String? = null,
     val arMode: String? = null,
     val arAnchorData: String? = null,
+    val format: String = "GRID",
+    val staggerOffset: Boolean = false,
 )
 
 private const val CELL_SEP = "" // Record Separator
@@ -28,6 +30,8 @@ fun RackEntity.toRack(): Rack = Rack(
     rows = rows,
     staggered = staggered,
     cells = cellsData.split(CELL_SEP).map { it.toRackCell() },
+    format = runCatching { RackFormat.valueOf(format) }.getOrNull() ?: RackFormat.GRID,
+    staggerOffset = staggerOffset,
     arImagePath = arImagePath,
     arCalibration = arCalibrationData?.toArCalibration(),
     arMode = arMode?.let { runCatching { ArMode.valueOf(it) }.getOrNull() } ?: ArMode.PHOTO,
@@ -45,6 +49,8 @@ fun Rack.toEntity(): RackEntity = RackEntity(
     arCalibrationData = arCalibration?.toData(),
     arMode = arMode.name,
     arAnchorData = arAnchor?.toData(),
+    format = format.name,
+    staggerOffset = staggerOffset,
 )
 
 private fun String.toRackCell(): RackCell {
