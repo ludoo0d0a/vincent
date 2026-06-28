@@ -361,6 +361,7 @@
     <string name="update_available">A new version is available.</string>
     <string name="update_up_to_date">The app is up to date.</string>
     <string name="update_downloaded">Update downloaded — restarting…</string>
+    <string name="update_downloading">Downloading update… The app will restart once the download completes.</string>
     <string name="update_error">Error checking for updates.</string>
     <string name="update_ineligible">Update available but not eligible.</string>
     <string name="settings_section_app">App</string>

@@ -60,13 +60,30 @@ class MainActivity : ComponentActivity() {
 
     private val appUpdateManager: AppUpdateManager by lazy { AppUpdateManagerFactory.create(applicationContext) }
 
-    // Flexible update: as soon as the download finishes, auto-complete it (restarts the app).
+    // Flexible update: show a non-blocking download banner while it downloads, then
+    // auto-complete it (restarts the app) as soon as the download finishes.
     private val installListener = InstallStateUpdatedListener { state ->
-        if (state.installStatus() == InstallStatus.DOWNLOADED) {
-            MainScope().launch {
-                Toast.makeText(this@MainActivity, getString(Res.string.update_downloaded), Toast.LENGTH_SHORT).show()
-                appUpdateManager.completeUpdate()
+        when (state.installStatus()) {
+            InstallStatus.PENDING -> UpdateState.onDownloading(null)
+
+            InstallStatus.DOWNLOADING -> {
+                val total = state.totalBytesToDownload()
+                val fraction = if (total > 0) state.bytesDownloaded().toFloat() / total else null
+                UpdateState.onDownloading(fraction)
             }
+
+            InstallStatus.DOWNLOADED -> {
+                // Keep the banner up; the app restarts almost immediately.
+                UpdateState.onDownloading(1f)
+                MainScope().launch {
+                    Toast.makeText(this@MainActivity, getString(Res.string.update_downloaded), Toast.LENGTH_SHORT).show()
+                    appUpdateManager.completeUpdate()
+                }
+            }
+
+            InstallStatus.FAILED, InstallStatus.CANCELED -> UpdateState.onIdle()
+
+            else -> {}
         }
     }
 

@@ -1,17 +1,23 @@
 package fr.geoking.vincent
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +41,7 @@ import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.ProvideAppLocale
+import fr.geoking.vincent.data.UpdateState
 import fr.geoking.vincent.data.rememberGoogleSignIn
 import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.model.Bottle
@@ -178,8 +185,60 @@ fun App() = VincentTheme {
                     .align(Alignment.BottomEnd)
                     .padding(end = 16.dp, bottom = 96.dp),
             )
+            // Non-blocking overlay shown while a flexible update downloads.
+            if (UpdateState.downloading) {
+                UpdateDownloadBanner(
+                    progress = UpdateState.progress,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                )
+            }
         }
       }
+    }
+}
+
+/**
+ * Compact, non-blocking banner shown while a flexible in-app update downloads.
+ * It floats above content and never intercepts touches, so the app stays usable.
+ */
+@Composable
+private fun UpdateDownloadBanner(progress: Float?, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = VincentColors.Surface,
+        contentColor = VincentColors.Fg,
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 6.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (progress != null) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(22.dp),
+                    color = VincentColors.Accent,
+                    trackColor = VincentColors.AccentSoft,
+                    strokeWidth = 2.5.dp,
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = VincentColors.Accent,
+                    trackColor = VincentColors.AccentSoft,
+                    strokeWidth = 2.5.dp,
+                )
+            }
+            Text(
+                text = stringResource(Res.string.update_downloading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = VincentColors.Muted,
+            )
+        }
     }
 }
 

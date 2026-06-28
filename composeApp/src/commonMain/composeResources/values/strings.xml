@@ -362,6 +362,7 @@
     <string name="update_available">Une nouvelle version est disponible.</string>
     <string name="update_up_to_date">L\'application est à jour.</string>
     <string name="update_downloaded">Mise à jour téléchargée — redémarrage…</string>
+    <string name="update_downloading">Téléchargement de la mise à jour… L\'application redémarrera une fois terminé.</string>
     <string name="update_error">Erreur lors de la vérification de la mise à jour.</string>
     <string name="update_ineligible">Mise à jour disponible mais non éligible.</string>
     <string name="settings_section_app">Application</string>
