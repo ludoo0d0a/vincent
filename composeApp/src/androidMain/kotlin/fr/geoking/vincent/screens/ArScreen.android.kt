@@ -1094,7 +1094,7 @@ private fun vAdd(a: FloatArray, b: FloatArray) = floatArrayOf(a[0] + b[0], a[1] 
 private fun vScale(a: FloatArray, s: Float) = floatArrayOf(a[0] * s, a[1] * s, a[2] * s)
 private fun vDot(a: FloatArray, b: FloatArray) = a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
-/** PHOTO mode marker: a fixed-size square showing only the bottle's position (no text, no image). */
+/** PHOTO mode marker: a fixed-size square showing the cell's grid position (e.g. "A2", "D4"). */
 @Composable
 private fun CellSquare(
     rack: Rack,
@@ -1122,5 +1122,14 @@ private fun CellSquare(
             .background(squareColor.copy(alpha = if (selected) 0.85f else 0.5f))
             .border(if (selected) 2.5.dp else 1.5.dp, squareColor, RoundedCornerShape(7.dp))
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            spot,
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.W800,
+            maxLines = 1,
+        )
+    }
 }
