@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocalBar
@@ -74,7 +75,7 @@ import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
 
 @Composable
-fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
+fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> Unit) {
     val live = Cellar.bottle(bottle.id) ?: bottle
     val qty = live.quantity
     val fav = live.favorite
@@ -99,14 +100,22 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
         Row(
             Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             IconChip(Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack, contentDescription = stringResource(Res.string.back))
-            IconChip(
-                Icons.Filled.Favorite,
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconChip(
+                    Icons.Filled.Edit,
+                    onClick = { onEdit(live) },
+                    contentDescription = stringResource(Res.string.edit_bottle),
+                )
+                IconChip(
+                    Icons.Filled.Favorite,
                 onClick = { Cellar.toggleFavorite(live.id) },
                 tint = if (fav) VincentColors.Accent else VincentColors.Muted,
-                bg = if (fav) VincentColors.AccentSoft else VincentColors.Surface2,
-            )
+                    bg = if (fav) VincentColors.AccentSoft else VincentColors.Surface2,
+                )
+            }
         }
 
         // Hero
@@ -125,14 +134,19 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f).padding(bottom = 4.dp)) {
-                ColorTag(live.color, label = "${stringResource(live.color.label)} · ${live.category.label}")
+                ColorTag(live.color, label = "${stringResource(live.color.label)} · ${stringResource(live.category.label)}")
                 Spacer(Modifier.height(7.dp))
-                Text("${live.domain} ${live.vintage}", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("${live.appellation} · ${live.provenance}", fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                val title = listOfNotNull(live.domain.takeIf { it.isNotBlank() }, live.vintage.takeIf { it != "NM" }).joinToString(" ")
+                Text(title.ifBlank { stringResource(Res.string.add_default_domain) }, fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                val sub = listOfNotNull(live.appellation.takeIf { it.isNotBlank() }, live.provenance.takeIf { it.isNotBlank() }).joinToString(" · ")
+                if (sub.isNotBlank()) {
+                    Text(sub, fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 9.dp)) {
                     Stars(live.rating)
                     Spacer(Modifier.width(7.dp))
-                    Text(stringResource(Res.string.detail_stars_count, live.rating.toString().replace('.', ',')), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                    val ratingStr = if (live.rating % 1.0 == 0.0) live.rating.toInt().toString() else live.rating.toString().replace('.', ',')
+                    Text(stringResource(Res.string.detail_stars_count, ratingStr), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
                 }
             }
         }

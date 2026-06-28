@@ -97,6 +97,16 @@ object Cellar {
         persist(b)
     }
 
+    fun updateBottle(updated: Bottle) {
+        val i = bottles.indexOfFirst { it.id == updated.id }
+        if (i >= 0) {
+            bottles[i] = updated
+            val ri = recent.indexOfFirst { it.id == updated.id }
+            if (ri >= 0) recent[ri] = updated
+            persist(updated)
+        }
+    }
+
     fun adjustQuantity(id: String, delta: Int) {
         val i = bottles.indexOfFirst { it.id == id }
         if (i >= 0) {
