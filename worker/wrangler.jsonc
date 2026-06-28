@@ -20,7 +20,8 @@
     "BURST_WINDOW_SECONDS": "60",
     "CACHE_TTL_SECONDS": "86400",
     "ENFORCE_APP_CHECK": "true",
-    "ENFORCE_AUTH": "true"
+    "ENFORCE_AUTH": "true",
+    "GRAPEMINDS_API_URL": "https://api.grapeminds.io/v1/identify"
   },
 
   // Per-user daily quota counters + response cache. The id is filled in by

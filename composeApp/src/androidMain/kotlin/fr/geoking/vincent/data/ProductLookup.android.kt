@@ -1,5 +1,7 @@
 package fr.geoking.vincent.data
 
+import fr.geoking.vincent.BuildConfig
+import fr.geoking.vincent.ai.AiNetwork
 import fr.geoking.vincent.debug.HttpDebug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -95,4 +97,34 @@ private fun JSONObject.frontImageUrl(): String? {
     return null
 }
 
-actual fun barcodeLookup(): BarcodeLookup = OpenFoodFacts
+/** Grapeminds-backed barcode lookup. */
+private object GrapemindsBarcodeLookup : BarcodeLookup {
+    override suspend fun byBarcode(code: String): ProductInfo? = withContext(Dispatchers.IO) {
+        val prompt = "identify barcode: $code"
+        val proxyUrl = BuildConfig.AI_PROXY_URL
+        val json = if (proxyUrl.isNotBlank()) {
+            val url = AiNetwork.grapemindsProxyUrl(proxyUrl)
+            val body = JSONObject().put("prompt", prompt)
+            AiNetwork.callProxy(url, body, label = "Grapeminds Barcode Proxy")
+        } else {
+            val apiKey = BuildConfig.GRAPEMINDS_API_KEY
+            val apiUrl = BuildConfig.GRAPEMINDS_API_URL
+            if (apiKey.isBlank() || apiUrl.isBlank()) null
+            else {
+                val body = JSONObject().put("prompt", prompt)
+                val headers = mapOf("X-Api-Key" to apiKey, "Authorization" to "Bearer $apiKey")
+                AiNetwork.callDirect(apiUrl, body, label = "Grapeminds Barcode Direct", headers = headers)
+            }
+        } ?: return@withContext null
+
+        ProductInfo(
+            name = json.optString("name").ifBlank { json.optString("domain") },
+            brand = json.optString("brand").ifBlank { json.optString("domain") },
+            country = json.optString("country").ifBlank { json.optString("region") },
+            category = json.optString("category"),
+            imageUrl = json.optString("imageUrl").takeIf { it.isNotBlank() },
+        )
+    }
+}
+
+actual fun barcodeLookup(): BarcodeLookup = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsBarcodeLookup else OpenFoodFacts
