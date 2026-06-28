@@ -83,7 +83,6 @@ import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
 import fr.geoking.vincent.ui.PlacementCellHighlight
-import fr.geoking.vincent.ui.PlacementGridCell
 import fr.geoking.vincent.ui.PlacementRackGrid
 import fr.geoking.vincent.ui.SpeechTextInput
 import fr.geoking.vincent.ui.VCard
@@ -632,22 +631,6 @@ private fun PlacementSection(
             if (rack == null || !hasEmpty) {
                 Text(stringResource(Res.string.add_placement_none_free), fontSize = 11.5.sp, color = VincentColors.Muted, modifier = Modifier.padding(start = 2.dp))
             } else {
-                freeCells.chunked(6).forEach { row ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        row.forEach { (ci, _) ->
-                            val label = cellSpotLabel(ci, rack.cols)
-                            val selected = browse == placeRack && ci == placeCell
-                            PlacementSpotChip(
-                                label = label,
-                                selected = selected,
-                                onClick = { onPick(browse, ci, label) },
-                            )
-                        }
-                    }
-                }
                 PlacementRackGrid(
                     rack = rack,
                     selectedCell = if (browse == placeRack) placeCell else null,
@@ -668,26 +651,6 @@ private fun PlacementSection(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PlacementSpotChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(if (selected) VincentColors.Accent else VincentColors.AccentSoft)
-            .border(1.dp, VincentColors.Accent, RoundedCornerShape(9.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Text(
-            label,
-            style = MonoNumber,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.W700,
-            color = if (selected) Color.White else VincentColors.Accent,
-        )
     }
 }
 
