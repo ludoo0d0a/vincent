@@ -305,10 +305,10 @@ fun PlacementGridCell(
                 modifier
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(if (selected) VincentColors.Accent else VincentColors.AccentSoft)
+                    .background(if (selected) VincentColors.Accent else VincentColors.Surface2)
                     .border(
                         width = if (selected) 2.dp else 1.dp,
-                        color = VincentColors.Accent,
+                        color = if (selected) VincentColors.Accent else VincentColors.Border,
                         shape = RoundedCornerShape(7.dp),
                     )
                     .clickable(onClick = onClick),
@@ -327,7 +327,7 @@ fun PlacementGridCell(
                         style = MonoNumber,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.W700,
-                        color = VincentColors.Accent,
+                        color = VincentColors.Muted,
                     )
                 }
             }

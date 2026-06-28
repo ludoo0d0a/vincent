@@ -9,6 +9,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.Res
+import vincent.composeapp.generated.resources.ar_adjust
+import vincent.composeapp.generated.resources.ar_adjust_hint
+import vincent.composeapp.generated.resources.ar_cancel
 import vincent.composeapp.generated.resources.ar_install
 import vincent.composeapp.generated.resources.ar_install_action
 import vincent.composeapp.generated.resources.ar_marker_both_found
@@ -263,6 +266,7 @@ actual fun ArScreen(rackIndex: Int, onBack: () -> Unit) {
 
             // Live overlay. PHOTO needs no ARCore; MARKERS is gated behind it.
             rack.arMode == ArMode.PHOTO -> ArPhotoView(
+                rackIndex = rackIndex,
                 rack = rack,
                 onReconfigure = { setupMode = true },
                 onBack = onBack,
@@ -698,13 +702,19 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
     }
 }
 
-/** PHOTO mode: 2D overlay on the frozen reference photo, with pinch-zoom / pan and tappable chips. */
+/**
+ * PHOTO mode: 2D overlay on the frozen reference photo, with pinch-zoom / pan and tappable chips.
+ * The overlay can also be **repositioned in place**: tapping "Adjust" reveals the same four connected
+ * draggable corners used by the setup flow, but here drawn on top of the live slots (and their
+ * bottles) so the grid can be aligned precisely against the real holes before saving the calibration.
+ */
 @Composable
-private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
+private fun ArPhotoView(rackIndex: Int, rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
     val calibration = rack.arCalibration
-    val bitmap = remember(rack.arImagePath) { rack.arImagePath?.let { BitmapFactory.decodeFile(it) } }
+    val imagePath = rack.arImagePath
+    val bitmap = remember(imagePath) { imagePath?.let { BitmapFactory.decodeFile(it) } }
 
-    if (bitmap == null || calibration == null || !calibration.isValid) {
+    if (bitmap == null || calibration == null || !calibration.isValid || imagePath == null) {
         Box(Modifier.fillMaxSize()) {
             ArTopBar(onBack = onBack, onReconfigure = onReconfigure)
             ArHint(stringResource(Res.string.ar_searching))
@@ -712,6 +722,7 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
         return
     }
 
+    val density = LocalDensity.current
     val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
     val aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
 
@@ -720,14 +731,25 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     var selected by remember { mutableIntStateOf(-1) }
 
+    // Reposition state: the four connected draggable corners, seeded from the saved calibration and
+    // re-seeded whenever it changes (e.g. after a save). While editing, these drive the projection.
+    var editing by remember { mutableStateOf(false) }
+    var editCorners by remember(calibration) { mutableStateOf(calibration.corners) }
+    val handlePx = with(density) { 22.dp.toPx() }
+    val activeCalibration = if (editing) RackArCalibration(editCorners) else calibration
+
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, drag, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 6f)
-                        pan += drag
+                .pointerInput(editing) {
+                    // While repositioning, the corner handles own the gestures — no pan/zoom so the
+                    // normalised drag math (anchored to the un-transformed image box) stays correct.
+                    if (!editing) {
+                        detectTransformGestures { _, drag, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 6f)
+                            pan += drag
+                        }
                     }
                 },
             contentAlignment = Alignment.Center,
@@ -757,15 +779,18 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
                         for (col in 0 until rack.cols) {
                             val idx = row * rack.cols + col
                             val cell = rack.cells.getOrNull(idx) ?: continue
-                            val p = ArProjection.cellQuadPoint(calibration, col, row, rack.cols, rack.rows, rack.staggered, rack.staggerOffset)
+                            val p = ArProjection.cellQuadPoint(activeCalibration, col, row, rack.cols, rack.rows, rack.staggered, rack.staggerOffset)
                             if (cell.occupied) {
+                                // Taps are suppressed while editing so they don't fight the handles.
+                                val onCellClick: (() -> Unit)? =
+                                    if (editing) null else ({ selected = if (selected == idx) -1 else idx })
                                 CellSquare(
                                     rack = rack,
                                     cellIndex = idx,
                                     x = p.x * w,
                                     y = p.y * h,
                                     selected = selected == idx,
-                                    onClick = { selected = if (selected == idx) -1 else idx },
+                                    onClick = onCellClick,
                                 )
                             } else {
                                 // Thin ring marking a free slot, so the user can check the
@@ -774,22 +799,105 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
                             }
                         }
                     }
+
+                    // Reposition overlay: the same four connected draggable corners as the setup
+                    // flow, drawn over the live slots so the grid can be aligned hole-by-hole.
+                    if (editing) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val pts = editCorners.map { Offset(it.x * w, it.y * h) }
+                            for (i in pts.indices) {
+                                drawLine(Color(0xFFB5174E), pts[i], pts[(i + 1) % pts.size], strokeWidth = 4f)
+                            }
+                        }
+                        editCorners.forEachIndexed { idx, c ->
+                            Box(
+                                Modifier
+                                    .offset {
+                                        IntOffset(
+                                            (c.x * w - handlePx / 2f).roundToInt(),
+                                            (c.y * h - handlePx / 2f).roundToInt(),
+                                        )
+                                    }
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFB5174E))
+                                    .pointerInput(idx, w, h) {
+                                        detectDragGestures { change, drag ->
+                                            change.consume()
+                                            val nx = (editCorners[idx].x + drag.x / w).coerceIn(0f, 1f)
+                                            val ny = (editCorners[idx].y + drag.y / h).coerceIn(0f, 1f)
+                                            editCorners = editCorners.toMutableList().also { it[idx] = NormPoint(nx, ny) }
+                                        }
+                                    },
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        ArTopBar(onBack = onBack, onReconfigure = onReconfigure)
-        if (selected >= 0) {
-            ArSelectedCard(
-                rack = rack,
-                cellIndex = selected,
-                onDismiss = { selected = -1 },
-                modifier = Modifier
+        if (editing) {
+            // Editing chrome: a top hint plus Cancel / Save at the bottom.
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    stringResource(Res.string.ar_adjust_hint),
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.W600,
+                )
+            }
+            Row(
+                Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-            )
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(
+                    onClick = { editCorners = calibration.corners; editing = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(Res.string.ar_cancel), color = Color.White) }
+                Button(
+                    onClick = {
+                        Racks.setArCalibration(rackIndex, imagePath, RackArCalibration(editCorners))
+                        editing = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent),
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(Res.string.ar_setup_save), fontWeight = FontWeight.W700) }
+            }
         } else {
-            ArHint(stringResource(Res.string.ar_photo_hint))
+            ArTopBar(
+                onBack = onBack,
+                onReconfigure = onReconfigure,
+                onAdjust = {
+                    selected = -1
+                    scale = 1f
+                    pan = Offset.Zero
+                    editCorners = calibration.corners
+                    editing = true
+                },
+            )
+            if (selected >= 0) {
+                ArSelectedCard(
+                    rack = rack,
+                    cellIndex = selected,
+                    onDismiss = { selected = -1 },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                )
+            } else {
+                ArHint(stringResource(Res.string.ar_photo_hint))
+            }
         }
     }
 }
@@ -872,10 +980,21 @@ private fun ArSelectedCard(
 }
 
 @Composable
-private fun ArTopBar(onBack: () -> Unit, onReconfigure: () -> Unit) {
+private fun ArTopBar(onBack: () -> Unit, onReconfigure: () -> Unit, onAdjust: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         ArBackButton(onBack)
         Spacer(Modifier.weight(1f))
+        if (onAdjust != null) {
+            Box(
+                Modifier
+                    .padding(vertical = 14.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable { onAdjust() }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) { Text(stringResource(Res.string.ar_adjust), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700) }
+            Spacer(Modifier.width(8.dp))
+        }
         Box(
             Modifier
                 .padding(14.dp)

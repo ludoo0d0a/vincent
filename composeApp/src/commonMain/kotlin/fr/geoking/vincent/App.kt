@@ -53,7 +53,6 @@ import fr.geoking.vincent.screens.BottleDetailScreen
 import fr.geoking.vincent.screens.BottlesScreen
 import fr.geoking.vincent.screens.CellarScreen
 import fr.geoking.vincent.screens.DashboardScreen
-import fr.geoking.vincent.screens.FavoritesScreen
 import fr.geoking.vincent.screens.ImportExportScreen
 import fr.geoking.vincent.screens.LogcatScreen
 import fr.geoking.vincent.screens.LoginScreen
@@ -83,7 +82,6 @@ private sealed interface Dest {
     data object Account : Dest
     data object Settings : Dest
     data object Recent : Dest
-    data object Favorites : Dest
     data object Transfer : Dest
     data object Tastings : Dest
     data object Producers : Dest
@@ -101,6 +99,9 @@ fun App() = VincentTheme {
     var guest by remember { mutableStateOf(false) }
     val loggedIn = Auth.account != null || guest
     var tab by remember { mutableStateOf(Tab.HOME) }
+    // When opening the Bottles tab from the account favourites card, pre-select the
+    // favourites chip; a direct tab tap always shows every bottle.
+    var bottlesFavOnly by remember { mutableStateOf(false) }
     var cellarRackIdx by remember { mutableStateOf(0) }
     // Real navigation stack above the tabbed home; back pops one level.
     val stack = remember { mutableStateListOf<Dest>() }
@@ -128,12 +129,15 @@ fun App() = VincentTheme {
             } else when (val top = stack.lastOrNull()) {
                 null -> MainScaffold(
                     tab = tab,
-                    onTab = { tab = it },
+                    onTab = { t ->
+                        if (t == Tab.BOTTLES) bottlesFavOnly = false
+                        tab = t
+                    },
+                    bottlesFavOnly = bottlesFavOnly,
                     cellarRackIdx = cellarRackIdx,
                     onCellarRackIdxChange = { cellarRackIdx = it },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                     onOpenRecent = { stack.add(Dest.Recent) },
-                    onOpenFavorites = { stack.add(Dest.Favorites) },
                     onAdd = { stack.add(Dest.Add()) },
                     onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
@@ -157,7 +161,8 @@ fun App() = VincentTheme {
                     isLoading = googleLoading,
                     errorMsg = googleError,
                     onOpenRecent = { stack.add(Dest.Recent) },
-                    onOpenFavorites = { stack.add(Dest.Favorites) },
+                    onOpenBottles = { bottlesFavOnly = false; tab = Tab.BOTTLES; stack.clear() },
+                    onOpenFavorites = { bottlesFavOnly = true; tab = Tab.BOTTLES; stack.clear() },
                     onOpenTransfer = { stack.add(Dest.Transfer) },
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
@@ -191,11 +196,6 @@ fun App() = VincentTheme {
                 )
 
                 Dest.Recent -> RecentScreen(
-                    onBack = ::pop,
-                    onOpenBottle = { stack.add(Dest.Detail(it)) },
-                )
-
-                Dest.Favorites -> FavoritesScreen(
                     onBack = ::pop,
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                 )
@@ -266,11 +266,11 @@ private fun UpdateDownloadBanner(progress: Float?, modifier: Modifier = Modifier
 private fun MainScaffold(
     tab: Tab,
     onTab: (Tab) -> Unit,
+    bottlesFavOnly: Boolean,
     cellarRackIdx: Int,
     onCellarRackIdxChange: (Int) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
     onOpenRecent: () -> Unit,
-    onOpenFavorites: () -> Unit,
     onAdd: () -> Unit,
     onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
@@ -325,7 +325,7 @@ private fun MainScaffold(
                 onOpenAr = onOpenAr,
                 onEditRack = onEditRack
             )
-            Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, onOpenFavorites = onOpenFavorites)
+            Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, initialFavoritesOnly = bottlesFavOnly)
         }
     }
 }

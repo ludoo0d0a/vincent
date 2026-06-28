@@ -21,6 +21,7 @@
     <string name="last_added">Dernières bouteilles ajoutées</string>
     <string name="import_export_label">Importer / Exporter (PLOC, Vivino…)</string>
     <string name="my_favorites">Mes favoris</string>
+    <string name="favorites_card_sub">vins favoris</string>
     <plurals name="vines_count">
         <item quantity="one">%d vin</item>
         <item quantity="other">%d vins</item>
@@ -227,7 +228,11 @@
         <item quantity="one">Importé : %1$d bouteille · source détectée « %3$s »</item>
         <item quantity="other">Importé : %1$d bouteilles · source détectée « %3$s »</item>
     </plurals>
-    <string name="transfer_import_none">Aucune bouteille reconnue dans ce fichier.</string>
+    <string name="transfer_import_none">Aucune donnée reconnue dans ce fichier.</string>
+    <plurals name="data_import_done">
+        <item quantity="one">Importé : %1$d élément · source détectée « %2$s »</item>
+        <item quantity="other">Importé : %1$d éléments · source détectée « %2$s »</item>
+    </plurals>
     <string name="transfer_export_success">Cave exportée en CSV.</string>
     <string name="transfer_export_canceled">Export annulé.</string>
     <string name="format_ploc_desc">Export CSV (Réglages → Exporter)</string>
@@ -305,7 +310,17 @@
     <string name="add_parsed_domain">Domaine</string>
     <string name="add_parsed_vintage">Millésime</string>
     <string name="add_parsed_color">Couleur</string>
+    <string name="add_parsed_appellation">Appellation</string>
     <string name="add_parsed_estimated_price">Prix estimé</string>
+    <string name="add_voice_summary_title">Résumé</string>
+    <string name="add_voice_complete_hint">Touchez un champ à compléter ou discutez avec l\'assistant.</string>
+    <string name="add_voice_missing">À compléter</string>
+    <string name="add_voice_switch_manual">Éditer · saisie manuelle</string>
+    <string name="add_voice_discuss_title">Compléter par la discussion</string>
+    <string name="add_voice_discuss_placeholder">Ex. « millésime 2019, 24 € »</string>
+    <string name="add_voice_send">Envoyer</string>
+    <string name="add_voice_assistant_done">C\'est noté.</string>
+    <string name="add_voice_field_done">OK</string>
     <string name="add_photo_capture">Photographier l\'étiquette</string>
     <string name="add_barcode_scan">Scanner le code-barres</string>
     <string name="add_method_barcode">Code-barres</string>
@@ -443,6 +458,9 @@
     <string name="ar_mode_photo">Photo figée</string>
     <string name="ar_mode_marker">Marqueurs</string>
     <string name="ar_photo_hint">Pincez pour zoomer, glissez pour déplacer.</string>
+    <string name="ar_adjust">Ajuster l\'overlay</string>
+    <string name="ar_adjust_hint">Glissez les 4 coins pour aligner les casiers et leurs bouteilles sur la façade.</string>
+    <string name="ar_cancel">Annuler</string>
     <string name="ar_marker_searching">Pointez la caméra vers le marqueur…</string>
     <string name="ar_marker_setup_title">Calibrer avec deux marqueurs</string>
     <string name="ar_marker_print">Imprimez ces deux marqueurs (≈5 cm chacun) et collez-les sur les coins haut-gauche et bas-droite du casier.</string>

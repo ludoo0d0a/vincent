@@ -21,10 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,6 +46,7 @@ import fr.geoking.vincent.ai.AiUsage
 import fr.geoking.vincent.ai.PriceEstimate
 import fr.geoking.vincent.ai.priceEstimator
 import fr.geoking.vincent.ai.rememberBarcodeScanner
+import fr.geoking.vincent.ai.rememberDictation
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.ai.wineRecognizer
 import fr.geoking.vincent.model.BottlePhotoKind
@@ -54,11 +58,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
@@ -199,9 +206,30 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
     }
     val identify: () -> Unit = { startCapture() }
     var transcript by remember { mutableStateOf("") }
+    // Conversation used to complete the parsed bottle by discussing with the assistant.
+    var voiceChat by remember { mutableStateOf<List<VoiceChatMsg>>(emptyList()) }
+    var chatBusy by remember { mutableStateOf(false) }
+    val assistantDone = stringResource(Res.string.add_voice_assistant_done)
+
+    // Pre-fill the manual form from the current (possibly edited) voice result.
+    fun seedManualFromVoice() {
+        aiBottle?.let { b ->
+            val eff = aiPrice?.amountEur ?: b.price
+            manualSeed = ManualSeed(
+                domain = b.domain,
+                appellation = b.appellation,
+                color = b.color,
+                category = b.category,
+                vintage = if (b.vintage == "NM") "" else b.vintage,
+                price = eff.takeIf { it > 0 }?.toString() ?: "",
+            )
+        }
+    }
+
     val onVoiceDictationEnd: (String) -> Unit = { text ->
         busy = true
         aiError = null
+        voiceChat = emptyList()
         scope.launch {
             val outcome = recognizer.fromText(text)
             val b = outcome.bottle
@@ -209,17 +237,39 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
             aiError = outcome.error
             busy = false
             if (b != null) {
-                val est = estimator.estimate(b)
-                aiPrice = est
-                manualSeed = ManualSeed(
-                    domain = b.domain,
-                    appellation = b.appellation,
-                    color = b.color,
-                    category = b.category,
-                    vintage = if (b.vintage == "NM") "" else b.vintage,
-                    price = (est?.amountEur ?: b.price.takeIf { it > 0 })?.toString() ?: "",
-                )
-                mode = AddMode.MANUAL
+                // Stay on the voice summary; the user completes missing data by tapping
+                // a field or chatting, and only switches to the manual form on demand.
+                aiPrice = estimator.estimate(b)
+                seedManualFromVoice()
+            }
+        }
+    }
+    // Inline edits on the summary update the parsed bottle directly.
+    val onVoiceBottleChange: (Bottle) -> Unit = { b -> aiBottle = b }
+    // Editing the price by hand overrides the estimate.
+    val onVoicePriceChange: (Int) -> Unit = { p ->
+        aiBottle = aiBottle?.copy(price = p)
+        aiPrice = null
+    }
+    val onSwitchToManual: () -> Unit = {
+        seedManualFromVoice()
+        mode = AddMode.MANUAL
+    }
+    val onSendChat: (String) -> Unit = { msg ->
+        val current = aiBottle
+        if (current != null && msg.isNotBlank()) {
+            voiceChat = voiceChat + VoiceChatMsg(fromUser = true, text = msg)
+            chatBusy = true
+            scope.launch {
+                val outcome = recognizer.refine(current, msg)
+                outcome.bottle?.let { b ->
+                    aiBottle = b
+                    // Keep an explicit price; otherwise try to (re)estimate the missing one.
+                    aiPrice = if (b.price > 0) null else estimator.estimate(b)
+                }
+                val reply = outcome.reply ?: outcome.error ?: assistantDone
+                voiceChat = voiceChat + VoiceChatMsg(fromUser = false, text = reply)
+                chatBusy = false
             }
         }
     }
@@ -300,9 +350,16 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     onTranscriptChange = { transcript = it },
                     onDictationEnd = onVoiceDictationEnd,
                     parsed = aiBottle,
-                    priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
+                    effectivePrice = aiPrice?.amountEur ?: aiBottle?.price ?: 0,
+                    priceSource = aiPrice?.source,
                     errorMsg = aiError,
                     busy = busy,
+                    chat = voiceChat,
+                    chatBusy = chatBusy,
+                    onBottleChange = onVoiceBottleChange,
+                    onPriceChange = onVoicePriceChange,
+                    onSendChat = onSendChat,
+                    onSwitchToManual = onSwitchToManual,
                 )
                 AddMode.MANUAL -> ManualPane(
                     seed = manualSeed,
@@ -334,10 +391,21 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     } else {
                         Cellar.addBottle(b)
                     }
-                    // Place into the chosen empty rack cell, if any.
+                    // Place into the chosen empty rack cell, if any. The new cell is
+                    // marked selected (and any prior selection cleared) so the cellar
+                    // grid reopens on this freshly-added bottle.
                     if (mode == AddMode.MANUAL) manualPlacement?.let { (ri, ci) ->
                         Racks.all.getOrNull(ri)?.let { r ->
-                            Racks.update(ri, r.replaceCell(ci, RackCell(rowLabel(ci / r.cols), true, b.color, b.category, b.vintage, b.price)))
+                            val placed = r.copy(
+                                cells = r.cells.mapIndexed { idx, c ->
+                                    when {
+                                        idx == ci -> RackCell(rowLabel(ci / r.cols), true, b.color, b.category, b.vintage, b.price, selected = true)
+                                        c.selected -> c.copy(selected = false)
+                                        else -> c
+                                    }
+                                },
+                            )
+                            Racks.update(ri, placed)
                         }
                     }
                     onClose()
@@ -386,8 +454,6 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     var placeRack by remember(seed) { mutableStateOf(seed?.placeRack) }
     var placeCell by remember(seed) { mutableStateOf(seed?.placeCell) }
     var photos by remember { mutableStateOf<Map<BottlePhotoKind, String?>>(emptyMap()) }
-    var searchQuery by remember { mutableStateOf("") }
-    var debouncedQuery by remember { mutableStateOf("") }
     val draftId = remember { "new-${Cellar.references()}-${System.currentTimeMillis()}" }
     val labelSaver = rememberLabelImageSaver()
     val scope = rememberCoroutineScope()
@@ -401,24 +467,14 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         }
     }
 
-    LaunchedEffect(searchQuery) {
-        delay(300)
-        debouncedQuery = searchQuery
-    }
-
-    val cellarSize = Cellar.bottles.size
-    val suggestions = remember(debouncedQuery, cellarSize) { Cellar.search(debouncedQuery) }
-
-    fun applyFromCellar(b: Bottle) {
-        domain = b.domain
-        appellation = b.appellation
-        color = b.color
-        category = b.category
-        vintage = if (b.vintage == "NM") "" else b.vintage
-        price = if (b.price > 0) b.price.toString() else ""
-        photos = BottlePhotoKind.entries.associateWith { b.photo(it) }
-        searchQuery = ""
-        debouncedQuery = ""
+    fun applySuggestion(s: WineSuggestion) {
+        if (s.domain.isNotBlank()) domain = s.domain
+        if (s.appellation.isNotBlank()) appellation = s.appellation
+        s.color?.let { color = it }
+        s.category?.let { category = it }
+        if (s.vintage.isNotBlank()) vintage = s.vintage
+        s.price?.let { price = it.toString() }
+        s.bottle?.let { b -> photos = BottlePhotoKind.entries.associateWith { b.photo(it) } }
     }
 
     LaunchedEffect(seed) {
@@ -503,49 +559,18 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
             photos = BottlePhotoKind.entries.associateWith { photos[it] },
             onCapture = { kind -> pendingKind = kind; capture() },
         )
-        Text(
-            stringResource(Res.string.add_search_cellar),
-            fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
-            modifier = Modifier.padding(start = 2.dp),
+        AutocompleteField(
+            label = stringResource(Res.string.add_field_domain_name),
+            value = domain,
+            onChange = { domain = it },
+            onPick = ::applySuggestion,
         )
-        SearchField(
-            placeholder = stringResource(Res.string.add_search_placeholder),
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
+        AutocompleteField(
+            label = stringResource(Res.string.add_field_appellation_label),
+            value = appellation,
+            onChange = { appellation = it },
+            onPick = ::applySuggestion,
         )
-        if (debouncedQuery.length >= 2) {
-            if (suggestions.isEmpty()) {
-                Text(
-                    stringResource(Res.string.add_empty_cellar),
-                    fontSize = 11.5.sp, color = VincentColors.Muted,
-                    modifier = Modifier.padding(start = 2.dp),
-                )
-            } else {
-                suggestions.forEach { b ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(VincentColors.Surface)
-                            .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
-                            .clickable { applyFromCellar(b) }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        WineBottle(b.color, Modifier.size(width = 16.dp, height = 32.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(b.domain, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-                            Text("${b.appellation} · ${b.vintage}", fontSize = 11.sp, color = VincentColors.Muted)
-                        }
-                        Text(stringResource(Res.string.add_reuse), fontSize = 10.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
-                    }
-                }
-            }
-        }
-
-        Field(stringResource(Res.string.add_field_domain_name), domain) { domain = it }
-        Field(stringResource(Res.string.add_field_appellation_label), appellation) { appellation = it }
         ChipRow(stringResource(Res.string.add_field_color), WineColor.entries, color, { stringResource(it.label) }) { color = it }
         ChipRow(stringResource(Res.string.add_field_category), WineCategory.entries, category, { stringResource(it.label) }) { category = it }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -669,6 +694,130 @@ private fun Field(
         keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
         modifier = modifier.fillMaxWidth(),
     )
+}
+
+/** A wine candidate surfaced by [AutocompleteField], from the cellar or the wine catalogue. */
+private data class WineSuggestion(
+    val domain: String,
+    val appellation: String,
+    val color: WineColor? = null,
+    val category: WineCategory? = null,
+    val vintage: String = "",
+    val price: Int? = null,
+    /** Set when the candidate is an existing cellar bottle (lets us reuse its photos). */
+    val bottle: Bottle? = null,
+    /** Provider/source label shown on the right of the row (null for cellar matches). */
+    val source: String? = null,
+)
+
+/** Suggestions for the add form: local cellar bottles first, then the wine catalogue. */
+private suspend fun searchWineSuggestions(query: String): List<WineSuggestion> {
+    val q = query.trim()
+    if (q.length < 2) return emptyList()
+    val local = Cellar.search(q).map { b ->
+        WineSuggestion(
+            domain = b.domain,
+            appellation = b.appellation,
+            color = b.color,
+            category = b.category,
+            vintage = if (b.vintage == "NM") "" else b.vintage,
+            price = b.price.takeIf { it > 0 },
+            bottle = b,
+        )
+    }
+    val catalog = runCatching { WineDataSource.search(q) }.getOrDefault(emptyList()).map { p ->
+        WineSuggestion(
+            domain = p.brand.ifBlank { p.name },
+            appellation = (if (p.brand.isNotBlank()) p.name else p.region.orEmpty()).ifBlank { p.name },
+            vintage = p.vintage.orEmpty(),
+            source = p.source,
+        )
+    }
+    return (local + catalog)
+        .filter { it.domain.isNotBlank() || it.appellation.isNotBlank() }
+        .distinctBy { it.domain.lowercase() to it.appellation.lowercase() }
+        .take(8)
+}
+
+/**
+ * A text field that proposes cellar + catalogue matches as the user types. Picking a
+ * suggestion fills the whole form (domain, appellation, colour, vintage, price, photos).
+ */
+@Composable
+private fun AutocompleteField(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onChange: (String) -> Unit,
+    onPick: (WineSuggestion) -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    var debounced by remember { mutableStateOf(value) }
+    var suggestions by remember { mutableStateOf<List<WineSuggestion>>(emptyList()) }
+    val focusManager = LocalFocusManager.current
+
+    LaunchedEffect(value) {
+        delay(280)
+        debounced = value
+    }
+    LaunchedEffect(debounced, focused) {
+        suggestions = if (focused && debounced.trim().length >= 2) searchWineSuggestions(debounced) else emptyList()
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+            label = { Text(label, fontSize = 12.sp) },
+            modifier = modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+        )
+        if (focused && suggestions.isNotEmpty()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(VincentColors.Surface)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)),
+            ) {
+                suggestions.forEach { s ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onPick(s)
+                                suggestions = emptyList()
+                                focusManager.clearFocus()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        WineBottle(s.color ?: WineColor.RED, Modifier.size(width = 14.dp, height = 28.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                s.domain.ifBlank { s.appellation },
+                                fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                            val sub = listOfNotNull(
+                                s.appellation.takeIf { it.isNotBlank() && it != s.domain },
+                                s.vintage.takeIf { it.isNotBlank() },
+                            ).joinToString(" · ")
+                            if (sub.isNotBlank()) {
+                                Text(sub, fontSize = 11.sp, color = VincentColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                        Text(
+                            s.source ?: stringResource(Res.string.add_reuse),
+                            fontSize = 9.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -857,66 +1006,317 @@ private fun ScanPane(
     }
 }
 
+/** A single message in the "complete by discussion" conversation. */
+private data class VoiceChatMsg(val fromUser: Boolean, val text: String)
+
+/** Editable fields surfaced on the voice summary. */
+private enum class VoiceField { DOMAIN, APPELLATION, COLOR, VINTAGE, PRICE }
+
 @Composable
 private fun VoicePane(
     transcript: String,
     onTranscriptChange: (String) -> Unit,
     onDictationEnd: (String) -> Unit,
     parsed: Bottle?,
-    priceLabel: String?,
+    effectivePrice: Int,
+    priceSource: String?,
     errorMsg: String? = null,
     busy: Boolean = false,
+    chat: List<VoiceChatMsg>,
+    chatBusy: Boolean,
+    onBottleChange: (Bottle) -> Unit,
+    onPriceChange: (Int) -> Unit,
+    onSendChat: (String) -> Unit,
+    onSwitchToManual: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        SpeechTextInput(
-            value = transcript,
-            onValueChange = onTranscriptChange,
-            onDictationEnd = onDictationEnd,
-            placeholder = stringResource(Res.string.add_voice_placeholder),
-            title = stringResource(Res.string.add_voice_title),
-            subtitle = stringResource(Res.string.add_voice_subtitle),
-        )
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (parsed == null) {
+            // Step 1 — dictate, then parse. Once parsed, we keep the user on the summary.
+            SpeechTextInput(
+                value = transcript,
+                onValueChange = onTranscriptChange,
+                onDictationEnd = onDictationEnd,
+                placeholder = stringResource(Res.string.add_voice_placeholder),
+                title = stringResource(Res.string.add_voice_title),
+                subtitle = stringResource(Res.string.add_voice_subtitle),
+            )
+            Spacer(Modifier.height(14.dp))
+            if (busy) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(color = VincentColors.Accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(stringResource(Res.string.add_voice_analyzing), fontSize = 12.sp, color = VincentColors.Muted)
+                }
+            } else if (errorMsg != null) {
+                Text(errorMsg, fontSize = 12.sp, color = VincentColors.Red, lineHeight = 17.sp, modifier = Modifier.fillMaxWidth())
+            }
+        } else {
+            // Step 2 — summary with editable / missing fields + the discussion assistant.
+            VoiceSummary(
+                parsed = parsed,
+                effectivePrice = effectivePrice,
+                priceSource = priceSource,
+                onBottleChange = onBottleChange,
+                onPriceChange = onPriceChange,
+                onSwitchToManual = onSwitchToManual,
+            )
+            Spacer(Modifier.height(18.dp))
+            VoiceDiscussion(messages = chat, busy = chatBusy, onSend = onSendChat)
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
 
-        Spacer(Modifier.height(14.dp))
-        if (busy) {
+@Composable
+private fun VoiceSummary(
+    parsed: Bottle,
+    effectivePrice: Int,
+    priceSource: String?,
+    onBottleChange: (Bottle) -> Unit,
+    onPriceChange: (Int) -> Unit,
+    onSwitchToManual: () -> Unit,
+) {
+    var editing by remember { mutableStateOf<VoiceField?>(null) }
+
+    fun missing(f: VoiceField): Boolean = when (f) {
+        VoiceField.DOMAIN -> parsed.domain.isBlank()
+        VoiceField.APPELLATION -> parsed.appellation.isBlank() || parsed.appellation == "—"
+        VoiceField.COLOR -> false
+        VoiceField.VINTAGE -> parsed.vintage.isBlank() || parsed.vintage == "NM"
+        VoiceField.PRICE -> effectivePrice <= 0
+    }
+    val anyMissing = VoiceField.entries.any { missing(it) }
+
+    fun toggle(f: VoiceField) { editing = if (editing == f) null else f }
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(color = VincentColors.Accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
+                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(Res.string.add_voice_summary_title), fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+            }
+            // "Edit" → switch to the pre-filled manual entry.
+            Row(
+                Modifier.clip(RoundedCornerShape(10.dp)).background(VincentColors.Surface2)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp))
+                    .clickable(onClick = onSwitchToManual).padding(horizontal = 11.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Edit, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(Res.string.add_voice_switch_manual), fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+            }
+        }
+        if (anyMissing) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(Res.string.add_voice_complete_hint),
+                fontSize = 11.sp, color = VincentColors.Muted, lineHeight = 15.sp,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        SummaryRow(
+            label = stringResource(Res.string.add_parsed_domain),
+            value = parsed.domain,
+            missing = missing(VoiceField.DOMAIN),
+            editing = editing == VoiceField.DOMAIN,
+            onToggle = { toggle(VoiceField.DOMAIN) },
+        ) {
+            InlineEditField(parsed.domain) { onBottleChange(parsed.copy(domain = it)) }
+        }
+        SummaryRow(
+            label = stringResource(Res.string.add_parsed_appellation),
+            value = parsed.appellation.takeIf { it.isNotBlank() && it != "—" }.orEmpty(),
+            missing = missing(VoiceField.APPELLATION),
+            editing = editing == VoiceField.APPELLATION,
+            onToggle = { toggle(VoiceField.APPELLATION) },
+        ) {
+            InlineEditField(parsed.appellation.takeIf { it != "—" }.orEmpty()) { onBottleChange(parsed.copy(appellation = it)) }
+        }
+        SummaryRow(
+            label = stringResource(Res.string.add_parsed_color),
+            valueContent = { ColorTag(parsed.color) },
+            missing = false,
+            editing = editing == VoiceField.COLOR,
+            onToggle = { toggle(VoiceField.COLOR) },
+        ) {
+            ChipRow("", WineColor.entries, parsed.color, { stringResource(it.label) }) {
+                onBottleChange(parsed.copy(color = it)); editing = null
+            }
+        }
+        SummaryRow(
+            label = stringResource(Res.string.add_parsed_vintage),
+            value = parsed.vintage.takeIf { it != "NM" && it.isNotBlank() }.orEmpty(),
+            mono = true,
+            missing = missing(VoiceField.VINTAGE),
+            editing = editing == VoiceField.VINTAGE,
+            onToggle = { toggle(VoiceField.VINTAGE) },
+        ) {
+            InlineEditField(parsed.vintage.takeIf { it != "NM" }.orEmpty(), numeric = true) {
+                onBottleChange(parsed.copy(vintage = it.trim().ifBlank { "NM" }))
+            }
+        }
+        SummaryRow(
+            label = stringResource(Res.string.add_parsed_estimated_price),
+            value = if (effectivePrice > 0) "≈ $effectivePrice €" + (priceSource?.let { " · $it" } ?: "") else "",
+            missing = missing(VoiceField.PRICE),
+            editing = editing == VoiceField.PRICE,
+            onToggle = { toggle(VoiceField.PRICE) },
+        ) {
+            InlineEditField(effectivePrice.takeIf { it > 0 }?.toString().orEmpty(), numeric = true) {
+                onPriceChange(it.filter { c -> c.isDigit() }.toIntOrNull() ?: 0)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryRow(
+    label: String,
+    missing: Boolean,
+    editing: Boolean,
+    onToggle: () -> Unit,
+    value: String = "",
+    mono: Boolean = false,
+    valueContent: (@Composable () -> Unit)? = null,
+    editor: @Composable () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(11.dp))
+            .background(VincentColors.Surface)
+            .border(1.dp, if (editing) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(11.dp))
+            .padding(horizontal = 13.dp, vertical = 11.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onToggle),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+            when {
+                editing -> Icon(Icons.Filled.Check, contentDescription = stringResource(Res.string.add_voice_field_done), tint = VincentColors.Accent, modifier = Modifier.size(16.dp))
+                missing -> Text(stringResource(Res.string.add_voice_missing), fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Red)
+                valueContent != null -> valueContent()
+                mono -> Text(value, style = MonoNumber, color = VincentColors.Fg)
+                else -> Text(value, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+            }
+        }
+        if (editing) {
+            Spacer(Modifier.height(8.dp))
+            editor()
+        }
+    }
+}
+
+@Composable
+private fun InlineEditField(initial: String, numeric: Boolean = false, onChange: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it; onChange(it) },
+        singleLine = true,
+        keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun VoiceDiscussion(
+    messages: List<VoiceChatMsg>,
+    busy: Boolean,
+    onSend: (String) -> Unit,
+) {
+    var draft by remember { mutableStateOf("") }
+    var listening by remember { mutableStateOf(false) }
+    val startDictation = rememberDictation(
+        onText = { draft = it },
+        onLevel = {},
+        onListening = { listening = it },
+    )
+
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            stringResource(Res.string.add_voice_discuss_title),
+            fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
+            modifier = Modifier.padding(bottom = 2.dp).fillMaxWidth(),
+        )
+        messages.forEach { ChatBubble(it) }
+        if (busy) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(color = VincentColors.Accent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(stringResource(Res.string.add_voice_analyzing), fontSize = 12.sp, color = VincentColors.Muted)
             }
-        } else if (errorMsg != null && parsed == null) {
-            Text(errorMsg, fontSize = 12.sp, color = VincentColors.Red, lineHeight = 17.sp, modifier = Modifier.fillMaxWidth())
         }
-        if (parsed != null) {
-            ParsedField(stringResource(Res.string.add_parsed_domain), parsed.domain)
-            ParsedField(stringResource(Res.string.add_parsed_vintage), parsed.vintage, mono = true)
-            ParsedFieldTag(stringResource(Res.string.add_parsed_color), parsed.color)
-            if (priceLabel != null) ParsedField(stringResource(Res.string.add_parsed_estimated_price), priceLabel)
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                singleLine = true,
+                placeholder = { Text(stringResource(Res.string.add_voice_discuss_placeholder), fontSize = 12.sp) },
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                    .background(if (listening) VincentColors.Accent else VincentColors.AccentSoft)
+                    .clickable(enabled = !busy, onClick = startDictation),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Mic,
+                    contentDescription = stringResource(Res.string.ui_speech_speak),
+                    tint = if (listening) Color.White else VincentColors.Accent,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            val canSend = draft.isNotBlank() && !busy
+            Box(
+                Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                    .background(if (canSend) VincentColors.Accent else VincentColors.Surface2)
+                    .clickable(enabled = canSend) { onSend(draft.trim()); draft = "" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = stringResource(Res.string.add_voice_send),
+                    tint = if (canSend) Color.White else VincentColors.Faint,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ParsedField(label: String, value: String, mono: Boolean = false) {
+private fun ChatBubble(msg: VoiceChatMsg) {
     Row(
-        Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp)).padding(horizontal = 13.dp, vertical = 11.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth().padding(top = 6.dp),
+        horizontalArrangement = if (msg.fromUser) Arrangement.End else Arrangement.Start,
     ) {
-        Text(label, fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
-        if (mono) Text(value, style = MonoNumber, color = VincentColors.Fg)
-        else Text(value, fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-    }
-}
-
-@Composable
-private fun ParsedFieldTag(label: String, color: WineColor) {
-    Row(
-        Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(11.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp)).padding(horizontal = 13.dp, vertical = 9.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
-        ColorTag(color)
+        Text(
+            msg.text,
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
+            color = if (msg.fromUser) Color.White else VincentColors.Fg,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (msg.fromUser) VincentColors.Accent else VincentColors.Surface)
+                .then(if (msg.fromUser) Modifier else Modifier.border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
     }
 }

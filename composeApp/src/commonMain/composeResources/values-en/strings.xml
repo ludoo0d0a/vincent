@@ -21,6 +21,7 @@
     <string name="last_added">Recently added bottles</string>
     <string name="import_export_label">Import / Export (PLOC, Vivino…)</string>
     <string name="my_favorites">My favorites</string>
+    <string name="favorites_card_sub">favorite wines</string>
     <plurals name="vines_count">
         <item quantity="one">%d wine</item>
         <item quantity="other">%d wines</item>
@@ -226,7 +227,11 @@
         <item quantity="one">Imported: %1$d bottle · source detected “%3$s”</item>
         <item quantity="other">Imported: %1$d bottles · source detected “%3$s”</item>
     </plurals>
-    <string name="transfer_import_none">No bottle recognized in this file.</string>
+    <string name="transfer_import_none">No data recognized in this file.</string>
+    <plurals name="data_import_done">
+        <item quantity="one">Imported: %1$d item · source detected “%2$s”</item>
+        <item quantity="other">Imported: %1$d items · source detected “%2$s”</item>
+    </plurals>
     <string name="transfer_export_success">Cellar exported to CSV.</string>
     <string name="transfer_export_canceled">Export canceled.</string>
     <string name="format_ploc_desc">CSV Export (Settings → Export)</string>
@@ -304,7 +309,17 @@
     <string name="add_parsed_domain">Domain</string>
     <string name="add_parsed_vintage">Vintage</string>
     <string name="add_parsed_color">Color</string>
+    <string name="add_parsed_appellation">Appellation</string>
     <string name="add_parsed_estimated_price">Estimated price</string>
+    <string name="add_voice_summary_title">Summary</string>
+    <string name="add_voice_complete_hint">Tap a field to complete, or chat with the assistant.</string>
+    <string name="add_voice_missing">To complete</string>
+    <string name="add_voice_switch_manual">Edit · manual entry</string>
+    <string name="add_voice_discuss_title">Complete by chatting</string>
+    <string name="add_voice_discuss_placeholder">e.g. “vintage 2019, €24”</string>
+    <string name="add_voice_send">Send</string>
+    <string name="add_voice_assistant_done">Got it.</string>
+    <string name="add_voice_field_done">OK</string>
     <string name="add_photo_capture">Photo capture</string>
     <string name="add_barcode_scan">Barcode scan</string>
     <string name="add_method_barcode">Barcode</string>
@@ -440,6 +455,9 @@
     <string name="ar_mode_photo">Frozen photo</string>
     <string name="ar_mode_marker">Markers</string>
     <string name="ar_photo_hint">Pinch to zoom, drag to move.</string>
+    <string name="ar_adjust">Adjust overlay</string>
+    <string name="ar_adjust_hint">Drag the 4 corners to align the slots and their bottles on the rack face.</string>
+    <string name="ar_cancel">Cancel</string>
     <string name="ar_marker_searching">Point the camera at the marker…</string>
     <string name="ar_marker_setup_title">Calibrate with two markers</string>
     <string name="ar_marker_print">Print these two markers (≈5 cm each) and stick them on the rack\'s top-left and bottom-right corners.</string>

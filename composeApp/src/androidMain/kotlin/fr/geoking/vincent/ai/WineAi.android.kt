@@ -55,6 +55,42 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         else RecognizeOutcome(bottle = bottle)
     }
 
+    override suspend fun refine(current: Bottle, instruction: String): RecognizeOutcome = withContext(Dispatchers.IO) {
+        val ctx = JSONObject()
+            .put("domain", current.domain)
+            .put("appellation", current.appellation)
+            .put("color", colorToken(current.color))
+            .put("region", current.provenance)
+            .put("vintage", current.vintage)
+            .put("price", current.price)
+        val json = generate(
+            langDirective() +
+                "Tu aides à compléter la fiche d'un vin par la discussion. " +
+                "Fiche actuelle (JSON): $ctx. " +
+                "Précision de l'utilisateur : \"$instruction\". " +
+                "Renvoie la fiche mise à jour en JSON " +
+                "{domain, appellation, color, region, vintage, category, price, reply}. " +
+                "color parmi rouge/blanc/rosé/pétillant. " +
+                "price = prix unitaire en euros (entier, 0 si inconnu). " +
+                "vintage = année sur 4 chiffres ou \"NM\" si non millésimé. " +
+                "Conserve les valeurs déjà connues si l'utilisateur ne les change pas. " +
+                "reply = une phrase courte confirmant ce qui a été complété ou demandant la donnée manquante.",
+            imageB64 = null,
+        ) ?: return@withContext RecognizeOutcome(error = lastError)
+        val reply = json.optString("reply").trim().takeIf { it.isNotEmpty() }
+        val updated = toBottle(json, current.id)?.copy(
+            price = json.optInt("price", current.price).takeIf { it > 0 } ?: current.price,
+            quantity = current.quantity,
+            cellarSpot = current.cellarSpot,
+            source = current.source,
+            photoBottle = current.photoBottle,
+            photoLabel = current.photoLabel,
+            photoBack = current.photoBack,
+        )
+        if (updated == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text), reply = reply)
+        else RecognizeOutcome(bottle = updated, reply = reply)
+    }
+
     override suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome = withContext(Dispatchers.IO) {
         val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
         val json = generate(
@@ -364,6 +400,15 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             source = AddSource.SCAN,
             addedLabel = getString(Res.string.ai_added_label),
         )
+    }
+
+    // Stable French token sent back to Gemini so a refinement keeps the same colour
+    // vocabulary it was asked to produce (decoupled from the localized UI label).
+    private fun colorToken(color: WineColor): String = when (color) {
+        WineColor.RED -> "rouge"
+        WineColor.WHITE -> "blanc"
+        WineColor.ROSE -> "rosé"
+        WineColor.SPARKLING -> "pétillant"
     }
 
     private fun colorOf(raw: String): WineColor {
