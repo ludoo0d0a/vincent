@@ -63,6 +63,10 @@ data class RackArAnchor(
     val qw: Float,
     val gridWidthMeters: Float,
     val gridHeightMeters: Float,
+    /** Custom top-left marker image path; null ⇒ procedurally generated marker. */
+    val tlImagePath: String? = null,
+    /** Custom bottom-right marker image path; null ⇒ procedurally generated marker. */
+    val brImagePath: String? = null,
 ) {
     val isValid: Boolean
         get() = markerId.isNotBlank() && markerWidthMeters > 0f &&

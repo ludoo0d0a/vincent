@@ -46,6 +46,25 @@ object ArProjection {
     }
 
     /**
+     * Four world-space corners (metres) of a detected Augmented Image, derived from its
+     * [centerPose] and physical [extentX] (local X) x [extentZ] (local Z). Order is TL, TR, BR, BL
+     * in the marker's own plane. Used to outline each detected marker on screen.
+     */
+    fun markerCorners(centerPose: Pose, extentX: Float, extentZ: Float): List<FloatArray> {
+        val hx = extentX / 2f
+        val hz = extentZ / 2f
+        return listOf(
+            floatArrayOf(-hx, 0f, -hz),
+            floatArrayOf(hx, 0f, -hz),
+            floatArrayOf(hx, 0f, hz),
+            floatArrayOf(-hx, 0f, hz),
+        ).map { local ->
+            val p = centerPose.compose(Pose.makeTranslation(local[0], local[1], local[2]))
+            floatArrayOf(p.tx(), p.ty(), p.tz())
+        }
+    }
+
+    /**
      * Grid fraction (fu, fv) in 0..1 for the centre of the cell at [col],[row], honouring the
      * half-cell [staggered] (quinconce) shift on odd rows.
      */

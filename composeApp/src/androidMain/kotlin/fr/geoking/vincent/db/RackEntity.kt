@@ -92,6 +92,8 @@ private fun String.toArAnchor(): RackArAnchor? {
         qx = nums[4]!!, qy = nums[5]!!, qz = nums[6]!!, qw = nums[7]!!,
         gridWidthMeters = nums[8]!!,
         gridHeightMeters = nums[9]!!,
+        tlImagePath = f.getOrNull(11)?.takeIf { it.isNotEmpty() },
+        brImagePath = f.getOrNull(12)?.takeIf { it.isNotEmpty() },
     )
 }
 
@@ -102,4 +104,6 @@ private fun RackArAnchor.toData(): String = listOf(
     qx.toString(), qy.toString(), qz.toString(), qw.toString(),
     gridWidthMeters.toString(),
     gridHeightMeters.toString(),
+    tlImagePath ?: "",
+    brImagePath ?: "",
 ).joinToString(FIELD_SEP)

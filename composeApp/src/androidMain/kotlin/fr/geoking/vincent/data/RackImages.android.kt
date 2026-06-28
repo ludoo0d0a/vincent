@@ -19,6 +19,14 @@ actual fun rememberRackImageSaver(): RackImageSaver {
                 file.writeBytes(jpeg)
                 file.absolutePath
             }
+
+            override suspend fun saveNamed(jpeg: ByteArray, name: String): String = withContext(Dispatchers.IO) {
+                val dir = File(context.filesDir, "racks").apply { mkdirs() }
+                val safeName = name.replace(Regex("[^a-zA-Z0-9_-]"), "-").ifBlank { "marker" }
+                val file = File(dir, "$safeName.jpg")
+                file.writeBytes(jpeg)
+                file.absolutePath
+            }
         }
     }
 }

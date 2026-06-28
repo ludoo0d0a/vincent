@@ -3,8 +3,10 @@ package fr.geoking.vincent.screens
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.Res
@@ -13,6 +15,13 @@ import vincent.composeapp.generated.resources.ar_install_action
 import vincent.composeapp.generated.resources.ar_low_quality
 import vincent.composeapp.generated.resources.ar_marker_both_found
 import vincent.composeapp.generated.resources.ar_marker_br
+import vincent.composeapp.generated.resources.ar_marker_capture_hint
+import vincent.composeapp.generated.resources.ar_marker_gallery
+import vincent.composeapp.generated.resources.ar_marker_need_both
+import vincent.composeapp.generated.resources.ar_marker_photo
+import vincent.composeapp.generated.resources.ar_marker_print_action
+import vincent.composeapp.generated.resources.ar_marker_source_custom
+import vincent.composeapp.generated.resources.ar_marker_source_proposed
 import vincent.composeapp.generated.resources.ar_marker_measured
 import vincent.composeapp.generated.resources.ar_marker_point_br
 import vincent.composeapp.generated.resources.ar_marker_point_tl
@@ -45,6 +54,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,6 +89,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -104,6 +115,7 @@ import com.google.ar.core.Pose
 import com.google.ar.core.TrackingState
 import fr.geoking.vincent.ar.ArProjection
 import fr.geoking.vincent.ar.MarkerImages
+import fr.geoking.vincent.ar.MarkerPrinter
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Racks
@@ -126,8 +138,46 @@ import kotlin.math.roundToInt
 /** Per-frame AR tracking state, mutated in `onSessionUpdated` without reallocation. */
 private class ArFrameHolder {
     var image: AugmentedImage? = null
+    var brImage: AugmentedImage? = null
     val view = FloatArray(16)
     val proj = FloatArray(16)
+}
+
+/** Distinct highlight colours so each detected marker reads as its own zone. */
+private val MarkerHighlightTl = Color(0xFF3B82F6) // top-left: blue
+private val MarkerHighlightBr = Color(0xFFF59E0B) // bottom-right: orange
+
+/** Outlines a detected Augmented Image (its physical rectangle) in [color] on the AR view. */
+private fun DrawScope.drawMarkerHighlight(
+    img: AugmentedImage,
+    view: FloatArray,
+    proj: FloatArray,
+    widthPx: Int,
+    heightPx: Int,
+    color: Color,
+) {
+    val pts = ArProjection.markerCorners(img.centerPose, img.extentX, img.extentZ)
+        .map { ArProjection.projectWorldPoint(it, view, proj, widthPx, heightPx) }
+    if (pts.any { !it.visible }) return
+    val path = Path().apply {
+        moveTo(pts[0].x, pts[0].y)
+        for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
+        close()
+    }
+    drawPath(path, color.copy(alpha = 0.28f))
+    drawPath(path, color, style = Stroke(width = 5f))
+}
+
+/** Decodes JPEG bytes, downscaling so the longest side stays near [maxDim] (keeps ARCore memory sane). */
+private fun decodeScaledBitmap(bytes: ByteArray, maxDim: Int = 1024): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+    if (longest <= 0) return null
+    var sample = 1
+    while (longest / sample > maxDim) sample *= 2
+    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
 }
 
 @Composable
@@ -498,7 +548,15 @@ private fun ArPhotoSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
 @Composable
 private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
     val anchor = rack.arAnchor
-    val markerBitmap = remember(anchor?.markerId) { anchor?.let { MarkerImages.bitmap(it.markerId) } }
+    val tlId = anchor?.markerId
+    val brId = remember(rack.id) { brMarkerId(rack.id) }
+    // TL is the re-localisation beacon; BR is tracked only for its coloured highlight.
+    val tlBitmap = remember(anchor?.markerId, anchor?.tlImagePath) {
+        anchor?.let { it.tlImagePath?.let { p -> BitmapFactory.decodeFile(p) } ?: MarkerImages.bitmap(it.markerId) }
+    }
+    val brBitmap = remember(brId, anchor?.brImagePath) {
+        anchor?.let { it.brImagePath?.let { p -> BitmapFactory.decodeFile(p) } ?: MarkerImages.bitmap(brId) }
+    }
 
     val holder = remember { ArFrameHolder() }
     var frameTick by remember { mutableIntStateOf(0) }
@@ -506,14 +564,15 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
     var lowQuality by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().onSizeChanged { viewSize = it }) {
-        if (anchor != null && anchor.isValid && markerBitmap != null) {
+        if (anchor != null && anchor.isValid && tlBitmap != null && tlId != null) {
             ARSceneView(
                 modifier = Modifier.fillMaxSize(),
                 planeRenderer = false,
                 sessionConfiguration = { session, config ->
                     try {
                         val db = AugmentedImageDatabase(session)
-                        db.addImage(anchor.markerId, markerBitmap, anchor.markerWidthMeters)
+                        db.addImage(tlId, tlBitmap, anchor.markerWidthMeters)
+                        if (brBitmap != null) db.addImage(brId, brBitmap, anchor.markerWidthMeters)
                         config.augmentedImageDatabase = db
                     } catch (_: Exception) {
                         lowQuality = true
@@ -526,8 +585,10 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
                     if (cam.trackingState == TrackingState.TRACKING) {
                         cam.getViewMatrix(holder.view, 0)
                         cam.getProjectionMatrix(holder.proj, 0, 0.1f, 100f)
-                        holder.image = frame.getUpdatedTrackables(AugmentedImage::class.java)
-                            .firstOrNull { it.name == anchor.markerId && it.trackingState == TrackingState.TRACKING }
+                        val tracked = frame.getUpdatedTrackables(AugmentedImage::class.java)
+                            .filter { it.trackingState == TrackingState.TRACKING }
+                        holder.image = tracked.firstOrNull { it.name == tlId }
+                        holder.brImage = tracked.firstOrNull { it.name == brId }
                         frameTick++
                     }
                 },
@@ -549,6 +610,12 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
                     heightPx = viewSize.height,
                 )
                 Canvas(Modifier.fillMaxSize()) {
+                    holder.image?.let {
+                        drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightTl)
+                    }
+                    holder.brImage?.let {
+                        drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightBr)
+                    }
                     positions.forEach { pos ->
                         if (pos.visible) {
                             drawCircle(
@@ -781,7 +848,7 @@ private fun CenterPrompt(message: String, actionLabel: String, onAction: () -> U
     }
 }
 
-private const val MARKER_WIDTH_METERS = 0.10f
+private const val MARKER_WIDTH_METERS = 0.05f
 
 private fun tlMarkerId(rackId: String) = "$rackId-tl"
 private fun brMarkerId(rackId: String) = "$rackId-br"
@@ -790,6 +857,8 @@ private fun brMarkerId(rackId: String) = "$rackId-br"
 private class ArMarkerSetupHolder {
     var tlPose: Pose? = null
     var brPose: Pose? = null
+    var tlImage: AugmentedImage? = null
+    var brImage: AugmentedImage? = null
     val view = FloatArray(16)
     val proj = FloatArray(16)
 }
@@ -823,11 +892,73 @@ private fun MarkerPrintTile(label: String, bitmap: androidx.compose.ui.graphics.
     }
 }
 
-/** Pre-capture screen: shows the two markers to print before launching the live camera. */
+/** A custom marker tile: preview thumbnail with Photo + Gallery capture actions. */
 @Composable
-private fun ArMarkerPrint(
-    tl: androidx.compose.ui.graphics.ImageBitmap,
-    br: androidx.compose.ui.graphics.ImageBitmap,
+private fun CustomMarkerTile(
+    label: String,
+    bitmap: Bitmap?,
+    onPhoto: () -> Unit,
+    onGallery: () -> Unit,
+    modifier: Modifier,
+) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700)
+        Spacer(Modifier.height(6.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(VincentColors.Surface2),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Text("+", color = Color.White.copy(alpha = 0.6f), fontSize = 28.sp, fontWeight = FontWeight.W700)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(
+                onClick = onPhoto,
+                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(Res.string.ar_marker_photo), color = Color.White, fontSize = 11.sp) }
+            Button(
+                onClick = onGallery,
+                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(Res.string.ar_marker_gallery), color = Color.White, fontSize = 11.sp) }
+        }
+    }
+}
+
+/**
+ * Pre-capture screen: pick the marker source (proposed markers to print, or the user's own markers
+ * via photo/gallery), then launch the live camera.
+ */
+@Composable
+private fun ArMarkerConfigure(
+    custom: Boolean,
+    onSelectSource: (Boolean) -> Unit,
+    generatedTl: Bitmap,
+    generatedBr: Bitmap,
+    tlCustom: Bitmap?,
+    brCustom: Bitmap?,
+    tlLabel: String,
+    brLabel: String,
+    onPrint: () -> Unit,
+    onCapturePhoto: (Boolean) -> Unit,
+    onPickGallery: (Boolean) -> Unit,
+    canStart: Boolean,
     onStart: () -> Unit,
 ) {
     Column(
@@ -839,20 +970,63 @@ private fun ArMarkerPrint(
             fontSize = 15.sp,
             fontWeight = FontWeight.W800,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(Res.string.ar_marker_print),
-            color = Color.White.copy(alpha = 0.8f),
-            fontSize = 12.sp,
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MarkerPrintTile(stringResource(Res.string.ar_marker_tl), tl, Modifier.weight(1f))
-            MarkerPrintTile(stringResource(Res.string.ar_marker_br), br, Modifier.weight(1f))
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                false to stringResource(Res.string.ar_marker_source_proposed),
+                true to stringResource(Res.string.ar_marker_source_custom),
+            ).forEach { (value, text) ->
+                val selected = value == custom
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (selected) VincentColors.Accent else VincentColors.Surface2)
+                        .clickable { onSelectSource(value) }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.W800 else FontWeight.W600,
+                    )
+                }
+            }
         }
+        Spacer(Modifier.height(12.dp))
+
+        if (!custom) {
+            Text(stringResource(Res.string.ar_marker_print), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MarkerPrintTile(tlLabel, generatedTl.asImageBitmap(), Modifier.weight(1f))
+                MarkerPrintTile(brLabel, generatedBr.asImageBitmap(), Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onPrint,
+                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(Res.string.ar_marker_print_action), color = Color.White, fontWeight = FontWeight.W700) }
+        } else {
+            Text(stringResource(Res.string.ar_marker_capture_hint), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CustomMarkerTile(tlLabel, tlCustom, { onCapturePhoto(true) }, { onPickGallery(true) }, Modifier.weight(1f))
+                CustomMarkerTile(brLabel, brCustom, { onCapturePhoto(false) }, { onPickGallery(false) }, Modifier.weight(1f))
+            }
+            if (!canStart) {
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(Res.string.ar_marker_need_both), color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
         Button(
             onClick = onStart,
+            enabled = canStart,
             colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent),
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(Res.string.ar_setup_start), fontWeight = FontWeight.W700) }
@@ -860,25 +1034,87 @@ private fun ArMarkerPrint(
 }
 
 /**
- * MARKERS setup. The user prints two markers, sticks them on the rack's top-left and bottom-right
- * corners, then sweeps the camera over them. ARCore tracks both Augmented Images; their 3D
- * positions give the rack's physical width/height (no measurement is typed). Each marker is
- * confirmed when first detected and the spanned zone is highlighted live.
+ * MARKERS setup. The user prints two markers (or supplies two custom marker images via photo or
+ * gallery), sticks them on the rack's top-left and bottom-right corners, then sweeps the camera
+ * over them. ARCore tracks both Augmented Images; their 3D positions give the rack's physical
+ * width/height (no measurement is typed). Each detected marker's zone is highlighted in its own
+ * colour (top-left blue, bottom-right orange).
  */
 @Composable
 private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val saver = rememberRackImageSaver()
     val tlId = remember(rack.id) { tlMarkerId(rack.id) }
     val brId = remember(rack.id) { brMarkerId(rack.id) }
-    val tlBitmap = remember(tlId) { MarkerImages.bitmap(tlId) }
-    val brBitmap = remember(brId) { MarkerImages.bitmap(brId) }
+    val generatedTl = remember(tlId) { MarkerImages.bitmap(tlId) }
+    val generatedBr = remember(brId) { MarkerImages.bitmap(brId) }
+
+    val tlLabel = stringResource(Res.string.ar_marker_tl)
+    val brLabel = stringResource(Res.string.ar_marker_br)
+    val printJob = stringResource(Res.string.ar_marker_setup_title)
+
+    var custom by remember { mutableStateOf(false) }
+    var tlCustom by remember { mutableStateOf<Bitmap?>(null) }
+    var brCustom by remember { mutableStateOf<Bitmap?>(null) }
+    var tlCustomPath by remember { mutableStateOf<String?>(null) }
+    var brCustomPath by remember { mutableStateOf<String?>(null) }
+    var captureTl by remember { mutableStateOf(true) }
+
+    fun handleBytes(bytes: ByteArray) {
+        val bmp = decodeScaledBitmap(bytes) ?: return
+        val isTl = captureTl
+        scope.launch {
+            val path = saver.saveNamed(bytes, "${rack.id}-marker-${if (isTl) "tl" else "br"}")
+            if (isTl) {
+                tlCustom = bmp; tlCustomPath = path
+            } else {
+                brCustom = bmp; brCustomPath = path
+            }
+        }
+    }
+
+    val takePhoto = rememberPhotoCapture { handleBytes(it) }
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            if (bytes != null) handleBytes(bytes)
+        }
+    }
 
     var started by remember { mutableStateOf(false) }
     if (!started) {
-        ArMarkerPrint(
-            tl = tlBitmap.asImageBitmap(),
-            br = brBitmap.asImageBitmap(),
+        ArMarkerConfigure(
+            custom = custom,
+            onSelectSource = { custom = it },
+            generatedTl = generatedTl,
+            generatedBr = generatedBr,
+            tlCustom = tlCustom,
+            brCustom = brCustom,
+            tlLabel = tlLabel,
+            brLabel = brLabel,
+            onPrint = {
+                MarkerPrinter.printMarkers(
+                    context,
+                    printJob,
+                    listOf(tlLabel to generatedTl, brLabel to generatedBr),
+                )
+            },
+            onCapturePhoto = { isTl -> captureTl = isTl; takePhoto() },
+            onPickGallery = { isTl ->
+                captureTl = isTl
+                pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            canStart = !custom || (tlCustom != null && brCustom != null),
             onStart = { started = true },
         )
+        return
+    }
+
+    val tlBitmap = if (custom) tlCustom else generatedTl
+    val brBitmap = if (custom) brCustom else generatedBr
+    if (tlBitmap == null || brBitmap == null) {
+        LaunchedEffect(Unit) { started = false }
         return
     }
 
@@ -915,8 +1151,8 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                     frame.getUpdatedTrackables(AugmentedImage::class.java).forEach { img ->
                         if (img.trackingState == TrackingState.TRACKING) {
                             when (img.name) {
-                                tlId -> holder.tlPose = img.centerPose
-                                brId -> holder.brPose = img.centerPose
+                                tlId -> { holder.tlPose = img.centerPose; holder.tlImage = img }
+                                brId -> { holder.brPose = img.centerPose; holder.brImage = img }
                             }
                         }
                     }
@@ -931,8 +1167,6 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
         val brSeen = brPose != null
         val measure = if (tlPose != null && brPose != null) measureFromMarkers(tlPose, brPose) else null
 
-        val tlLabel = stringResource(Res.string.ar_marker_tl)
-        val brLabel = stringResource(Res.string.ar_marker_br)
         val tlMsg = stringResource(Res.string.ar_marker_recorded, tlLabel)
         val brMsg = stringResource(Res.string.ar_marker_recorded, brLabel)
         LaunchedEffect(tlSeen) { if (tlSeen && !tlRecorded) { tlRecorded = true; toast = tlMsg } }
@@ -941,6 +1175,7 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
 
         if (viewSize.width > 0 && viewSize.height > 0) {
             Canvas(Modifier.fillMaxSize()) {
+                // Spanned rack rectangle (neutral) for alignment feedback.
                 if (measure != null) {
                     val pts = measure.corners.map {
                         ArProjection.projectWorldPoint(it, holder.view, holder.proj, viewSize.width, viewSize.height)
@@ -951,18 +1186,16 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                             for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
                             close()
                         }
-                        drawPath(path, Color(0x4635C46B))
-                        drawPath(path, Color(0xFF35C46B), style = Stroke(width = 5f))
+                        drawPath(path, Color.White.copy(alpha = 0.10f))
+                        drawPath(path, Color.White.copy(alpha = 0.55f), style = Stroke(width = 3f))
                     }
                 }
-                listOf(tlPose, brPose).forEach { pose ->
-                    if (pose != null) {
-                        val sp = ArProjection.projectWorldPoint(
-                            floatArrayOf(pose.tx(), pose.ty(), pose.tz()),
-                            holder.view, holder.proj, viewSize.width, viewSize.height,
-                        )
-                        if (sp.visible) drawCircle(Color(0xFF35C46B), 9.dp.toPx(), Offset(sp.x, sp.y))
-                    }
+                // Each detected marker's own zone, in a distinct colour.
+                holder.tlImage?.let {
+                    drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightTl)
+                }
+                holder.brImage?.let {
+                    drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightBr)
                 }
             }
         }
@@ -1019,7 +1252,11 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                         val tp = holder.tlPose
                         val bp = holder.brPose
                         if (tp != null && bp != null) {
-                            val anchor = buildAnchorFromMarkers(tlId, tp, bp)
+                            val anchor = buildAnchorFromMarkers(
+                                tlId, tp, bp,
+                                tlImagePath = if (custom) tlCustomPath else null,
+                                brImagePath = if (custom) brCustomPath else null,
+                            )
                             if (anchor != null) {
                                 Racks.setArAnchor(rackIndex, anchor)
                                 onDone()
@@ -1064,7 +1301,13 @@ private fun measureFromMarkers(tlPose: Pose, brPose: Pose): MarkerMeasure? {
  * Builds the persistent anchor from the two markers: the grid frame is centred on the rectangle
  * and shares the top-left marker's orientation, stored relative to that marker (the live beacon).
  */
-private fun buildAnchorFromMarkers(markerId: String, tlPose: Pose, brPose: Pose): RackArAnchor? {
+private fun buildAnchorFromMarkers(
+    markerId: String,
+    tlPose: Pose,
+    brPose: Pose,
+    tlImagePath: String? = null,
+    brImagePath: String? = null,
+): RackArAnchor? {
     val measure = measureFromMarkers(tlPose, brPose) ?: return null
     val center = vScale(vAdd(measure.corners[0], measure.corners[2]), 0.5f)
     val rq = FloatArray(4)
@@ -1080,6 +1323,8 @@ private fun buildAnchorFromMarkers(markerId: String, tlPose: Pose, brPose: Pose)
         qx = rrq[0], qy = rrq[1], qz = rrq[2], qw = rrq[3],
         gridWidthMeters = measure.widthM,
         gridHeightMeters = measure.heightM,
+        tlImagePath = tlImagePath,
+        brImagePath = brImagePath,
     )
 }
 
