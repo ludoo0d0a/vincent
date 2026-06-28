@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vincent — icône Play Store &amp; déclinaisons</title>
+<style>
+  :root{
+    --bg:#f4f4f5; --card:#ffffff; --ink:#1b1b20; --muted:#6b6b76; --line:#e4e4e8;
+    --wine-a:#892934; --wine-b:#68101F;
+    --mono:'SF Mono','JetBrains Mono',ui-monospace,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;padding:40px 32px 80px}
+  header{max-width:1040px;margin:0 auto 36px}
+  h1{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+  .lede{color:var(--muted);font-size:14px;margin:0;max-width:60ch;line-height:1.5}
+  main{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:30px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px}
+  .sec-h{display:flex;align-items:baseline;gap:10px;margin:0 0 18px}
+  .sec-h h2{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:0}
+  .sec-h span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .row{display:flex;flex-wrap:wrap;gap:26px;align-items:flex-end}
+  .item{display:flex;flex-direction:column;align-items:center;gap:9px}
+  .cap{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;line-height:1.35}
+  .cap b{color:var(--ink);font-weight:700}
+  /* icon tile */
+  .ico{display:block;background:transparent}
+  .mask{overflow:hidden;display:grid;place-items:center;box-shadow:0 6px 18px -8px rgba(20,8,12,.45)}
+  .mask.sq{border-radius:22.4%}      /* Play Store / rounded square */
+  .mask.circle{border-radius:50%}
+  .mask.squircle{border-radius:42% 42% 42% 42% / 42%}
+  .mask.full{border-radius:0}
+  .swatch{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+  .chip{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .dot{width:16px;height:16px;border-radius:5px;border:1px solid rgba(0,0,0,.12)}
+  .safe-note{font-size:12.5px;color:var(--muted);line-height:1.5;margin:14px 0 0;max-width:64ch}
+  .tile-dark{background:#15151a}
+  .tile-light{background:#e6e6ea}
+  .note{font-family:var(--mono);font-size:11px;color:var(--muted);background:#faf7f2;border:1px dashed #e0d6c8;border-radius:10px;padding:10px 13px;line-height:1.55}
+  .grid-dens{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-end}
+  footer{max-width:1040px;margin:30px auto 0;color:var(--muted);font-size:12px;line-height:1.6}
+  code{font-family:var(--mono);font-size:12px;background:#f0eef0;padding:1px 6px;border-radius:5px}
+</style>
+</head>
+<body>
+
+<!-- Shared source: one branded icon + two mark variants, reused everywhere via <use>. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="wine" x1="66" y1="38" x2="474" y2="493" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#892934"/>
+      <stop offset="1" stop-color="#68101F"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.7" cy="0.85" r="0.6">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.10"/>
+      <stop offset="0.55" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- balloon glass: straight rim, rounded belly, stem + foot (24-space) -->
+    <symbol id="glass" viewBox="0 0 24 24">
+      <path d="M7.6 7H16.4C16.7 9 15.8 11.2 12 12C8.2 11.2 7.3 9 7.6 7Z" fill="#D62F44"/>
+      <g fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3.5H16C18 6.8 17.4 11 12 12C6.6 11 6 6.8 8 3.5Z"/>
+        <path d="M12 12v7M8.5 19h7"/>
+      </g>
+    </symbol>
+    <!-- solid silhouette for monochrome / notification (uses currentColor) -->
+    <symbol id="glass-solid" viewBox="0 0 24 24">
+      <path d="M8 3.5H16C18 6.8 17.4 11 12 12C6.6 11 6 6.8 8 3.5Z M11.1 11.5h1.8v7.6h-1.8z M8 18.1h8v1.5h-8z" fill="currentColor"/>
+    </symbol>
+    <!-- the full branded icon, full-bleed square -->
+    <symbol id="icon-full" viewBox="0 0 512 512">
+      <rect width="512" height="512" fill="url(#wine)"/>
+      <rect width="512" height="512" fill="url(#sheen)"/>
+      <use href="#glass" x="106" y="106" width="300" height="300"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <h1>Vincent — icône Play Store &amp; déclinaisons</h1>
+  <p class="lede">Verre ballon (buvant droit, panse arrondie) en blanc sur fond lie-de-vin. Toutes les déclinaisons ci-dessous proviennent d'une seule source vectorielle (<code>icon-master.svg</code>) — l'icône du launcher Android est, elle, pilotée par les vector drawables du projet.</p>
+</header>
+
+<main>
+
+  <!-- 1. Play Store -->
+  <section>
+    <div class="sec-h"><h2>Icône Play Store</h2><span>512 × 512 · PNG 32-bit · plein cadre</span></div>
+    <div class="row">
+      <div class="item">
+        <div class="mask sq" style="width:256px;height:256px"><svg class="ico" width="256" height="256"><use href="#icon-full"/></svg></div>
+        <div class="cap"><b>Aperçu boutique</b><br>arrondi appliqué par Google Play</div>
+      </div>
+      <div class="item">
+        <div class="mask full" style="width:160px;height:160px;border-radius:12px"><svg class="ico" width="160" height="160"><use href="#icon-full"/></svg></div>
+        <div class="cap"><b>Fichier livré</b><br>carré plein, sans arrondi</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <span class="chip"><span class="dot" style="background:#892934"></span>#892934</span>
+      <span class="chip"><span class="dot" style="background:#68101F"></span>#68101F</span>
+      <span class="chip"><span class="dot" style="background:#D62F44"></span>#D62F44 vin</span>
+      <span class="chip"><span class="dot" style="background:#fff"></span>#FFFFFF verre</span>
+    </div>
+  </section>
+
+  <!-- 2. Adaptive launcher masks -->
+  <section>
+    <div class="sec-h"><h2>Launcher adaptatif</h2><span>108 × 108 dp · masque selon le lanceur / l'OEM</span></div>
+    <div class="row">
+      <div class="item"><div class="mask circle" style="width:132px;height:132px"><svg class="ico" width="132" height="132"><use href="#icon-full"/></svg></div><div class="cap"><b>Cercle</b><br>Pixel</div></div>
+      <div class="item"><div class="mask squircle" style="width:132px;height:132px"><svg class="ico" width="132" height="132"><use href="#icon-full"/></svg></div><div class="cap"><b>Squircle</b><br>Samsung One UI</div></div>
+      <div class="item"><div class="mask sq" style="width:132px;height:132px"><svg class="ico" width="132" height="132"><use href="#icon-full"/></svg></div><div class="cap"><b>Rounded square</b><br>Material</div></div>
+      <div class="item"><div class="mask full" style="width:132px;height:132px;border-radius:8px"><svg class="ico" width="132" height="132"><use href="#icon-full"/></svg></div><div class="cap"><b>Carré</b><br>plein cadre</div></div>
+    </div>
+    <p class="safe-note">Le verre tient dans la zone de sécurité (66 dp centraux) : aucun masque ne le rogne. Le fond est à fond perdu — c'est le système qui applique la forme.</p>
+  </section>
+
+  <!-- 3. Themed / monochrome -->
+  <section>
+    <div class="sec-h"><h2>Icône thématique (monochrome)</h2><span>Android 13+ · silhouette recolorée par le système</span></div>
+    <div class="row">
+      <div class="item"><div class="mask circle tile-light" style="width:120px;height:120px;color:#3a3a40"><svg width="120" height="120" viewBox="0 0 108 108"><g transform="translate(10.8 14.4) scale(3.6)"><use href="#glass-solid" width="24" height="24"/></g></svg></div><div class="cap"><b>Thème clair</b></div></div>
+      <div class="item"><div class="mask circle tile-dark" style="width:120px;height:120px;color:#e9e2d6"><svg width="120" height="120" viewBox="0 0 108 108"><g transform="translate(10.8 14.4) scale(3.6)"><use href="#glass-solid" width="24" height="24"/></g></svg></div><div class="cap"><b>Thème sombre</b></div></div>
+    </div>
+  </section>
+
+  <!-- 4. Round + notification + favicon -->
+  <section>
+    <div class="sec-h"><h2>Autres déclinaisons</h2><span>round · notification · web</span></div>
+    <div class="row">
+      <div class="item"><div class="mask circle" style="width:120px;height:120px"><svg class="ico" width="120" height="120"><use href="#icon-full"/></svg></div><div class="cap"><b>ic_launcher_round</b></div></div>
+      <div class="item"><div class="mask full tile-dark" style="width:88px;height:88px;border-radius:14px;color:#fff"><svg width="56" height="56" viewBox="0 0 108 108"><g transform="translate(10.8 14.4) scale(3.6)"><use href="#glass-solid" width="24" height="24"/></g></svg></div><div class="cap"><b>Notification</b><br>24 dp · blanc plein</div></div>
+      <div class="item"><div class="mask sq" style="width:64px;height:64px;border-radius:14.4%"><svg class="ico" width="64" height="64"><use href="#icon-full"/></svg></div><div class="cap"><b>Favicon</b><br>64</div></div>
+      <div class="item"><div class="mask sq" style="width:32px;height:32px;border-radius:14.4%"><svg class="ico" width="32" height="32"><use href="#icon-full"/></svg></div><div class="cap"><b></b>32</div></div>
+      <div class="item"><div class="mask sq" style="width:16px;height:16px;border-radius:14.4%"><svg class="ico" width="16" height="16"><use href="#icon-full"/></svg></div><div class="cap"><b></b>16</div></div>
+    </div>
+  </section>
+
+  <!-- 5. Density grid -->
+  <section>
+    <div class="sec-h"><h2>Densités launcher</h2><span>ic_launcher.png · mdpi → xxxhdpi</span></div>
+    <div class="grid-dens">
+      <div class="item"><div class="mask sq" style="width:48px;height:48px;border-radius:14.4%"><svg class="ico" width="48" height="48"><use href="#icon-full"/></svg></div><div class="cap"><b>mdpi</b><br>48</div></div>
+      <div class="item"><div class="mask sq" style="width:72px;height:72px;border-radius:14.4%"><svg class="ico" width="72" height="72"><use href="#icon-full"/></svg></div><div class="cap"><b>hdpi</b><br>72</div></div>
+      <div class="item"><div class="mask sq" style="width:96px;height:96px;border-radius:14.4%"><svg class="ico" width="96" height="96"><use href="#icon-full"/></svg></div><div class="cap"><b>xhdpi</b><br>96</div></div>
+      <div class="item"><div class="mask sq" style="width:144px;height:144px;border-radius:14.4%"><svg class="ico" width="144" height="144"><use href="#icon-full"/></svg></div><div class="cap"><b>xxhdpi</b><br>144</div></div>
+      <div class="item"><div class="mask sq" style="width:192px;height:192px;border-radius:14.4%"><svg class="ico" width="192" height="192"><use href="#icon-full"/></svg></div><div class="cap"><b>xxxhdpi</b><br>192</div></div>
+    </div>
+    <p class="note">Rappel export : sur Android API 26+ (la quasi-totalité du parc) l'icône est rendue depuis les vector drawables — déjà à jour. Les PNG <code>mipmap-*dpi</code> ne servent que sur API 24–25 ; <code>icon-512.png</code> et la feature graphic sont aussi des PNG figés. Tous se régénèrent depuis cette source (Android Studio → Image Asset, ou rasterisation de <code>icon-master.svg</code>).</p>
+  </section>
+
+</main>
+
+<footer>
+  Source unique : <code>playstore/icon-master.svg</code> · launcher Android : <code>ic_launcher_foreground.xml</code> + <code>ic_launcher_monochrome.xml</code> + <code>ic_launcher_background.xml</code>.
+</footer>
+
+</body>
+</html>

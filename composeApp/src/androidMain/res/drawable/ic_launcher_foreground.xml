@@ -10,18 +10,20 @@
         android:scaleY="3.6"
         android:translateX="10.8"
         android:translateY="14.4">
-        <!-- Red wine filling the lower part of the bowl. -->
+        <!-- Red wine filling the lower (rounded) part of the balloon bowl. -->
         <path
-            android:pathData="M7.9,5.5H16.1L15.6,10A3.6,3.6 0 0 1 8.4,10L7.9,5.5Z"
+            android:pathData="M7.6,7H16.4C16.7,9 15.8,11.2 12,12C8.2,11.2 7.3,9 7.6,7Z"
             android:fillColor="#D62F44" />
+        <!-- Balloon bowl: straight rim, rounded belly. -->
         <path
-            android:pathData="M7,3h10l-0.8,7a4.2,4.2 0 0 1 -8.4,0L7,3Z"
+            android:pathData="M8,3.5H16C18,6.8 17.4,11 12,12C6.6,11 6,6.8 8,3.5Z"
             android:strokeColor="#FFFFFF"
             android:strokeWidth="1.6"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
+        <!-- Stem + foot. -->
         <path
-            android:pathData="M12,14v5M8.5,19h7"
+            android:pathData="M12,12v7M8.5,19h7"
             android:strokeColor="#FFFFFF"
             android:strokeWidth="1.6"
             android:strokeLineCap="round"
