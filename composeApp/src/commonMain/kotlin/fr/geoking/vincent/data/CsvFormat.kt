@@ -62,6 +62,8 @@ object CsvFormat {
         "cols" to listOf("cols", "colonnes", "nombre de colonnes"),
         "rows" to listOf("rows", "rangées", "nombre de lignes"),
         "staggered" to listOf("staggered", "quinconce"),
+        "staggerOffset" to listOf("staggeroffset", "décalage", "decalage"),
+        "format" to listOf("format", "type de casier"),
     )
 
     // ---------- export ----------
@@ -182,10 +184,18 @@ object CsvFormat {
 
     private fun List<String>.toRack(index: Map<String, Int>): Rack? {
         val name = field("name", index) ?: return null
-        val cols = field("cols", index).toIntOr(6)
-        val rows = field("rows", index).toIntOr(6)
+        var cols = field("cols", index).toIntOr(6)
+        var rows = field("rows", index).toIntOr(6)
         val staggered = field("staggered", index).toBoolLoose()
-        return emptyRack(name, cols, rows, staggered)
+        val staggerOffset = field("staggerOffset", index).toBoolLoose()
+        val format = field("format", index)?.let { runCatching { RackFormat.valueOf(it.uppercase()) }.getOrNull() }
+            ?: RackFormat.GRID
+        // X-bins group 2×2 cells, so the grid must be even in both dimensions.
+        if (format == RackFormat.X) {
+            if (cols % 2 != 0) cols += 1
+            if (rows % 2 != 0) rows += 1
+        }
+        return emptyRack(name, cols, rows, staggered).copy(format = format, staggerOffset = staggerOffset)
     }
 
     private fun List<String>.toTasting(index: Map<String, Int>): Tasting? {

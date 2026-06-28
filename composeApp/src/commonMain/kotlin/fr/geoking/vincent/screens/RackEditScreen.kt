@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Racks
+import fr.geoking.vincent.model.RackFormat
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
 
@@ -61,6 +62,8 @@ fun RackEditScreen(
     var cols by remember { mutableIntStateOf(rack.cols) }
     var rows by remember { mutableIntStateOf(rack.rows) }
     var staggered by remember { mutableStateOf(rack.staggered) }
+    var staggerOffset by remember { mutableStateOf(rack.staggerOffset) }
+    var format by remember { mutableStateOf(rack.format) }
     val canDelete = Racks.all.size > 1
 
     Column(
@@ -113,28 +116,87 @@ fun RackEditScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Stepper(stringResource(Res.string.cellar_edit_cols), cols, 1..10) { cols = it }
-            Stepper(stringResource(Res.string.cellar_edit_rows), rows, 1..12) { rows = it }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(Res.string.cellar_edit_staggered),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.W600,
-                        color = VincentColors.Fg
+            // Layout format picker.
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    stringResource(Res.string.cellar_edit_format),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.W600,
+                    color = VincentColors.Fg,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FormatPill(
+                        label = stringResource(Res.string.cellar_edit_format_grid),
+                        selected = format == RackFormat.GRID,
+                        onClick = { format = RackFormat.GRID },
+                        modifier = Modifier.weight(1f),
                     )
-                    Text(
-                        stringResource(Res.string.cellar_edit_staggered_desc),
-                        fontSize = 10.5.sp,
-                        color = VincentColors.Muted
+                    FormatPill(
+                        label = stringResource(Res.string.cellar_edit_format_x),
+                        selected = format == RackFormat.X,
+                        onClick = {
+                            // X bins group 2×2 cells, so dimensions must be even.
+                            if (cols % 2 != 0) cols = (cols + 1).coerceAtMost(10)
+                            if (rows % 2 != 0) rows = (rows + 1).coerceAtMost(12)
+                            cols = cols.coerceAtLeast(2)
+                            rows = rows.coerceAtLeast(2)
+                            format = RackFormat.X
+                        },
+                        modifier = Modifier.weight(1f),
                     )
                 }
-                Switch(checked = staggered, onCheckedChange = { staggered = it })
+            }
+
+            if (format == RackFormat.X) {
+                Stepper(stringResource(Res.string.cellar_edit_square_cols), cols / 2, 1..5) { cols = it * 2 }
+                Stepper(stringResource(Res.string.cellar_edit_square_rows), rows / 2, 1..6) { rows = it * 2 }
+            } else {
+                Stepper(stringResource(Res.string.cellar_edit_cols), cols, 1..10) { cols = it }
+                Stepper(stringResource(Res.string.cellar_edit_rows), rows, 1..12) { rows = it }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(Res.string.cellar_edit_staggered),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.W600,
+                            color = VincentColors.Fg
+                        )
+                        Text(
+                            stringResource(Res.string.cellar_edit_staggered_desc),
+                            fontSize = 10.5.sp,
+                            color = VincentColors.Muted
+                        )
+                    }
+                    Switch(checked = staggered, onCheckedChange = { staggered = it })
+                }
+
+                if (staggered) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(Res.string.cellar_edit_stagger_offset),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.W600,
+                                color = VincentColors.Fg
+                            )
+                            Text(
+                                stringResource(Res.string.cellar_edit_stagger_offset_desc),
+                                fontSize = 10.5.sp,
+                                color = VincentColors.Muted
+                            )
+                        }
+                        Switch(checked = staggerOffset, onCheckedChange = { staggerOffset = it })
+                    }
+                }
             }
 
             Text(
-                stringResource(Res.string.cellar_edit_capacity, cols * rows),
+                if (format == RackFormat.X) {
+                    stringResource(Res.string.cellar_edit_capacity_x, (cols / 2) * (rows / 2), cols * rows)
+                } else {
+                    stringResource(Res.string.cellar_edit_capacity, cols * rows)
+                },
                 fontSize = 11.sp,
                 color = VincentColors.Muted
             )
@@ -170,7 +232,11 @@ fun RackEditScreen(
 
             Button(
                 onClick = {
-                    Racks.update(rackIndex, rack.resized(cols, rows, staggered).copy(name = name.ifBlank { rack.name }))
+                    Racks.update(
+                        rackIndex,
+                        rack.resized(cols, rows, staggered, format, staggerOffset)
+                            .copy(name = name.ifBlank { rack.name }),
+                    )
                     onBack()
                 },
                 modifier = Modifier
@@ -182,6 +248,30 @@ fun RackEditScreen(
                 Text(stringResource(Res.string.cellar_edit_save), fontWeight = FontWeight.W700)
             }
         }
+    }
+}
+
+@Composable
+private fun FormatPill(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (selected) VincentColors.Accent else VincentColors.Surface2)
+            .border(
+                1.dp,
+                if (selected) VincentColors.Accent else VincentColors.Border,
+                RoundedCornerShape(11.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.W700,
+            color = if (selected) Color.White else VincentColors.Muted,
+        )
     }
 }
 

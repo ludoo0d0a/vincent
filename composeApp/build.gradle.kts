@@ -77,6 +77,10 @@ kotlin {
             // for the offline AR cellar screen. Android target only.
             implementation(libs.google.arcore)
             implementation(libs.sceneview.arsceneview)
+            // BoofCV (pure JVM, no NDK): square-binary fiducial detection + pose for the
+            // hybrid marker AR mode. boofcv-android adds GrayU8 <-> Bitmap conversion.
+            implementation(libs.boofcv.core)
+            implementation(libs.boofcv.android)
         }
     }
 }
@@ -96,14 +100,18 @@ android {
         // AI calls go through the Cloudflare Worker proxy (key held server-side).
         // Set by ./scripts/setup-ai-proxy.sh (local.properties) or the CI secret.
         buildConfigField("String", "AI_PROXY_URL", "\"${secret("AI_PROXY_URL")}\"")
-        // Provider used for AI features (gemini | grapeminds).
-        buildConfigField("String", "AI_PROVIDER", "\"${secret("AI_PROVIDER").ifBlank { "gemini" }}\"")
-        // Direct API key and URL for Grapeminds (dev/debug only, like Gemini).
-        buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY")}\"")
-        buildConfigField("String", "GRAPEMINDS_API_URL", "\"${secret("GRAPEMINDS_API_URL")}\"")
         // Feature flag for the ARCore "AR cellar" screen. Optional AR_ENABLED in
         // local.properties / CI env (true|false) flips it; defaults to enabled.
         buildConfigField("Boolean", "AR_ENABLED", secret("AR_ENABLED").ifBlank { "true" })
+        // Wine data provider credentials/source. "xxx" placeholders mean "not
+        // configured": the matching providers stay inert until a real value is set
+        // via local.properties / gradle properties / CI env.
+        buildConfigField("String", "GWDB_API_KEY", "\"${secret("GWDB_API_KEY").ifBlank { "xxx" }}\"")
+        buildConfigField("String", "GWDB_API_SECRET", "\"${secret("GWDB_API_SECRET").ifBlank { "xxx" }}\"")
+        buildConfigField("String", "INVINTORY_API_KEY", "\"${secret("INVINTORY_API_KEY").ifBlank { "xxx" }}\"")
+        buildConfigField("String", "CELLARTRACKER_API_KEY", "\"${secret("CELLARTRACKER_API_KEY").ifBlank { "xxx" }}\"")
+        buildConfigField("String", "X_WINES_DATASET_URL", "\"${secret("X_WINES_DATASET_URL").ifBlank { "xxx" }}\"")
+        buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY").ifBlank { "xxx" }}\"")
     }
 
     buildFeatures {

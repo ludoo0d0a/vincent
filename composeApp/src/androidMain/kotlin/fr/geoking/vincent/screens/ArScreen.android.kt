@@ -5,24 +5,18 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.Res
+import vincent.composeapp.generated.resources.ar_adjust
+import vincent.composeapp.generated.resources.ar_adjust_hint
+import vincent.composeapp.generated.resources.ar_cancel
 import vincent.composeapp.generated.resources.ar_install
 import vincent.composeapp.generated.resources.ar_install_action
-import vincent.composeapp.generated.resources.ar_low_quality
 import vincent.composeapp.generated.resources.ar_marker_both_found
 import vincent.composeapp.generated.resources.ar_marker_br
-import vincent.composeapp.generated.resources.ar_marker_capture_hint
-import vincent.composeapp.generated.resources.ar_marker_gallery
-import vincent.composeapp.generated.resources.ar_marker_need_both
-import vincent.composeapp.generated.resources.ar_marker_photo
 import vincent.composeapp.generated.resources.ar_marker_print_action
-import vincent.composeapp.generated.resources.ar_marker_source_custom
-import vincent.composeapp.generated.resources.ar_marker_source_proposed
 import vincent.composeapp.generated.resources.ar_marker_measured
 import vincent.composeapp.generated.resources.ar_marker_point_br
 import vincent.composeapp.generated.resources.ar_marker_point_tl
@@ -55,7 +49,6 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -108,16 +101,25 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import android.media.Image
+import boofcv.struct.image.GrayU8
+import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
-import com.google.ar.core.AugmentedImage
-import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
+import com.google.ar.core.Frame
 import com.google.ar.core.Pose
+import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import fr.geoking.vincent.ar.ArPoseBridge
 import fr.geoking.vincent.ar.ArProjection
-import fr.geoking.vincent.ar.MarkerImages
+import fr.geoking.vincent.ar.BoofCvFiducials
 import fr.geoking.vincent.ar.MarkerPrinter
+import fr.geoking.vincent.ar.SquareMarkers
+import fr.geoking.vincent.ar.imageYToGray
 import fr.geoking.vincent.ai.rememberPhotoCapture
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.rememberRackImageSaver
@@ -136,28 +138,81 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** Per-frame AR tracking state, mutated in `onSessionUpdated` without reallocation. */
-private class ArFrameHolder {
-    var image: AugmentedImage? = null
-    var brImage: AugmentedImage? = null
-    val view = FloatArray(16)
-    val proj = FloatArray(16)
+/** A marker seen this session: its decoded fiducial [id] and world [pose] (rack-face convention). */
+private class MarkerWorldSighting(val id: Int, val pose: Pose)
+
+/**
+ * Detects the square-binary markers on ARCore camera frames without blocking the render thread.
+ *
+ * [submit] is called from `onSessionUpdated`: it cheaply copies the camera image's luminance plane,
+ * the intrinsics and the world camera pose, closes the image, and (when not already busy) runs the
+ * CPU-heavy BoofCV detection on a background dispatcher. Results are exposed in world space via
+ * [sightings], refreshed once each detection completes.
+ */
+private class FiducialDetectionDriver(targetWidthMeters: Double) {
+    private val fiducials = BoofCvFiducials(targetWidthMeters)
+    private val gray = GrayU8(1, 1)
+    private val busy = AtomicBoolean(false)
+
+    @Volatile
+    var sightings: List<MarkerWorldSighting> = emptyList()
+        private set
+
+    fun submit(frame: Frame, scope: CoroutineScope) {
+        if (!busy.compareAndSet(false, true)) return
+        val image: Image = try {
+            frame.acquireCameraImage()
+        } catch (_: Exception) {
+            busy.set(false)
+            return
+        }
+        val cameraPose: Pose
+        val fx: Double
+        val fy: Double
+        val cx: Double
+        val cy: Double
+        try {
+            val intr = frame.camera.imageIntrinsics
+            val fl = intr.focalLength
+            val pp = intr.principalPoint
+            fx = fl[0].toDouble(); fy = fl[1].toDouble()
+            cx = pp[0].toDouble(); cy = pp[1].toDouble()
+            cameraPose = frame.camera.pose
+            imageYToGray(image, gray)
+        } catch (_: Exception) {
+            busy.set(false)
+            return
+        } finally {
+            image.close()
+        }
+        scope.launch(Dispatchers.Default) {
+            try {
+                sightings = fiducials.detect(gray, fx, fy, cx, cy)
+                    .map { MarkerWorldSighting(it.id, ArPoseBridge.markerWorldPose(it, cameraPose)) }
+            } catch (_: Exception) {
+                // Keep the previous sightings; a transient detection failure shouldn't clear the grid.
+            } finally {
+                busy.set(false)
+            }
+        }
+    }
 }
 
 /** Distinct highlight colours so each detected marker reads as its own zone. */
 private val MarkerHighlightTl = Color(0xFF3B82F6) // top-left: blue
 private val MarkerHighlightBr = Color(0xFFF59E0B) // bottom-right: orange
 
-/** Outlines a detected Augmented Image (its physical rectangle) in [color] on the AR view. */
+/** Outlines a marker's physical square (centred on [centerPose], side [widthMeters]) in [color]. */
 private fun DrawScope.drawMarkerHighlight(
-    img: AugmentedImage,
+    centerPose: Pose,
+    widthMeters: Float,
     view: FloatArray,
     proj: FloatArray,
     widthPx: Int,
     heightPx: Int,
     color: Color,
 ) {
-    val pts = ArProjection.markerCorners(img.centerPose, img.extentX, img.extentZ)
+    val pts = ArProjection.markerCorners(centerPose, widthMeters, widthMeters)
         .map { ArProjection.projectWorldPoint(it, view, proj, widthPx, heightPx) }
     if (pts.any { !it.visible }) return
     val path = Path().apply {
@@ -167,18 +222,6 @@ private fun DrawScope.drawMarkerHighlight(
     }
     drawPath(path, color.copy(alpha = 0.28f))
     drawPath(path, color, style = Stroke(width = 5f))
-}
-
-/** Decodes JPEG bytes, downscaling so the longest side stays near [maxDim] (keeps ARCore memory sane). */
-private fun decodeScaledBitmap(bytes: ByteArray, maxDim: Int = 1024): Bitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    val longest = maxOf(bounds.outWidth, bounds.outHeight)
-    if (longest <= 0) return null
-    var sample = 1
-    while (longest / sample > maxDim) sample *= 2
-    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
 }
 
 @Composable
@@ -223,6 +266,7 @@ actual fun ArScreen(rackIndex: Int, onBack: () -> Unit) {
 
             // Live overlay. PHOTO needs no ARCore; MARKERS is gated behind it.
             rack.arMode == ArMode.PHOTO -> ArPhotoView(
+                rackIndex = rackIndex,
                 rack = rack,
                 onReconfigure = { setupMode = true },
                 onBack = onBack,
@@ -545,59 +589,58 @@ private fun ArPhotoSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
     }
 }
 
-/** MARKERS live overlay: tracks the top-left marker beacon and projects the grid onto it. */
+/** Per-frame state for the live marker overlay, mutated in `onSessionUpdated` without reallocation. */
+private class MarkerLiveHolder {
+    val view = FloatArray(16)
+    val proj = FloatArray(16)
+    var arAnchor: Anchor? = null
+    var tlMarkerPose: Pose? = null
+    var brMarkerPose: Pose? = null
+}
+
+/**
+ * MARKERS live overlay. BoofCV detects the two square-binary markers on the ARCore camera frames;
+ * the top-left beacon establishes an ARCore world [Anchor] at the grid origin, so the grid stays
+ * locked even when no marker is in view. The anchor is re-created automatically if ARCore loses it.
+ */
 @Composable
 private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
     val anchor = rack.arAnchor
-    val tlId = anchor?.markerId
-    val brId = remember(rack.id) { brMarkerId(rack.id) }
-    // TL is the re-localisation beacon; BR is tracked only for its coloured highlight.
-    val tlBitmap = remember(anchor?.markerId, anchor?.tlImagePath) {
-        anchor?.let {
-            it.tlImagePath?.let { p ->
-                runCatching { File(p).readBytes() }.getOrNull()?.let { bytes -> decodeScaledBitmap(bytes) }
-            } ?: MarkerImages.bitmap(it.markerId)
-        }
-    }
-    val brBitmap = remember(brId, anchor?.brImagePath) {
-        anchor?.let {
-            it.brImagePath?.let { p ->
-                runCatching { File(p).readBytes() }.getOrNull()?.let { bytes -> decodeScaledBitmap(bytes) }
-            } ?: MarkerImages.bitmap(brId)
-        }
-    }
-
-    val holder = remember { ArFrameHolder() }
+    val scope = rememberCoroutineScope()
+    val holder = remember { MarkerLiveHolder() }
     var frameTick by remember { mutableIntStateOf(0) }
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    var lowQuality by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().onSizeChanged { viewSize = it }) {
-        if (anchor != null && anchor.isValid && tlBitmap != null && tlId != null) {
-            val sessionConfig = remember(tlId, tlBitmap, brId, brBitmap, anchor.markerWidthMeters) {
-                { session: com.google.ar.core.Session, config: Config ->
-                    try {
-                        val db = AugmentedImageDatabase(session)
-                        db.addImage(tlId, tlBitmap, anchor.markerWidthMeters)
-                        if (brBitmap != null) db.addImage(brId, brBitmap, anchor.markerWidthMeters)
-                        config.augmentedImageDatabase = db
-                    } catch (_: Exception) {
-                        lowQuality = true
-                    }
+        if (anchor != null && anchor.isValid) {
+            val driver = remember(anchor.markerWidthMeters) {
+                FiducialDetectionDriver(anchor.markerWidthMeters.toDouble())
+            }
+            val sessionConfig = remember {
+                { _: Session, config: Config ->
                     config.focusMode = Config.FocusMode.AUTO
                     config.lightEstimationMode = Config.LightEstimationMode.DISABLED
                 }
             }
-            val onSessionUpdated = remember(tlId, brId) {
-                { _: com.google.ar.core.Session, frame: com.google.ar.core.Frame ->
+            val onSessionUpdated = remember(anchor) {
+                { session: Session, frame: Frame ->
                     val cam = frame.camera
                     if (cam.trackingState == TrackingState.TRACKING) {
                         cam.getViewMatrix(holder.view, 0)
                         cam.getProjectionMatrix(holder.proj, 0, 0.1f, 100f)
-                        val tracked = frame.getUpdatedTrackables(AugmentedImage::class.java)
-                            .filter { it.trackingState == TrackingState.TRACKING }
-                        holder.image = tracked.firstOrNull { it.name == tlId }
-                        holder.brImage = tracked.firstOrNull { it.name == brId }
+                        driver.submit(frame, scope)
+                        val sights = driver.sightings
+                        holder.tlMarkerPose = sights.firstOrNull { it.id == anchor.tlFiducialId }?.pose
+                        holder.brMarkerPose = sights.firstOrNull { it.id == anchor.brFiducialId }?.pose
+                        // (Re)establish the world anchor from the top-left beacon when needed.
+                        val needsAnchor = holder.arAnchor?.trackingState != TrackingState.TRACKING
+                        val tl = holder.tlMarkerPose
+                        if (needsAnchor && tl != null) {
+                            holder.arAnchor?.detach()
+                            holder.arAnchor = runCatching {
+                                session.createAnchor(ArProjection.gridFrame(tl, anchor))
+                            }.getOrNull()
+                        }
                         frameTick++
                     }
                 }
@@ -608,28 +651,31 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
                 sessionConfiguration = sessionConfig,
                 onSessionUpdated = onSessionUpdated,
             )
+            DisposableEffect(Unit) {
+                onDispose { holder.arAnchor?.detach(); holder.arAnchor = null }
+            }
 
-            val img = holder.image
-            if (frameTick >= 0 && img != null && viewSize.width > 0 && viewSize.height > 0) {
-                val gridFrame = ArProjection.gridFrame(img.centerPose, anchor)
+            val gridPose = holder.arAnchor?.takeIf { it.trackingState == TrackingState.TRACKING }?.pose
+            if (frameTick >= 0 && gridPose != null && viewSize.width > 0 && viewSize.height > 0) {
                 val positions = ArProjection.cellPositions(
-                    gridFrame = gridFrame,
+                    gridFrame = gridPose,
                     gridWidthMeters = anchor.gridWidthMeters,
                     gridHeightMeters = anchor.gridHeightMeters,
                     cols = rack.cols,
                     rows = rack.rows,
                     staggered = rack.staggered,
+                    staggerOffset = rack.staggerOffset,
                     viewMatrix = holder.view,
                     projMatrix = holder.proj,
                     widthPx = viewSize.width,
                     heightPx = viewSize.height,
                 )
                 Canvas(Modifier.fillMaxSize()) {
-                    holder.image?.let {
-                        drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightTl)
+                    holder.tlMarkerPose?.let {
+                        drawMarkerHighlight(it, anchor.markerWidthMeters, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightTl)
                     }
-                    holder.brImage?.let {
-                        drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightBr)
+                    holder.brMarkerPose?.let {
+                        drawMarkerHighlight(it, anchor.markerWidthMeters, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightBr)
                     }
                     positions.forEach { pos ->
                         if (pos.visible) {
@@ -653,17 +699,22 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
         }
 
         ArTopBar(onBack = onBack, onReconfigure = onReconfigure)
-        if (lowQuality) ArHint(stringResource(Res.string.ar_low_quality))
     }
 }
 
-/** PHOTO mode: 2D overlay on the frozen reference photo, with pinch-zoom / pan and tappable chips. */
+/**
+ * PHOTO mode: 2D overlay on the frozen reference photo, with pinch-zoom / pan and tappable chips.
+ * The overlay can also be **repositioned in place**: tapping "Adjust" reveals the same four connected
+ * draggable corners used by the setup flow, but here drawn on top of the live slots (and their
+ * bottles) so the grid can be aligned precisely against the real holes before saving the calibration.
+ */
 @Composable
-private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
+private fun ArPhotoView(rackIndex: Int, rack: Rack, onReconfigure: () -> Unit, onBack: () -> Unit) {
     val calibration = rack.arCalibration
-    val bitmap = remember(rack.arImagePath) { rack.arImagePath?.let { BitmapFactory.decodeFile(it) } }
+    val imagePath = rack.arImagePath
+    val bitmap = remember(imagePath) { imagePath?.let { BitmapFactory.decodeFile(it) } }
 
-    if (bitmap == null || calibration == null || !calibration.isValid) {
+    if (bitmap == null || calibration == null || !calibration.isValid || imagePath == null) {
         Box(Modifier.fillMaxSize()) {
             ArTopBar(onBack = onBack, onReconfigure = onReconfigure)
             ArHint(stringResource(Res.string.ar_searching))
@@ -671,6 +722,7 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
         return
     }
 
+    val density = LocalDensity.current
     val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
     val aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
 
@@ -679,14 +731,25 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     var selected by remember { mutableIntStateOf(-1) }
 
+    // Reposition state: the four connected draggable corners, seeded from the saved calibration and
+    // re-seeded whenever it changes (e.g. after a save). While editing, these drive the projection.
+    var editing by remember { mutableStateOf(false) }
+    var editCorners by remember(calibration) { mutableStateOf(calibration.corners) }
+    val handlePx = with(density) { 22.dp.toPx() }
+    val activeCalibration = if (editing) RackArCalibration(editCorners) else calibration
+
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, drag, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 6f)
-                        pan += drag
+                .pointerInput(editing) {
+                    // While repositioning, the corner handles own the gestures — no pan/zoom so the
+                    // normalised drag math (anchored to the un-transformed image box) stays correct.
+                    if (!editing) {
+                        detectTransformGestures { _, drag, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 6f)
+                            pan += drag
+                        }
                     }
                 },
             contentAlignment = Alignment.Center,
@@ -716,15 +779,18 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
                         for (col in 0 until rack.cols) {
                             val idx = row * rack.cols + col
                             val cell = rack.cells.getOrNull(idx) ?: continue
-                            val p = ArProjection.cellQuadPoint(calibration, col, row, rack.cols, rack.rows, rack.staggered)
+                            val p = ArProjection.cellQuadPoint(activeCalibration, col, row, rack.cols, rack.rows, rack.staggered, rack.staggerOffset)
                             if (cell.occupied) {
+                                // Taps are suppressed while editing so they don't fight the handles.
+                                val onCellClick: (() -> Unit)? =
+                                    if (editing) null else ({ selected = if (selected == idx) -1 else idx })
                                 CellSquare(
                                     rack = rack,
                                     cellIndex = idx,
                                     x = p.x * w,
                                     y = p.y * h,
                                     selected = selected == idx,
-                                    onClick = { selected = if (selected == idx) -1 else idx },
+                                    onClick = onCellClick,
                                 )
                             } else {
                                 // Thin ring marking a free slot, so the user can check the
@@ -733,22 +799,105 @@ private fun ArPhotoView(rack: Rack, onReconfigure: () -> Unit, onBack: () -> Uni
                             }
                         }
                     }
+
+                    // Reposition overlay: the same four connected draggable corners as the setup
+                    // flow, drawn over the live slots so the grid can be aligned hole-by-hole.
+                    if (editing) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val pts = editCorners.map { Offset(it.x * w, it.y * h) }
+                            for (i in pts.indices) {
+                                drawLine(Color(0xFFB5174E), pts[i], pts[(i + 1) % pts.size], strokeWidth = 4f)
+                            }
+                        }
+                        editCorners.forEachIndexed { idx, c ->
+                            Box(
+                                Modifier
+                                    .offset {
+                                        IntOffset(
+                                            (c.x * w - handlePx / 2f).roundToInt(),
+                                            (c.y * h - handlePx / 2f).roundToInt(),
+                                        )
+                                    }
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFB5174E))
+                                    .pointerInput(idx, w, h) {
+                                        detectDragGestures { change, drag ->
+                                            change.consume()
+                                            val nx = (editCorners[idx].x + drag.x / w).coerceIn(0f, 1f)
+                                            val ny = (editCorners[idx].y + drag.y / h).coerceIn(0f, 1f)
+                                            editCorners = editCorners.toMutableList().also { it[idx] = NormPoint(nx, ny) }
+                                        }
+                                    },
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        ArTopBar(onBack = onBack, onReconfigure = onReconfigure)
-        if (selected >= 0) {
-            ArSelectedCard(
-                rack = rack,
-                cellIndex = selected,
-                onDismiss = { selected = -1 },
-                modifier = Modifier
+        if (editing) {
+            // Editing chrome: a top hint plus Cancel / Save at the bottom.
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    stringResource(Res.string.ar_adjust_hint),
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.W600,
+                )
+            }
+            Row(
+                Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-            )
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(
+                    onClick = { editCorners = calibration.corners; editing = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(Res.string.ar_cancel), color = Color.White) }
+                Button(
+                    onClick = {
+                        Racks.setArCalibration(rackIndex, imagePath, RackArCalibration(editCorners))
+                        editing = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent),
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(Res.string.ar_setup_save), fontWeight = FontWeight.W700) }
+            }
         } else {
-            ArHint(stringResource(Res.string.ar_photo_hint))
+            ArTopBar(
+                onBack = onBack,
+                onReconfigure = onReconfigure,
+                onAdjust = {
+                    selected = -1
+                    scale = 1f
+                    pan = Offset.Zero
+                    editCorners = calibration.corners
+                    editing = true
+                },
+            )
+            if (selected >= 0) {
+                ArSelectedCard(
+                    rack = rack,
+                    cellIndex = selected,
+                    onDismiss = { selected = -1 },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                )
+            } else {
+                ArHint(stringResource(Res.string.ar_photo_hint))
+            }
         }
     }
 }
@@ -831,10 +980,21 @@ private fun ArSelectedCard(
 }
 
 @Composable
-private fun ArTopBar(onBack: () -> Unit, onReconfigure: () -> Unit) {
+private fun ArTopBar(onBack: () -> Unit, onReconfigure: () -> Unit, onAdjust: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         ArBackButton(onBack)
         Spacer(Modifier.weight(1f))
+        if (onAdjust != null) {
+            Box(
+                Modifier
+                    .padding(vertical = 14.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable { onAdjust() }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) { Text(stringResource(Res.string.ar_adjust), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700) }
+            Spacer(Modifier.width(8.dp))
+        }
         Box(
             Modifier
                 .padding(14.dp)
@@ -865,15 +1025,10 @@ private fun CenterPrompt(message: String, actionLabel: String, onAction: () -> U
 
 private const val MARKER_WIDTH_METERS = 0.05f
 
-private fun tlMarkerId(rackId: String) = "$rackId-tl"
-private fun brMarkerId(rackId: String) = "$rackId-br"
-
 /** Per-frame state for the two-marker capture, mutated in `onSessionUpdated` without reallocation. */
 private class ArMarkerSetupHolder {
     var tlPose: Pose? = null
     var brPose: Pose? = null
-    var tlImage: AugmentedImage? = null
-    var brImage: AugmentedImage? = null
     val view = FloatArray(16)
     val proj = FloatArray(16)
 }
@@ -907,73 +1062,17 @@ private fun MarkerPrintTile(label: String, bitmap: androidx.compose.ui.graphics.
     }
 }
 
-/** A custom marker tile: preview thumbnail with Photo + Gallery capture actions. */
-@Composable
-private fun CustomMarkerTile(
-    label: String,
-    bitmap: Bitmap?,
-    onPhoto: () -> Unit,
-    onGallery: () -> Unit,
-    modifier: Modifier,
-) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.W700)
-        Spacer(Modifier.height(6.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(VincentColors.Surface2),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (bitmap != null) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Text("+", color = Color.White.copy(alpha = 0.6f), fontSize = 28.sp, fontWeight = FontWeight.W700)
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Button(
-                onClick = onPhoto,
-                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                modifier = Modifier.weight(1f),
-            ) { Text(stringResource(Res.string.ar_marker_photo), color = Color.White, fontSize = 11.sp) }
-            Button(
-                onClick = onGallery,
-                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                modifier = Modifier.weight(1f),
-            ) { Text(stringResource(Res.string.ar_marker_gallery), color = Color.White, fontSize = 11.sp) }
-        }
-    }
-}
-
 /**
- * Pre-capture screen: pick the marker source (proposed markers to print, or the user's own markers
- * via photo/gallery), then launch the live camera.
+ * Pre-capture screen: shows the two square-binary markers to print and a print action, then launches
+ * the live camera so the user can sweep over the markers stuck on the rack.
  */
 @Composable
 private fun ArMarkerConfigure(
-    custom: Boolean,
-    onSelectSource: (Boolean) -> Unit,
     generatedTl: Bitmap,
     generatedBr: Bitmap,
-    tlCustom: Bitmap?,
-    brCustom: Bitmap?,
     tlLabel: String,
     brLabel: String,
     onPrint: () -> Unit,
-    onCapturePhoto: (Boolean) -> Unit,
-    onPickGallery: (Boolean) -> Unit,
-    canStart: Boolean,
     onStart: () -> Unit,
 ) {
     Column(
@@ -985,63 +1084,23 @@ private fun ArMarkerConfigure(
             fontSize = 15.sp,
             fontWeight = FontWeight.W800,
         )
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                false to stringResource(Res.string.ar_marker_source_proposed),
-                true to stringResource(Res.string.ar_marker_source_custom),
-            ).forEach { (value, text) ->
-                val selected = value == custom
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (selected) VincentColors.Accent else VincentColors.Surface2)
-                        .clickable { onSelectSource(value) }
-                        .padding(vertical = 9.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = if (selected) FontWeight.W800 else FontWeight.W600,
-                    )
-                }
-            }
+        Spacer(Modifier.height(12.dp))
+        Text(stringResource(Res.string.ar_marker_print), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MarkerPrintTile(tlLabel, generatedTl.asImageBitmap(), Modifier.weight(1f))
+            MarkerPrintTile(brLabel, generatedBr.asImageBitmap(), Modifier.weight(1f))
         }
         Spacer(Modifier.height(12.dp))
-
-        if (!custom) {
-            Text(stringResource(Res.string.ar_marker_print), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MarkerPrintTile(tlLabel, generatedTl.asImageBitmap(), Modifier.weight(1f))
-                MarkerPrintTile(brLabel, generatedBr.asImageBitmap(), Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = onPrint,
-                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(Res.string.ar_marker_print_action), color = Color.White, fontWeight = FontWeight.W700) }
-        } else {
-            Text(stringResource(Res.string.ar_marker_capture_hint), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CustomMarkerTile(tlLabel, tlCustom, { onCapturePhoto(true) }, { onPickGallery(true) }, Modifier.weight(1f))
-                CustomMarkerTile(brLabel, brCustom, { onCapturePhoto(false) }, { onPickGallery(false) }, Modifier.weight(1f))
-            }
-            if (!canStart) {
-                Spacer(Modifier.height(8.dp))
-                Text(stringResource(Res.string.ar_marker_need_both), color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
-            }
-        }
+        Button(
+            onClick = onPrint,
+            colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Surface2),
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(Res.string.ar_marker_print_action), color = Color.White, fontWeight = FontWeight.W700) }
 
         Spacer(Modifier.height(16.dp))
         Button(
             onClick = onStart,
-            enabled = canStart,
             colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent),
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(Res.string.ar_setup_start), fontWeight = FontWeight.W700) }
@@ -1049,63 +1108,28 @@ private fun ArMarkerConfigure(
 }
 
 /**
- * MARKERS setup. The user prints two markers (or supplies two custom marker images via photo or
- * gallery), sticks them on the rack's top-left and bottom-right corners, then sweeps the camera
- * over them. ARCore tracks both Augmented Images; their 3D positions give the rack's physical
- * width/height (no measurement is typed). Each detected marker's zone is highlighted in its own
- * colour (top-left blue, bottom-right orange).
+ * MARKERS setup. The user prints the two square-binary markers, sticks them on the rack's top-left
+ * and bottom-right corners, then sweeps the camera over them. BoofCV detects both markers on the
+ * ARCore frames; their 3D positions give the rack's physical width/height (no measurement is typed).
+ * Each detected marker's zone is highlighted in its own colour (top-left blue, bottom-right orange).
  */
 @Composable
 private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val saver = rememberRackImageSaver()
-    val tlId = remember(rack.id) { tlMarkerId(rack.id) }
-    val brId = remember(rack.id) { brMarkerId(rack.id) }
-    val generatedTl = remember(tlId) { MarkerImages.bitmap(tlId) }
-    val generatedBr = remember(brId) { MarkerImages.bitmap(brId) }
+    val tlFidId = remember(rack.id) { SquareMarkers.tlId(rack.id) }
+    val brFidId = remember(rack.id) { SquareMarkers.brId(rack.id) }
+    val generatedTl = remember(tlFidId) { SquareMarkers.bitmap(tlFidId) }
+    val generatedBr = remember(brFidId) { SquareMarkers.bitmap(brFidId) }
 
     val tlLabel = stringResource(Res.string.ar_marker_tl)
     val brLabel = stringResource(Res.string.ar_marker_br)
     val printJob = stringResource(Res.string.ar_marker_setup_title)
 
-    var custom by remember { mutableStateOf(false) }
-    var tlCustom by remember { mutableStateOf<Bitmap?>(null) }
-    var brCustom by remember { mutableStateOf<Bitmap?>(null) }
-    var tlCustomPath by remember { mutableStateOf<String?>(null) }
-    var brCustomPath by remember { mutableStateOf<String?>(null) }
-    var captureTl by remember { mutableStateOf(true) }
-
-    fun handleBytes(bytes: ByteArray) {
-        val bmp = decodeScaledBitmap(bytes) ?: return
-        val isTl = captureTl
-        scope.launch {
-            val path = saver.saveNamed(bytes, "${rack.id}-marker-${if (isTl) "tl" else "br"}")
-            if (isTl) {
-                tlCustom = bmp; tlCustomPath = path
-            } else {
-                brCustom = bmp; brCustomPath = path
-            }
-        }
-    }
-
-    val takePhoto = rememberPhotoCapture { handleBytes(it) }
-    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
-            if (bytes != null) handleBytes(bytes)
-        }
-    }
-
     var started by remember { mutableStateOf(false) }
     if (!started) {
         ArMarkerConfigure(
-            custom = custom,
-            onSelectSource = { custom = it },
             generatedTl = generatedTl,
             generatedBr = generatedBr,
-            tlCustom = tlCustom,
-            brCustom = brCustom,
             tlLabel = tlLabel,
             brLabel = brLabel,
             onPrint = {
@@ -1115,62 +1139,38 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                     listOf(tlLabel to generatedTl, brLabel to generatedBr),
                 )
             },
-            onCapturePhoto = { isTl -> captureTl = isTl; takePhoto() },
-            onPickGallery = { isTl ->
-                captureTl = isTl
-                pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            canStart = !custom || (tlCustom != null && brCustom != null),
             onStart = { started = true },
         )
         return
     }
 
-    val tlBitmap = if (custom) tlCustom else generatedTl
-    val brBitmap = if (custom) brCustom else generatedBr
-    if (tlBitmap == null || brBitmap == null) {
-        LaunchedEffect(Unit) { started = false }
-        return
-    }
-
+    val scope = rememberCoroutineScope()
+    val driver = remember { FiducialDetectionDriver(MARKER_WIDTH_METERS.toDouble()) }
     val holder = remember { ArMarkerSetupHolder() }
     var tick by remember { mutableIntStateOf(0) }
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    var lowQuality by remember { mutableStateOf(false) }
 
     var tlRecorded by remember { mutableStateOf(false) }
     var brRecorded by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
 
     Box(Modifier.fillMaxSize().onSizeChanged { viewSize = it }) {
-        val sessionConfig = remember(tlId, tlBitmap, brId, brBitmap) {
-            { session: com.google.ar.core.Session, config: Config ->
-                try {
-                    val db = AugmentedImageDatabase(session)
-                    db.addImage(tlId, tlBitmap, MARKER_WIDTH_METERS)
-                    db.addImage(brId, brBitmap, MARKER_WIDTH_METERS)
-                    config.augmentedImageDatabase = db
-                } catch (_: Exception) {
-                    lowQuality = true
-                }
+        val sessionConfig = remember {
+            { _: Session, config: Config ->
                 config.focusMode = Config.FocusMode.AUTO
                 config.lightEstimationMode = Config.LightEstimationMode.DISABLED
             }
         }
-        val onSessionUpdated = remember(tlId, brId) {
-            { _: com.google.ar.core.Session, frame: com.google.ar.core.Frame ->
+        val onSessionUpdated = remember {
+            { _: Session, frame: Frame ->
                 val cam = frame.camera
                 if (cam.trackingState == TrackingState.TRACKING) {
                     cam.getViewMatrix(holder.view, 0)
                     cam.getProjectionMatrix(holder.proj, 0, 0.1f, 100f)
-                    frame.getUpdatedTrackables(AugmentedImage::class.java).forEach { img ->
-                        if (img.trackingState == TrackingState.TRACKING) {
-                            when (img.name) {
-                                tlId -> { holder.tlPose = img.centerPose; holder.tlImage = img }
-                                brId -> { holder.brPose = img.centerPose; holder.brImage = img }
-                            }
-                        }
-                    }
+                    driver.submit(frame, scope)
+                    val sights = driver.sightings
+                    sights.firstOrNull { it.id == tlFidId }?.let { holder.tlPose = it.pose }
+                    sights.firstOrNull { it.id == brFidId }?.let { holder.brPose = it.pose }
                     tick++
                 }
             }
@@ -1212,11 +1212,11 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                     }
                 }
                 // Each detected marker's own zone, in a distinct colour.
-                holder.tlImage?.let {
-                    drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightTl)
+                tlPose?.let {
+                    drawMarkerHighlight(it, MARKER_WIDTH_METERS, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightTl)
                 }
-                holder.brImage?.let {
-                    drawMarkerHighlight(it, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightBr)
+                brPose?.let {
+                    drawMarkerHighlight(it, MARKER_WIDTH_METERS, holder.view, holder.proj, viewSize.width, viewSize.height, MarkerHighlightBr)
                 }
             }
         }
@@ -1273,13 +1273,9 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                         val tp = holder.tlPose
                         val bp = holder.brPose
                         if (tp != null && bp != null) {
-                            val anchor = buildAnchorFromMarkers(
-                                tlId, tp, bp,
-                                tlImagePath = if (custom) tlCustomPath else null,
-                                brImagePath = if (custom) brCustomPath else null,
-                            )
-                            if (anchor != null) {
-                                Racks.setArAnchor(rackIndex, anchor)
+                            val built = buildAnchorFromMarkers(rack.id, tlFidId, brFidId, tp, bp)
+                            if (built != null) {
+                                Racks.setArAnchor(rackIndex, built)
                                 onDone()
                             }
                         }
@@ -1290,8 +1286,6 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                 ) { Text(stringResource(Res.string.ar_setup_save), fontWeight = FontWeight.W700) }
             }
         }
-
-        if (lowQuality) ArHint(stringResource(Res.string.ar_low_quality))
     }
 }
 
@@ -1324,10 +1318,10 @@ private fun measureFromMarkers(tlPose: Pose, brPose: Pose): MarkerMeasure? {
  */
 private fun buildAnchorFromMarkers(
     markerId: String,
+    tlFiducialId: Int,
+    brFiducialId: Int,
     tlPose: Pose,
     brPose: Pose,
-    tlImagePath: String? = null,
-    brImagePath: String? = null,
 ): RackArAnchor? {
     val measure = measureFromMarkers(tlPose, brPose) ?: return null
     val center = vScale(vAdd(measure.corners[0], measure.corners[2]), 0.5f)
@@ -1344,8 +1338,8 @@ private fun buildAnchorFromMarkers(
         qx = rrq[0], qy = rrq[1], qz = rrq[2], qw = rrq[3],
         gridWidthMeters = measure.widthM,
         gridHeightMeters = measure.heightM,
-        tlImagePath = tlImagePath,
-        brImagePath = brImagePath,
+        tlFiducialId = tlFiducialId,
+        brFiducialId = brFiducialId,
     )
 }
 

@@ -21,6 +21,7 @@
     <string name="last_added">Dernières bouteilles ajoutées</string>
     <string name="import_export_label">Importer / Exporter (PLOC, Vivino…)</string>
     <string name="my_favorites">Mes favoris</string>
+    <string name="favorites_card_sub">vins favoris</string>
     <plurals name="vines_count">
         <item quantity="one">%d vin</item>
         <item quantity="other">%d vins</item>
@@ -104,6 +105,16 @@
     <string name="detail_compare_prices">Comparer les prix</string>
     <string name="detail_compare_desc">Consultez les offres sur le web — Vincent ne collecte ni ne stocke ces prix.</string>
     <string name="detail_pairings_title">Accords mets-vin</string>
+    <string name="detail_description">Description</string>
+    <string name="detail_grapes">Cépages</string>
+    <string name="detail_flavor_profile">Profil aromatique</string>
+    <string name="detail_maturity">Maturité</string>
+    <string name="detail_fp_sweetness">Sucrosité</string>
+    <string name="detail_fp_acidity">Acidité</string>
+    <string name="detail_fp_tannins">Tanins</string>
+    <string name="detail_fp_alcohol">Alcool</string>
+    <string name="detail_fp_body">Corps</string>
+    <string name="detail_fp_finish">Finale</string>
     <string name="detail_analyzing">Analyse…</string>
     <string name="detail_suggest_ai">Suggérer d\'autres accords (IA)</string>
     <string name="detail_drink_peak">Apogée — à boire</string>
@@ -173,7 +184,15 @@
     <string name="cellar_edit_rows">Rangées</string>
     <string name="cellar_edit_staggered">Quinconce</string>
     <string name="cellar_edit_staggered_desc">Rangées décalées d\'une demi-case</string>
+    <string name="cellar_edit_stagger_offset">Première rangée décalée</string>
+    <string name="cellar_edit_stagger_offset_desc">Sinon elle démarre dans le coin</string>
+    <string name="cellar_edit_format">Format</string>
+    <string name="cellar_edit_format_grid">Grille</string>
+    <string name="cellar_edit_format_x">Casier en X</string>
+    <string name="cellar_edit_square_cols">Carrés (colonnes)</string>
+    <string name="cellar_edit_square_rows">Carrés (rangées)</string>
     <string name="cellar_edit_capacity">Capacité : %d emplacements</string>
+    <string name="cellar_edit_capacity_x">Capacité : %1$d carrés × 4 = %2$d bouteilles</string>
     <string name="cellar_edit_duplicate">Dupliquer</string>
     <string name="cellar_edit_delete">Supprimer</string>
     <string name="cellar_edit_cancel">Annuler</string>
@@ -219,7 +238,11 @@
         <item quantity="one">Importé : %1$d bouteille · source détectée « %3$s »</item>
         <item quantity="other">Importé : %1$d bouteilles · source détectée « %3$s »</item>
     </plurals>
-    <string name="transfer_import_none">Aucune bouteille reconnue dans ce fichier.</string>
+    <string name="transfer_import_none">Aucune donnée reconnue dans ce fichier.</string>
+    <plurals name="data_import_done">
+        <item quantity="one">Importé : %1$d élément · source détectée « %2$s »</item>
+        <item quantity="other">Importé : %1$d éléments · source détectée « %2$s »</item>
+    </plurals>
     <string name="transfer_export_success">Cave exportée en CSV.</string>
     <string name="transfer_export_canceled">Export annulé.</string>
     <string name="format_ploc_desc">Export CSV (Réglages → Exporter)</string>
@@ -297,7 +320,17 @@
     <string name="add_parsed_domain">Domaine</string>
     <string name="add_parsed_vintage">Millésime</string>
     <string name="add_parsed_color">Couleur</string>
+    <string name="add_parsed_appellation">Appellation</string>
     <string name="add_parsed_estimated_price">Prix estimé</string>
+    <string name="add_voice_summary_title">Résumé</string>
+    <string name="add_voice_complete_hint">Touchez un champ à compléter ou discutez avec l\'assistant.</string>
+    <string name="add_voice_missing">À compléter</string>
+    <string name="add_voice_switch_manual">Éditer · saisie manuelle</string>
+    <string name="add_voice_discuss_title">Compléter par la discussion</string>
+    <string name="add_voice_discuss_placeholder">Ex. « millésime 2019, 24 € »</string>
+    <string name="add_voice_send">Envoyer</string>
+    <string name="add_voice_assistant_done">C\'est noté.</string>
+    <string name="add_voice_field_done">OK</string>
     <string name="add_photo_capture">Photographier l\'étiquette</string>
     <string name="add_barcode_scan">Scanner le code-barres</string>
     <string name="add_method_barcode">Code-barres</string>
@@ -369,6 +402,17 @@
     <string name="update_ineligible">Mise à jour disponible mais non éligible.</string>
     <string name="settings_section_app">Application</string>
 
+    <string name="settings_section_data_sources">Sources de données</string>
+    <string name="settings_xwines_title">Base X-Wines (recherche hors ligne)</string>
+    <string name="settings_xwines_download">Télécharger</string>
+    <string name="settings_xwines_update">Mettre à jour</string>
+    <string name="settings_xwines_downloading">Téléchargement…</string>
+    <string name="settings_xwines_never">Jamais téléchargée</string>
+    <string name="settings_xwines_count">%d vins disponibles</string>
+    <string name="settings_xwines_updated">Dernière mise à jour : %s</string>
+    <string name="settings_xwines_not_configured">Source non configurée</string>
+    <string name="settings_xwines_error">Échec du téléchargement</string>
+
     <string name="suppliers_title">Mes fournisseurs</string>
     <string name="suppliers_subtitle">%d fournisseurs enregistrés</string>
     <string name="suppliers_import_button">Importer des fournisseurs</string>
@@ -424,6 +468,9 @@
     <string name="ar_mode_photo">Photo figée</string>
     <string name="ar_mode_marker">Marqueurs</string>
     <string name="ar_photo_hint">Pincez pour zoomer, glissez pour déplacer.</string>
+    <string name="ar_adjust">Ajuster l\'overlay</string>
+    <string name="ar_adjust_hint">Glissez les 4 coins pour aligner les casiers et leurs bouteilles sur la façade.</string>
+    <string name="ar_cancel">Annuler</string>
     <string name="ar_marker_searching">Pointez la caméra vers le marqueur…</string>
     <string name="ar_marker_setup_title">Calibrer avec deux marqueurs</string>
     <string name="ar_marker_print">Imprimez ces deux marqueurs (≈5 cm chacun) et collez-les sur les coins haut-gauche et bas-droite du casier.</string>
@@ -434,11 +481,5 @@
     <string name="ar_marker_recorded">Marqueur %1$s enregistré</string>
     <string name="ar_marker_both_found">Deux marqueurs détectés</string>
     <string name="ar_marker_measured">Casier : %1$d × %2$d cm</string>
-    <string name="ar_marker_source_proposed">Marqueurs proposés</string>
-    <string name="ar_marker_source_custom">Mes marqueurs</string>
     <string name="ar_marker_print_action">Imprimer</string>
-    <string name="ar_marker_photo">Photo</string>
-    <string name="ar_marker_gallery">Galerie</string>
-    <string name="ar_marker_capture_hint">Choisissez une image bien texturée et asymétrique pour chaque marqueur, puis collez-la sur le casier (≈5 cm).</string>
-    <string name="ar_marker_need_both">Ajoutez les deux marqueurs pour continuer.</string>
 </resources>

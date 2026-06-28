@@ -66,10 +66,19 @@ object ArProjection {
 
     /**
      * Grid fraction (fu, fv) in 0..1 for the centre of the cell at [col],[row], honouring the
-     * half-cell [staggered] (quinconce) shift on odd rows.
+     * half-cell [staggered] (quinconce) shift. [staggerOffset] flips which rows are shifted:
+     * false ⇒ odd rows shift (first row flush in the corner); true ⇒ even rows shift.
      */
-    fun gridFraction(col: Int, row: Int, cols: Int, rows: Int, staggered: Boolean): Pair<Float, Float> {
-        val rowShift = if (staggered && row % 2 == 1) 0.5f else 0f
+    fun gridFraction(
+        col: Int,
+        row: Int,
+        cols: Int,
+        rows: Int,
+        staggered: Boolean,
+        staggerOffset: Boolean = false,
+    ): Pair<Float, Float> {
+        val shiftedRow = row % 2 == (if (staggerOffset) 0 else 1)
+        val rowShift = if (staggered && shiftedRow) 0.5f else 0f
         val fu = (col + 0.5f + rowShift) / (if (staggered) cols + 0.5f else cols.toFloat())
         val fv = (row + 0.5f) / rows
         return fu to fv
@@ -102,8 +111,9 @@ object ArProjection {
         cols: Int,
         rows: Int,
         staggered: Boolean,
+        staggerOffset: Boolean = false,
     ): NormPoint {
-        val (fu, fv) = gridFraction(col, row, cols, rows, staggered)
+        val (fu, fv) = gridFraction(col, row, cols, rows, staggered, staggerOffset)
         return quadPoint(calibration, fu, fv)
     }
 
@@ -127,6 +137,7 @@ object ArProjection {
         projMatrix: FloatArray,
         widthPx: Int,
         heightPx: Int,
+        staggerOffset: Boolean = false,
     ): List<CellScreenPos> {
         if (cols <= 0 || rows <= 0 || widthPx <= 0 || heightPx <= 0) return emptyList()
         if (gridWidthMeters <= 0f || gridHeightMeters <= 0f) return emptyList()
@@ -140,7 +151,7 @@ object ArProjection {
         val result = ArrayList<CellScreenPos>(cols * rows)
         for (row in 0 until rows) {
             for (col in 0 until cols) {
-                val (fu, fv) = gridFraction(col, row, cols, rows, staggered)
+                val (fu, fv) = gridFraction(col, row, cols, rows, staggered, staggerOffset)
                 // Grid local frame: +X right across the face, +Z down the face, +Y is the normal.
                 val localX = (fu - 0.5f) * gridWidthMeters
                 val localZ = (fv - 0.5f) * gridHeightMeters

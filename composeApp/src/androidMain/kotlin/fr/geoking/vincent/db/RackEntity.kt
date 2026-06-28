@@ -16,6 +16,8 @@ data class RackEntity(
     val arCalibrationData: String? = null,
     val arMode: String? = null,
     val arAnchorData: String? = null,
+    val format: String = "GRID",
+    val staggerOffset: Boolean = false,
 )
 
 private const val CELL_SEP = "" // Record Separator
@@ -28,6 +30,8 @@ fun RackEntity.toRack(): Rack = Rack(
     rows = rows,
     staggered = staggered,
     cells = cellsData.split(CELL_SEP).map { it.toRackCell() },
+    format = runCatching { RackFormat.valueOf(format) }.getOrNull() ?: RackFormat.GRID,
+    staggerOffset = staggerOffset,
     arImagePath = arImagePath,
     arCalibration = arCalibrationData?.toArCalibration(),
     arMode = arMode?.let { runCatching { ArMode.valueOf(it) }.getOrNull() } ?: ArMode.PHOTO,
@@ -45,6 +49,8 @@ fun Rack.toEntity(): RackEntity = RackEntity(
     arCalibrationData = arCalibration?.toData(),
     arMode = arMode.name,
     arAnchorData = arAnchor?.toData(),
+    format = format.name,
+    staggerOffset = staggerOffset,
 )
 
 private fun String.toRackCell(): RackCell {
@@ -85,6 +91,8 @@ private fun String.toArAnchor(): RackArAnchor? {
     val markerId = f.getOrNull(0)?.takeIf { it.isNotEmpty() } ?: return null
     val nums = (1..10).map { f.getOrNull(it)?.toFloatOrNull() }
     if (nums.any { it == null }) return null
+    // Anchors stored before the BoofCV migration lack the fiducial ids; default to -1 so they fail
+    // isValid and the rack is re-calibrated rather than mis-tracked.
     return RackArAnchor(
         markerId = markerId,
         markerWidthMeters = nums[0]!!,
@@ -92,8 +100,8 @@ private fun String.toArAnchor(): RackArAnchor? {
         qx = nums[4]!!, qy = nums[5]!!, qz = nums[6]!!, qw = nums[7]!!,
         gridWidthMeters = nums[8]!!,
         gridHeightMeters = nums[9]!!,
-        tlImagePath = f.getOrNull(11)?.takeIf { it.isNotEmpty() },
-        brImagePath = f.getOrNull(12)?.takeIf { it.isNotEmpty() },
+        tlFiducialId = f.getOrNull(11)?.toIntOrNull() ?: -1,
+        brFiducialId = f.getOrNull(12)?.toIntOrNull() ?: -1,
     )
 }
 
@@ -104,6 +112,6 @@ private fun RackArAnchor.toData(): String = listOf(
     qx.toString(), qy.toString(), qz.toString(), qw.toString(),
     gridWidthMeters.toString(),
     gridHeightMeters.toString(),
-    tlImagePath ?: "",
-    brImagePath ?: "",
+    tlFiducialId.toString(),
+    brFiducialId.toString(),
 ).joinToString(FIELD_SEP)

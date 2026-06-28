@@ -28,105 +28,6 @@ import vincent.composeapp.generated.resources.*
 private const val MODEL = "gemini-flash-latest"
 private const val TAG = "VincentAI"
 
-/** Shared networking for AI providers. */
-internal object AiNetwork {
-    fun grapemindsProxyUrl(proxyUrl: String): String {
-        return if (proxyUrl.endsWith("/")) proxyUrl + "v1/grapeminds"
-        else proxyUrl.replace("/v1/generate", "/v1/grapeminds")
-    }
-
-    suspend fun callProxy(
-        url: String,
-        body: JSONObject,
-        label: String = "Proxy",
-        onQuota: ((remaining: Int, limit: Int) -> Unit)? = null,
-    ): JSONObject? = withContext(Dispatchers.IO) {
-        val started = System.currentTimeMillis()
-        val appCheckToken = try {
-            FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
-        } catch (e: Exception) {
-            Log.w(TAG, "App Check token unavailable: ${e.message}")
-            ""
-        }
-        val idToken = try {
-            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
-        } catch (e: Exception) {
-            Log.w(TAG, "ID token unavailable: ${e.message}")
-            null
-        }
-        if (idToken.isNullOrBlank()) {
-            return@withContext null
-        }
-        try {
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                connectTimeout = 15000
-                readTimeout = 25000
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Authorization", "Bearer $idToken")
-                setRequestProperty("X-Firebase-AppCheck", appCheckToken)
-            }
-            conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
-            val code = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            if (code == 200 && onQuota != null) {
-                val remaining = conn.getHeaderField("X-AI-Quota-Remaining")?.toIntOrNull()
-                val limit = conn.getHeaderField("X-AI-Quota-Limit")?.toIntOrNull()
-                if (remaining != null && limit != null) onQuota(remaining, limit)
-            }
-            if (code !in 200..299) {
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                Log.e(TAG, "$label HTTP $code: ${err?.take(400)}")
-                HttpDebug.log(label, "POST", url, body.toString(), code, err, elapsed)
-                return@withContext null
-            }
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            HttpDebug.log(label, "POST", url, body.toString(), code, resp, elapsed)
-            JSONObject(resp)
-        } catch (e: Exception) {
-            Log.e(TAG, "$label failed", e)
-            HttpDebug.log(label, "POST", url, body.toString(), 0, null, System.currentTimeMillis() - started, e.message)
-            null
-        }
-    }
-
-    suspend fun callDirect(
-        url: String,
-        body: JSONObject,
-        label: String = "Direct",
-        headers: Map<String, String> = emptyMap(),
-    ): JSONObject? = withContext(Dispatchers.IO) {
-        val started = System.currentTimeMillis()
-        try {
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                connectTimeout = 15000
-                readTimeout = 25000
-                setRequestProperty("Content-Type", "application/json")
-                headers.forEach { (k, v) -> setRequestProperty(k, v) }
-            }
-            conn.outputStream.use { it.write(body.toString().encodeToByteArray()) }
-            val code = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            if (code !in 200..299) {
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                Log.e(TAG, "$label HTTP $code: ${err?.take(400)}")
-                HttpDebug.log(label, "POST", url, body.toString(), code, err, elapsed)
-                return@withContext null
-            }
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            HttpDebug.log(label, "POST", url, body.toString(), code, resp, elapsed)
-            JSONObject(resp)
-        } catch (e: Exception) {
-            Log.e(TAG, "$label failed", e)
-            HttpDebug.log(label, "POST", url, body.toString(), 0, null, System.currentTimeMillis() - started, e.message)
-            null
-        }
-    }
-}
-
 /** Single Gemini-backed client implementing both seams. */
 object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
 
@@ -152,6 +53,42 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         val bottle = toBottle(json, "ia-${title.hashCode()}")
         if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
         else RecognizeOutcome(bottle = bottle)
+    }
+
+    override suspend fun refine(current: Bottle, instruction: String): RecognizeOutcome = withContext(Dispatchers.IO) {
+        val ctx = JSONObject()
+            .put("domain", current.domain)
+            .put("appellation", current.appellation)
+            .put("color", colorToken(current.color))
+            .put("region", current.provenance)
+            .put("vintage", current.vintage)
+            .put("price", current.price)
+        val json = generate(
+            langDirective() +
+                "Tu aides à compléter la fiche d'un vin par la discussion. " +
+                "Fiche actuelle (JSON): $ctx. " +
+                "Précision de l'utilisateur : \"$instruction\". " +
+                "Renvoie la fiche mise à jour en JSON " +
+                "{domain, appellation, color, region, vintage, category, price, reply}. " +
+                "color parmi rouge/blanc/rosé/pétillant. " +
+                "price = prix unitaire en euros (entier, 0 si inconnu). " +
+                "vintage = année sur 4 chiffres ou \"NM\" si non millésimé. " +
+                "Conserve les valeurs déjà connues si l'utilisateur ne les change pas. " +
+                "reply = une phrase courte confirmant ce qui a été complété ou demandant la donnée manquante.",
+            imageB64 = null,
+        ) ?: return@withContext RecognizeOutcome(error = lastError)
+        val reply = json.optString("reply").trim().takeIf { it.isNotEmpty() }
+        val updated = toBottle(json, current.id)?.copy(
+            price = json.optInt("price", current.price).takeIf { it > 0 } ?: current.price,
+            quantity = current.quantity,
+            cellarSpot = current.cellarSpot,
+            source = current.source,
+            photoBottle = current.photoBottle,
+            photoLabel = current.photoLabel,
+            photoBack = current.photoBack,
+        )
+        if (updated == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text), reply = reply)
+        else RecognizeOutcome(bottle = updated, reply = reply)
     }
 
     override suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome = withContext(Dispatchers.IO) {
@@ -222,16 +159,86 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         prompt: String,
         imageB64: String?,
     ): JSONObject? {
-        val body = JSONObject()
-            .put("prompt", prompt)
-            .put("responseMimeType", "application/json")
-            .put("cacheable", imageB64 == null)
-        if (imageB64 != null) body.put("imageB64", imageB64)
+        val appCheckToken = try {
+            FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
+        } catch (e: Exception) {
+            Log.w(TAG, "App Check token unavailable: ${e.message}")
+            ""
+        }
+        val idToken = try {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+        } catch (e: Exception) {
+            Log.w(TAG, "ID token unavailable: ${e.message}")
+            null
+        }
+        if (idToken.isNullOrBlank()) {
+            return fail(getString(Res.string.ai_error_sign_in))
+        }
+        val started = System.currentTimeMillis()
+        return try {
+            val body = JSONObject()
+                .put("prompt", prompt)
+                .put("responseMimeType", "application/json")
+                .put("cacheable", imageB64 == null)
+            if (imageB64 != null) body.put("imageB64", imageB64)
+            val bodyText = body.toString()
+            val logBody = if (imageB64 != null) {
+                bodyText.replace(imageB64, "<image ${imageB64.length} chars>")
+            } else {
+                bodyText
+            }
 
-        val resp = AiNetwork.callProxy(proxyUrl, body, onQuota = { rem, lim -> AiUsage.update(rem, lim) })
-            ?: return fail(getString(Res.string.ai_error_generic))
-
-        return parseModelJson(resp.toString())
+            val conn = (URL(proxyUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 15000
+                readTimeout = 25000
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $idToken")
+                setRequestProperty("X-Firebase-AppCheck", appCheckToken)
+            }
+            conn.outputStream.use { it.write(bodyText.encodeToByteArray()) }
+            val code = conn.responseCode
+            val elapsed = System.currentTimeMillis() - started
+            readQuotaHeaders(conn)
+            if (code !in 200..299) {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+                Log.e(TAG, "AI proxy HTTP $code: ${err?.take(400)}")
+                HttpDebug.log(
+                    label = "AI proxy",
+                    method = "POST",
+                    url = proxyUrl,
+                    requestBody = logBody,
+                    statusCode = code,
+                    responseBody = err,
+                    durationMs = elapsed,
+                    error = geminiErrorDetail(err),
+                )
+                return fail(httpFailMessage(code, err))
+            }
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            HttpDebug.log(
+                label = "AI proxy",
+                method = "POST",
+                url = proxyUrl,
+                requestBody = logBody,
+                statusCode = code,
+                responseBody = resp,
+                durationMs = elapsed,
+            )
+            parseModelJson(resp)
+        } catch (e: Exception) {
+            val elapsed = System.currentTimeMillis() - started
+            Log.e(TAG, "AI proxy call failed: ${e.javaClass.simpleName}: ${e.message}", e)
+            HttpDebug.log(
+                label = "AI proxy",
+                method = "POST",
+                url = proxyUrl,
+                durationMs = elapsed,
+                error = "${e.javaClass.simpleName}: ${e.message}",
+            )
+            fail(getString(Res.string.ai_error_generic))
+        }
     }
 
     // Dev fallback (debug builds without a configured proxy): call Gemini directly
@@ -240,25 +247,78 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         if (BuildConfig.GEMINI_API_KEY.isBlank()) {
             return fail(getString(Res.string.ai_error_no_key))
         }
+        val started = System.currentTimeMillis()
         val endpoint =
             "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent" +
                 "?key=${BuildConfig.GEMINI_API_KEY}"
+        return try {
+            val parts = JSONArray().put(JSONObject().put("text", prompt))
+            if (imageB64 != null) {
+                parts.put(
+                    JSONObject().put(
+                        "inline_data",
+                        JSONObject().put("mime_type", "image/jpeg").put("data", imageB64),
+                    ),
+                )
+            }
+            val body = JSONObject()
+                .put("contents", JSONArray().put(JSONObject().put("parts", parts)))
+                .put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
+            val bodyText = body.toString()
+            val logBody = if (imageB64 != null) {
+                bodyText.replace(imageB64, "<image ${imageB64.length} chars>")
+            } else {
+                bodyText
+            }
 
-        val parts = JSONArray().put(JSONObject().put("text", prompt))
-        if (imageB64 != null) {
-            parts.put(
-                JSONObject().put(
-                    "inline_data",
-                    JSONObject().put("mime_type", "image/jpeg").put("data", imageB64),
-                ),
+            val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 15000
+                readTimeout = 25000
+                setRequestProperty("Content-Type", "application/json")
+            }
+            conn.outputStream.use { it.write(bodyText.encodeToByteArray()) }
+            val code = conn.responseCode
+            val elapsed = System.currentTimeMillis() - started
+            if (code !in 200..299) {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+                Log.e(TAG, "Gemini HTTP $code: ${err?.take(400)}")
+                HttpDebug.log(
+                    label = "Gemini $MODEL",
+                    method = "POST",
+                    url = endpoint,
+                    requestBody = logBody,
+                    statusCode = code,
+                    responseBody = err,
+                    durationMs = elapsed,
+                    error = geminiErrorDetail(err),
+                )
+                return fail(httpFailMessage(code, err))
+            }
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            HttpDebug.log(
+                label = "Gemini $MODEL",
+                method = "POST",
+                url = endpoint,
+                requestBody = logBody,
+                statusCode = code,
+                responseBody = resp,
+                durationMs = elapsed,
             )
+            parseModelJson(resp)
+        } catch (e: Exception) {
+            val elapsed = System.currentTimeMillis() - started
+            Log.e(TAG, "Gemini call failed: ${e.javaClass.simpleName}: ${e.message}", e)
+            HttpDebug.log(
+                label = "Gemini $MODEL",
+                method = "POST",
+                url = endpoint,
+                durationMs = elapsed,
+                error = "${e.javaClass.simpleName}: ${e.message}",
+            )
+            fail(getString(Res.string.ai_error_generic))
         }
-        val body = JSONObject()
-            .put("contents", JSONArray().put(JSONObject().put("parts", parts)))
-            .put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
-
-        val resp = AiNetwork.callDirect(endpoint, body) ?: return fail(getString(Res.string.ai_error_generic))
-        return parseModelJson(resp.toString())
     }
 
     // The proxy and the direct call both return the raw Gemini generateContent
@@ -326,8 +386,8 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             id = id,
             domain = domain,
             appellation = appellation,
-            color = WineMapping.colorOf(j.optString("color")),
-            category = WineMapping.categoryOf("$region $appellation ${j.optString("category")}"),
+            color = colorOf(j.optString("color")),
+            category = categoryOf("$region $appellation ${j.optString("category")}"),
             vintage = j.optString("vintage").ifBlank { "NM" },
             price = 0,
             quantity = 1,
@@ -342,11 +402,16 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         )
     }
 
-}
+    // Stable French token sent back to Gemini so a refinement keeps the same colour
+    // vocabulary it was asked to produce (decoupled from the localized UI label).
+    private fun colorToken(color: WineColor): String = when (color) {
+        WineColor.RED -> "rouge"
+        WineColor.WHITE -> "blanc"
+        WineColor.ROSE -> "rosé"
+        WineColor.SPARKLING -> "pétillant"
+    }
 
-/** Mapping utilities for wine attributes. */
-internal object WineMapping {
-    fun colorOf(raw: String): WineColor {
+    private fun colorOf(raw: String): WineColor {
         val v = raw.lowercase()
         return when {
             "ros" in v -> WineColor.ROSE
@@ -356,7 +421,7 @@ internal object WineMapping {
         }
     }
 
-    fun categoryOf(text: String): WineCategory {
+    private fun categoryOf(text: String): WineCategory {
         val v = text.lowercase()
         return when {
             "bourgogne" in v || "burgundy" in v || "chablis" in v -> WineCategory.BOURGOGNE
@@ -369,98 +434,6 @@ internal object WineMapping {
     }
 }
 
-/** Grapeminds-backed client. */
-object GrapemindsClient : WineRecognizer, PriceEstimator, FoodPairer {
-    override suspend fun pairings(bottle: Bottle): List<String> = withContext(Dispatchers.IO) {
-        val q = "${bottle.domain} ${bottle.vintage} — ${bottle.color.label}, ${bottle.appellation}"
-        val json = generate("pairings for $q") ?: return@withContext emptyList()
-        val arr = json.optJSONArray("pairings") ?: return@withContext emptyList()
-        (0 until arr.length()).mapNotNull { i -> arr.optString(i).trim().takeIf { it.isNotEmpty() } }
-    }
-
-    override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
-        val json = generate("identify text: $title") ?: return@withContext RecognizeOutcome(error = lastError)
-        val bottle = toBottle(json, "gm-${title.hashCode()}")
-        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
-        else RecognizeOutcome(bottle = bottle)
-    }
-
-    override suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome = withContext(Dispatchers.IO) {
-        val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
-        val json = generate("identify image", b64) ?: return@withContext RecognizeOutcome(error = lastError)
-        val bottle = toBottle(json, "gm-img-${jpeg.size}")
-        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_no_label))
-        else RecognizeOutcome(bottle = bottle)
-    }
-
-    override suspend fun estimate(bottle: Bottle): PriceEstimate? = withContext(Dispatchers.IO) {
-        val q = "${bottle.domain} ${bottle.vintage} ${bottle.appellation}".trim()
-        val json = generate("price for $q") ?: return@withContext null
-        val price = json.optInt("price", 0)
-        if (price <= 0) null
-        else PriceEstimate(price, json.optString("source", "grapeminds"), "estimation Grapeminds")
-    }
-
-    private var lastError: String? = null
-
-    private fun fail(msg: String): JSONObject? {
-        lastError = msg
-        Log.e(TAG, "Grapeminds: $msg")
-        return null
-    }
-
-    private suspend fun generate(prompt: String, imageB64: String? = null): JSONObject? {
-        lastError = null
-        val proxyUrl = BuildConfig.AI_PROXY_URL
-        return if (proxyUrl.isNotBlank()) {
-            generateViaProxy(AiNetwork.grapemindsProxyUrl(proxyUrl), prompt, imageB64)
-        } else {
-            generateDirect(prompt, imageB64)
-        }
-    }
-
-    private suspend fun generateViaProxy(url: String, prompt: String, imageB64: String?): JSONObject? {
-        val body = JSONObject().put("prompt", prompt).put("imageB64", imageB64)
-        return AiNetwork.callProxy(url, body, label = "Grapeminds Proxy", onQuota = { rem, lim -> AiUsage.update(rem, lim) })
-            ?: fail("Proxy call failed")
-    }
-
-    private suspend fun generateDirect(prompt: String, imageB64: String?): JSONObject? {
-        val apiKey = BuildConfig.GRAPEMINDS_API_KEY
-        val apiUrl = BuildConfig.GRAPEMINDS_API_URL
-        if (apiKey.isBlank() || apiUrl.isBlank()) return fail("Grapeminds not configured")
-
-        val body = JSONObject().put("prompt", prompt).put("imageB64", imageB64)
-        val headers = mapOf("X-Api-Key" to apiKey, "Authorization" to "Bearer $apiKey")
-        return AiNetwork.callDirect(apiUrl, body, label = "Grapeminds Direct", headers = headers) ?: fail("Direct call failed")
-    }
-
-    private suspend fun toBottle(j: JSONObject, id: String): Bottle? {
-        val domain = j.optString("domain").ifBlank { j.optString("name") }.trim()
-        if (domain.isEmpty()) return null
-        val region = j.optString("region")
-        val appellation = j.optString("appellation").ifBlank { region }
-        return Bottle(
-            id = id,
-            domain = domain,
-            appellation = appellation,
-            color = WineMapping.colorOf(j.optString("color")),
-            category = WineMapping.categoryOf("${j.optString("region")} ${j.optString("appellation")}"),
-            vintage = j.optString("vintage").ifBlank { "NM" },
-            price = 0,
-            quantity = 1,
-            rating = 0.0,
-            cellarSpot = "—",
-            provenance = region.ifBlank { appellation },
-            merchant = "—",
-            purchaseDate = getString(Res.string.add_today),
-            occasion = "—",
-            source = AddSource.SCAN,
-            addedLabel = getString(Res.string.ai_added_label),
-        )
-    }
-}
-
-actual fun wineRecognizer(): WineRecognizer = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsClient else GeminiClient
-actual fun priceEstimator(): PriceEstimator = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsClient else GeminiClient
-actual fun foodPairer(): FoodPairer = if (BuildConfig.AI_PROVIDER == "grapeminds") GrapemindsClient else GeminiClient
+actual fun wineRecognizer(): WineRecognizer = GeminiClient
+actual fun priceEstimator(): PriceEstimator = GeminiClient
+actual fun foodPairer(): FoodPairer = GeminiClient

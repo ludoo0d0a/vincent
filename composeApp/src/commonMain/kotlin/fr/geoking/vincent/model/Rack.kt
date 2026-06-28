@@ -46,10 +46,13 @@ data class RackArCalibration(val corners: List<NormPoint>) {
 enum class ArMode { PHOTO, MARKERS }
 
 /**
- * Persistent AR anchor for [ArMode.MARKERS]: the top-left marker image (the re-localisation
- * beacon) plus the transform from that marker frame to the grid centre and the grid's physical
- * dimensions (derived from the two detected markers). The transform is a translation + a unit
- * quaternion.
+ * Persistent AR anchor for [ArMode.MARKERS]: the top-left marker (the re-localisation beacon) plus
+ * the transform from that marker frame to the grid centre and the grid's physical dimensions
+ * (derived from the two detected markers). The transform is a translation + a unit quaternion.
+ *
+ * The markers are BoofCV square-binary fiducials identified by their decoded numeric ids
+ * ([tlFiducialId] is the origin/beacon, [brFiducialId] the opposite corner), so they are fully
+ * described by their id and never need to be stored as images.
  */
 data class RackArAnchor(
     val markerId: String,
@@ -63,14 +66,28 @@ data class RackArAnchor(
     val qw: Float,
     val gridWidthMeters: Float,
     val gridHeightMeters: Float,
-    /** Custom top-left marker image path; null ⇒ procedurally generated marker. */
-    val tlImagePath: String? = null,
-    /** Custom bottom-right marker image path; null ⇒ procedurally generated marker. */
-    val brImagePath: String? = null,
+    /** Decoded id of the top-left (origin/beacon) square-binary fiducial. */
+    val tlFiducialId: Int = -1,
+    /** Decoded id of the bottom-right square-binary fiducial. */
+    val brFiducialId: Int = -1,
 ) {
     val isValid: Boolean
         get() = markerId.isNotBlank() && markerWidthMeters > 0f &&
-            gridWidthMeters > 0f && gridHeightMeters > 0f
+            gridWidthMeters > 0f && gridHeightMeters > 0f &&
+            tlFiducialId >= 0 && brFiducialId >= 0
+}
+
+/** Physical layout of a rack. */
+enum class RackFormat {
+    /** Regular [cols]×[rows] grid of single-bottle cells (optionally staggered). */
+    GRID,
+
+    /**
+     * "Casier en X": [cols]/2 × [rows]/2 squares, each grouping a 2×2 block of single-bottle
+     * cells drawn with a diagonal cross, the four bottles arranged en quinconce.
+     * [cols] and [rows] are therefore always even.
+     */
+    X,
 }
 
 /** A named rack: a [cols]×[rows] grid of [RackCell], optionally staggered (quinconce). */
@@ -80,6 +97,13 @@ data class Rack(
     val rows: Int,
     val staggered: Boolean,
     val cells: List<RackCell>,
+    /** Physical layout; [RackFormat.X] groups cells into 2×2 X-bins. */
+    val format: RackFormat = RackFormat.GRID,
+    /**
+     * Parity of the quinconce shift (only meaningful when [staggered]). false ⇒ first row (A)
+     * sits flush in the corner; true ⇒ first row is shifted half a cell.
+     */
+    val staggerOffset: Boolean = false,
     val id: String = "rack-${kotlin.math.abs(name.hashCode())}-${cols}x${rows}",
     /** Absolute path to the photo of this physical rack, used as the AR image target. */
     val arImagePath: String? = null,
@@ -99,14 +123,33 @@ data class Rack(
     val capacity: Int get() = cols * rows
     val occupiedCount: Int get() = cells.count { it.occupied }
 
+    /** Number of X-bin squares across; only meaningful when [format] is [RackFormat.X]. */
+    val squareCols: Int get() = cols / 2
+
+    /** Number of X-bin squares down; only meaningful when [format] is [RackFormat.X]. */
+    val squareRows: Int get() = rows / 2
+
     /** Resize to [newCols]×[newRows], keeping existing cells by position, padding empties. */
-    fun resized(newCols: Int, newRows: Int, newStaggered: Boolean): Rack {
+    fun resized(
+        newCols: Int,
+        newRows: Int,
+        newStaggered: Boolean,
+        newFormat: RackFormat = format,
+        newStaggerOffset: Boolean = staggerOffset,
+    ): Rack {
         val out = ArrayList<RackCell>(newCols * newRows)
         for (r in 0 until newRows) for (c in 0 until newCols) {
             val old = if (c < cols && r < rows) cells.getOrNull(r * cols + c) else null
             out += old ?: RackCell(rowLabel(r), false)
         }
-        return copy(cols = newCols, rows = newRows, staggered = newStaggered, cells = out)
+        return copy(
+            cols = newCols,
+            rows = newRows,
+            staggered = newStaggered,
+            format = newFormat,
+            staggerOffset = newStaggerOffset,
+            cells = out,
+        )
     }
 
     /** Replace one cell (e.g. empty it after consuming the bottle). */

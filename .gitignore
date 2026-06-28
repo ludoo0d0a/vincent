@@ -29,3 +29,6 @@ playstore/version.properties
 /secrets/*.json
 /composeApp/release/
 /secrets/upload_certificate.pem
+
+# Local API reference (grapeminds dashboard export, Postman collection) — not for the repo
+docs/

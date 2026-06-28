@@ -65,6 +65,63 @@ composeApp/src/
     └── screens/            # the 9 screens
 ```
 
+## Wine data providers
+
+All providers implement `WineDataProvider` (`commonMain/.../data/ProductLookup.kt`).
+`WineDataSource` routes each operation to the providers declaring the matching
+capability, **in the order of `wineDataProviders()`** (`androidMain/.../data/ProductLookup.android.kt`):
+barcode → first non-null wins; text search → results merged.
+
+Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `PRICE`.
+
+| # | Provider | Capabilities | Auth / key | Status |
+|---|----------|--------------|------------|--------|
+| 1 | **Open Food Facts** | `BARCODE_SCAN` | none (open API) | ✅ active |
+| 2 | **InVintory** | `TEXT_SEARCH`, `LABEL_SCAN` | `INVINTORY_API_KEY` (`x-api-key` header) | ✅ active when key set |
+| 3 | **grapeminds** | `TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH` | `GRAPEMINDS_API_KEY` (`Authorization: Bearer`) | ✅ active when key set (label scan needs Enterprise plan) |
+| 4 | **X-Wines** | `TEXT_SEARCH` (offline, local Room DB) | `X_WINES_DATASET_URL` | ✅ active when URL set |
+| 5 | **CellarTracker** | `TEXT_SEARCH`, `PRICE` | `CELLARTRACKER_API_KEY` | 🚧 wired but not implemented (returns empty) |
+| 6 | **AI Label (Gemini)** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ active |
+| — | **db.wine (GWDB)** | `BARCODE_SCAN` (planned) | `GWDB_API_KEY` + `GWDB_API_SECRET` | ❌ disabled (commented out in `wineDataProviders()`) |
+
+> grapeminds Public API v1 — base `https://api.grapeminds.eu/public/v1`, `Accept-Language` ∈ {de,en,es,fr,it,da}.
+> Endpoints used: `GET /wines/search?q=&limit=` (q min 3 chars), `POST /photo/analyze` (Enterprise only),
+> and for `ENRICH` `GET /wines/{id}` + `GET /drinking-periods/{id}`.
+> **Enrichment**: when a grapeminds catalogue suggestion is picked in Add, `WineDataSource.enrich(source, id)`
+> fetches `/wines/{id}` + `/drinking-periods/{id}` and fills the bottle's new rich fields — `description`,
+> `pairingNotes`, `grapes`, `flavorProfile` (sweetness/acidity/tannins/alcohol/body/finish 0–10), `maturity`
+> (statement + young/ripe/storage), plus the drink window (`drinkFrom`/`drinkTo` = vintage + ageing offsets)
+> and `tastingNotes`. These are persisted (Room **v8**, `MIGRATION_7_8` adds the columns) and rendered on the
+> bottle detail screen (Description, Grape varieties, Flavour-profile bars, pairing prose, maturity notes).
+> No barcode and no price field; `producers`/`regions`/`region-insights` endpoints exist but aren't wired.
+
+> Real priority: `OpenFoodFacts → InVintory → grapeminds → XWines → CellarTracker → AiLabel`.
+> `GwdbProvider` stays in the file but is excluded from the list (kept for later re-enable).
+
+### Config keys
+
+Resolved by the `secret()` function in `composeApp/build.gradle.kts`, in order:
+`local.properties` → Gradle property → environment variable. While a key equals
+`xxx` (default), the matching provider stays inert.
+
+| Key | Role | Default if absent |
+|-----|------|-------------------|
+| `INVINTORY_API_KEY` | InVintory provider | `xxx` |
+| `X_WINES_DATASET_URL` | X-Wines dataset source | `xxx` |
+| `GRAPEMINDS_API_KEY` | grapeminds provider (Bearer token) | `xxx` |
+| `CELLARTRACKER_API_KEY` | CellarTracker provider | `xxx` |
+| `GWDB_API_KEY` / `GWDB_API_SECRET` | db.wine provider (disabled) | `xxx` |
+| `GEMINI_API_KEY` | direct Gemini call (debug) | blank in release |
+| `AI_PROXY_URL` | Cloudflare Worker AI proxy (prod) | blank |
+| `WEB_CLIENT_ID` | Google Sign-in / Firebase | — |
+| `AR_ENABLED` | AR feature flag | `true` |
+
+Keys present in `local.properties` but **not read by the app code** (used by CI/deploy or to integrate):
+`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `NETLIFY_TOKEN`.
+
+> ⚠️ `local.properties` holds secrets in clear text — it must stay in `.gitignore`.
+> Any key that was ever committed must be revoked and regenerated.
+
 ## Notes
 
 - **State** — `data/Cellar.kt` is the single source of truth (Compose snapshot

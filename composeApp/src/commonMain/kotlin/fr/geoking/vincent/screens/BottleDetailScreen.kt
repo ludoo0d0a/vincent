@@ -198,8 +198,43 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 }
             }
 
+            // Description (provider overview)
+            if (live.description.isNotBlank()) {
+                Section(stringResource(Res.string.detail_description)) {
+                    Text(live.description, fontSize = 12.5.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+
+            // Grape varieties
+            if (live.grapes.isNotEmpty()) {
+                Section(stringResource(Res.string.detail_grapes)) {
+                    live.grapes.chunked(3).forEach { rowItems ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 7.dp)) {
+                            rowItems.forEach { Pairing(it) }
+                        }
+                    }
+                }
+            }
+
+            // Flavour profile (0–10 axes from the provider)
+            live.flavorProfile?.let { fp ->
+                Section(stringResource(Res.string.detail_flavor_profile)) {
+                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlavorBar(stringResource(Res.string.detail_fp_sweetness), fp.sweetness)
+                        FlavorBar(stringResource(Res.string.detail_fp_acidity), fp.acidity)
+                        FlavorBar(stringResource(Res.string.detail_fp_tannins), fp.tannins)
+                        FlavorBar(stringResource(Res.string.detail_fp_alcohol), fp.alcohol)
+                        FlavorBar(stringResource(Res.string.detail_fp_body), fp.body)
+                        FlavorBar(stringResource(Res.string.detail_fp_finish), fp.finish)
+                    }
+                }
+            }
+
             // Pairings — Gemini can suggest more on demand.
             Section(stringResource(Res.string.detail_pairings_title)) {
+                if (live.pairingNotes.isNotBlank()) {
+                    Text(live.pairingNotes, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 6.dp))
+                }
                 val all = (live.pairings + suggested).distinct()
                 all.chunked(2).forEach { rowItems ->
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 7.dp)) {
@@ -226,24 +261,29 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
             }
 
             // Drink window
-            if (live.drinkTo > 0) {
+            if (live.drinkTo > 0 || live.maturity.isNotBlank()) {
                 Section(stringResource(Res.string.detail_drink_peak)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                        Text("${live.drinkFrom}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
-                        Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                            Box(
-                                Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp))
-                                    .background(Brush.horizontalGradient(listOf(VincentColors.Amber, VincentColors.Green, VincentColors.Amber))),
-                            )
-                            Row(Modifier.fillMaxWidth()) {
-                                Spacer(Modifier.weight(live.drinkNow.coerceIn(0.02f, 0.95f)))
-                                Box(Modifier.size(13.dp).clip(RoundedCornerShape(50)).background(Color.White).border(3.dp, VincentColors.Green, RoundedCornerShape(50)))
-                                Spacer(Modifier.weight(1f - live.drinkNow.coerceIn(0.02f, 0.95f)))
+                    if (live.drinkTo > 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                            Text("${live.drinkFrom}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+                            Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                                Box(
+                                    Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp))
+                                        .background(Brush.horizontalGradient(listOf(VincentColors.Amber, VincentColors.Green, VincentColors.Amber))),
+                                )
+                                Row(Modifier.fillMaxWidth()) {
+                                    Spacer(Modifier.weight(live.drinkNow.coerceIn(0.02f, 0.95f)))
+                                    Box(Modifier.size(13.dp).clip(RoundedCornerShape(50)).background(Color.White).border(3.dp, VincentColors.Green, RoundedCornerShape(50)))
+                                    Spacer(Modifier.weight(1f - live.drinkNow.coerceIn(0.02f, 0.95f)))
+                                }
                             }
+                            Text("${live.drinkTo}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
                         }
-                        Text("${live.drinkTo}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
                     }
                     Text(live.tastingNotes.ifBlank { stringResource(Res.string.detail_no_notes) }, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
+                    if (live.maturity.isNotBlank()) {
+                        Text(live.maturity, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
+                    }
                 }
             }
 
@@ -352,6 +392,20 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     Column {
         Text(title, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
         content()
+    }
+}
+
+/** A 0–10 aroma/structure axis rendered as a labelled progress bar. */
+@Composable
+private fun FlavorBar(label: String, value: Int) {
+    val v = value.coerceIn(0, 10)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontSize = 11.sp, color = VincentColors.Muted, modifier = Modifier.width(78.dp))
+        Box(Modifier.weight(1f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Border)) {
+            Box(Modifier.fillMaxWidth(v / 10f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Accent))
+        }
+        Spacer(Modifier.width(8.dp))
+        Text("$v", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
     }
 }
 

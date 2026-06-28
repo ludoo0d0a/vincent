@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.FlavorProfile
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 
@@ -33,6 +34,11 @@ data class BottleEntity(
     val drinkTo: Int,
     val drinkNow: Float,
     val tastingNotes: String,
+    val description: String = "",
+    val pairingNotes: String = "",
+    val grapes: String = "",
+    val flavorProfile: String = "",
+    val maturity: String = "",
     val source: String,
     val addedLabel: String,
     /** Legacy column name — stores the front-label photo path or URL. */
@@ -64,6 +70,11 @@ fun BottleEntity.toBottle(): Bottle = Bottle(
     drinkTo = drinkTo,
     drinkNow = drinkNow,
     tastingNotes = tastingNotes,
+    description = description,
+    pairingNotes = pairingNotes,
+    grapes = if (grapes.isEmpty()) emptyList() else grapes.split(SEP),
+    flavorProfile = decodeFlavor(flavorProfile),
+    maturity = maturity,
     source = AddSource.valueOf(source),
     addedLabel = addedLabel,
     photoBottle = photoBottleUri.takeIf { it.isNotBlank() },
@@ -92,9 +103,24 @@ fun Bottle.toEntity(): BottleEntity = BottleEntity(
     drinkTo = drinkTo,
     drinkNow = drinkNow,
     tastingNotes = tastingNotes,
+    description = description,
+    pairingNotes = pairingNotes,
+    grapes = grapes.joinToString(SEP),
+    flavorProfile = encodeFlavor(flavorProfile),
+    maturity = maturity,
     source = source.name,
     addedLabel = addedLabel,
     imageUri = photoLabel.orEmpty(),
     photoBottleUri = photoBottle.orEmpty(),
     photoBackUri = photoBack.orEmpty(),
 )
+
+/** FlavorProfile ↔ a compact "s,a,t,al,b,f" string (empty when absent). */
+private fun encodeFlavor(f: FlavorProfile?): String =
+    if (f == null) "" else "${f.sweetness},${f.acidity},${f.tannins},${f.alcohol},${f.body},${f.finish}"
+
+private fun decodeFlavor(s: String): FlavorProfile? {
+    if (s.isBlank()) return null
+    val p = s.split(",").mapNotNull { it.trim().toIntOrNull() }
+    return if (p.size == 6) FlavorProfile(p[0], p[1], p[2], p[3], p[4], p[5]) else null
+}

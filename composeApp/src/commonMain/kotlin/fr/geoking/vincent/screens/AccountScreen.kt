@@ -36,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
-import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
@@ -54,6 +53,7 @@ fun AccountScreen(
     isLoading: Boolean = false,
     errorMsg: String? = null,
     onOpenRecent: () -> Unit,
+    onOpenBottles: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenTransfer: () -> Unit,
     onOpenTastings: () -> Unit = {},
@@ -140,20 +140,26 @@ fun AccountScreen(
                     }
                 }
             } else {
-                // Cloud sync not wired — show honest local stats instead.
+                // Local stats double as quick links into the bottle list.
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    VCard(Modifier.weight(1f)) {
+                    VCard(Modifier.weight(1f).clickable(onClick = onOpenBottles)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(stringResource(Res.string.bottles_label).replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(Res.string.bottles_label).replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600, modifier = Modifier.weight(1f))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(11.dp))
+                            }
                             Text("${Cellar.totalBottles()}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
                             Text(stringResource(Res.string.local_data), fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                         }
                     }
-                    VCard(Modifier.weight(1f)) {
+                    VCard(Modifier.weight(1f).clickable(onClick = onOpenFavorites)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(stringResource(Res.string.references), fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
-                            Text("${Cellar.references()}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                            Text(stringResource(Res.string.distinct_wines), fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(Res.string.bottles_filter_favorites), fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600, modifier = Modifier.weight(1f))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(11.dp))
+                            }
+                            Text("${Cellar.favorites.size}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent, modifier = Modifier.padding(top = 5.dp))
+                            Text(stringResource(Res.string.favorites_card_sub), fontSize = 10.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                         }
                     }
                 }
@@ -174,7 +180,7 @@ fun AccountScreen(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenTransfer).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(Res.string.export_csv_label), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
+                Text(stringResource(Res.string.transfer_title), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
                 Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
             }
 
@@ -187,9 +193,6 @@ fun AccountScreen(
 
             SectionHeader(stringResource(Res.string.settings_section_app))
             AccountLink(stringResource(Res.string.settings_title), onOpenSettings)
-
-            SectionHeader(stringResource(Res.string.my_favorites), pluralStringResource(Res.plurals.vines_count, Cellar.favorites.size, Cellar.favorites.size))
-            AccountLink(stringResource(Res.string.my_favorites), onOpenFavorites)
 
             Spacer(Modifier.height(16.dp))
             if (acc != null) {

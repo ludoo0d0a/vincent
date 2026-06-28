@@ -78,6 +78,7 @@ import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.Rack
 import fr.geoking.vincent.model.RackCell
+import fr.geoking.vincent.model.RackFormat
 import fr.geoking.vincent.model.RackMode
 import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.model.WineColor
@@ -88,8 +89,10 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ScreenHeader
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
+import fr.geoking.vincent.ui.XBinGrid
 import fr.geoking.vincent.ui.rackInteriorBase
 import fr.geoking.vincent.ui.rackWineBorderColor
+import fr.geoking.vincent.ui.rowShifted
 import fr.geoking.vincent.ui.rackYearOf
 
 /** A range filter applied to the rack (dims non-matching cells). */
@@ -434,43 +437,51 @@ private fun RackGrid(
     val moveActive = moving != null
     val dragActive = dragFrom != null
     val matching = rack.cells.count { it.occupied && (filter?.test?.invoke(it) ?: true) }
+    val cutSource = clipboard?.takeIf { it.mode == RackClipboardMode.CUT }
+    @Composable
+    fun cellAt(gi: Int, cell: RackCell, cellModifier: Modifier) {
+        Cell(
+            cell, mode, filter,
+            selected = gi == selectedIdx,
+            moving = gi == moving,
+            dragging = gi == dragFrom,
+            cutMarked = cutSource?.rackIndex == rackIdx && cutSource.cellIndex == gi,
+            dropTarget = when {
+                dragActive -> !cell.occupied && gi == dragHover
+                moveActive -> !cell.occupied
+                else -> false
+            },
+            pasteTarget = clipboard != null && !cell.occupied && !moveActive && !dragActive,
+            onClick = { onCellTap(gi) },
+            onBoundsChanged = { onCellBounds(gi, it) },
+            onDragStart = { onDragStart(gi) },
+            onDragMove = onDragMove,
+            onDragEnd = onDragEnd,
+            onDragCancel = onDragCancel,
+            modifier = cellModifier,
+        )
+    }
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        rowLabel(rowIndex),
-                        fontSize = 10.sp,
-                        color = VincentColors.Faint,
-                        modifier = Modifier.width(14.dp),
-                    )
-                    val shiftRight = rack.staggered && rowIndex % 2 == 1
-                    if (shiftRight) Spacer(Modifier.weight(0.5f))
-                    rowCells.forEachIndexed { colIndex, cell ->
-                        val gi = rowIndex * rack.cols + colIndex
-                        val cutSource = clipboard?.takeIf { it.mode == RackClipboardMode.CUT }
-                        Cell(
-                            cell, mode, filter,
-                            selected = gi == selectedIdx,
-                            moving = gi == moving,
-                            dragging = gi == dragFrom,
-                            cutMarked = cutSource?.rackIndex == rackIdx && cutSource.cellIndex == gi,
-                            dropTarget = when {
-                                dragActive -> !cell.occupied && gi == dragHover
-                                moveActive -> !cell.occupied
-                                else -> false
-                            },
-                            pasteTarget = clipboard != null && !cell.occupied && !moveActive && !dragActive,
-                            onClick = { onCellTap(gi) },
-                            onBoundsChanged = { onCellBounds(gi, it) },
-                            onDragStart = { onDragStart(gi) },
-                            onDragMove = onDragMove,
-                            onDragEnd = onDragEnd,
-                            onDragCancel = onDragCancel,
-                            modifier = Modifier.weight(1f),
+            if (rack.format == RackFormat.X) {
+                XBinGrid(rack) { gi, cell, m -> cellAt(gi, cell, m) }
+            } else {
+                rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            rowLabel(rowIndex),
+                            fontSize = 10.sp,
+                            color = VincentColors.Faint,
+                            modifier = Modifier.width(14.dp),
                         )
+                        val shiftRight = rack.rowShifted(rowIndex)
+                        if (shiftRight) Spacer(Modifier.weight(0.5f))
+                        rowCells.forEachIndexed { colIndex, cell ->
+                            val gi = rowIndex * rack.cols + colIndex
+                            cellAt(gi, cell, Modifier.weight(1f))
+                        }
+                        if (rack.staggered && !shiftRight) Spacer(Modifier.weight(0.5f))
                     }
-                    if (rack.staggered && !shiftRight) Spacer(Modifier.weight(0.5f))
                 }
             }
             Spacer(Modifier.height(2.dp))

@@ -21,6 +21,7 @@
     <string name="last_added">Recently added bottles</string>
     <string name="import_export_label">Import / Export (PLOC, Vivino…)</string>
     <string name="my_favorites">My favorites</string>
+    <string name="favorites_card_sub">favorite wines</string>
     <plurals name="vines_count">
         <item quantity="one">%d wine</item>
         <item quantity="other">%d wines</item>
@@ -103,6 +104,16 @@
     <string name="detail_compare_prices">Compare prices</string>
     <string name="detail_compare_desc">Check web offers — Vincent does not collect or store these prices.</string>
     <string name="detail_pairings_title">Food-wine pairings</string>
+    <string name="detail_description">Description</string>
+    <string name="detail_grapes">Grape varieties</string>
+    <string name="detail_flavor_profile">Flavour profile</string>
+    <string name="detail_maturity">Maturity</string>
+    <string name="detail_fp_sweetness">Sweetness</string>
+    <string name="detail_fp_acidity">Acidity</string>
+    <string name="detail_fp_tannins">Tannins</string>
+    <string name="detail_fp_alcohol">Alcohol</string>
+    <string name="detail_fp_body">Body</string>
+    <string name="detail_fp_finish">Finish</string>
     <string name="detail_analyzing">Analyzing…</string>
     <string name="detail_suggest_ai">Suggest more pairings (AI)</string>
     <string name="detail_drink_peak">Peak — ready to drink</string>
@@ -172,7 +183,15 @@
     <string name="cellar_edit_rows">Rows</string>
     <string name="cellar_edit_staggered">Staggered</string>
     <string name="cellar_edit_staggered_desc">Rows shifted by half a spot</string>
+    <string name="cellar_edit_stagger_offset">Shift first row</string>
+    <string name="cellar_edit_stagger_offset_desc">Otherwise it starts in the corner</string>
+    <string name="cellar_edit_format">Format</string>
+    <string name="cellar_edit_format_grid">Grid</string>
+    <string name="cellar_edit_format_x">X-bin rack</string>
+    <string name="cellar_edit_square_cols">Squares (columns)</string>
+    <string name="cellar_edit_square_rows">Squares (rows)</string>
     <string name="cellar_edit_capacity">Capacity: %d spots</string>
+    <string name="cellar_edit_capacity_x">Capacity: %1$d squares × 4 = %2$d bottles</string>
     <string name="cellar_edit_duplicate">Duplicate</string>
     <string name="cellar_edit_delete">Delete</string>
     <string name="cellar_edit_cancel">Cancel</string>
@@ -218,7 +237,11 @@
         <item quantity="one">Imported: %1$d bottle · source detected “%3$s”</item>
         <item quantity="other">Imported: %1$d bottles · source detected “%3$s”</item>
     </plurals>
-    <string name="transfer_import_none">No bottle recognized in this file.</string>
+    <string name="transfer_import_none">No data recognized in this file.</string>
+    <plurals name="data_import_done">
+        <item quantity="one">Imported: %1$d item · source detected “%2$s”</item>
+        <item quantity="other">Imported: %1$d items · source detected “%2$s”</item>
+    </plurals>
     <string name="transfer_export_success">Cellar exported to CSV.</string>
     <string name="transfer_export_canceled">Export canceled.</string>
     <string name="format_ploc_desc">CSV Export (Settings → Export)</string>
@@ -296,7 +319,17 @@
     <string name="add_parsed_domain">Domain</string>
     <string name="add_parsed_vintage">Vintage</string>
     <string name="add_parsed_color">Color</string>
+    <string name="add_parsed_appellation">Appellation</string>
     <string name="add_parsed_estimated_price">Estimated price</string>
+    <string name="add_voice_summary_title">Summary</string>
+    <string name="add_voice_complete_hint">Tap a field to complete, or chat with the assistant.</string>
+    <string name="add_voice_missing">To complete</string>
+    <string name="add_voice_switch_manual">Edit · manual entry</string>
+    <string name="add_voice_discuss_title">Complete by chatting</string>
+    <string name="add_voice_discuss_placeholder">e.g. “vintage 2019, €24”</string>
+    <string name="add_voice_send">Send</string>
+    <string name="add_voice_assistant_done">Got it.</string>
+    <string name="add_voice_field_done">OK</string>
     <string name="add_photo_capture">Photo capture</string>
     <string name="add_barcode_scan">Barcode scan</string>
     <string name="add_method_barcode">Barcode</string>
@@ -366,6 +399,17 @@
     <string name="update_ineligible">Update available but not eligible.</string>
     <string name="settings_section_app">App</string>
 
+    <string name="settings_section_data_sources">Data sources</string>
+    <string name="settings_xwines_title">X-Wines database (offline search)</string>
+    <string name="settings_xwines_download">Download</string>
+    <string name="settings_xwines_update">Update</string>
+    <string name="settings_xwines_downloading">Downloading…</string>
+    <string name="settings_xwines_never">Never downloaded</string>
+    <string name="settings_xwines_count">%d wines available</string>
+    <string name="settings_xwines_updated">Last update: %s</string>
+    <string name="settings_xwines_not_configured">Source not configured</string>
+    <string name="settings_xwines_error">Download failed</string>
+
     <string name="suppliers_title">My suppliers</string>
     <string name="suppliers_subtitle">%d suppliers registered</string>
     <string name="suppliers_import_button">Import suppliers</string>
@@ -421,6 +465,9 @@
     <string name="ar_mode_photo">Frozen photo</string>
     <string name="ar_mode_marker">Markers</string>
     <string name="ar_photo_hint">Pinch to zoom, drag to move.</string>
+    <string name="ar_adjust">Adjust overlay</string>
+    <string name="ar_adjust_hint">Drag the 4 corners to align the slots and their bottles on the rack face.</string>
+    <string name="ar_cancel">Cancel</string>
     <string name="ar_marker_searching">Point the camera at the marker…</string>
     <string name="ar_marker_setup_title">Calibrate with two markers</string>
     <string name="ar_marker_print">Print these two markers (≈5 cm each) and stick them on the rack\'s top-left and bottom-right corners.</string>
@@ -431,11 +478,5 @@
     <string name="ar_marker_recorded">%1$s marker recorded</string>
     <string name="ar_marker_both_found">Both markers detected</string>
     <string name="ar_marker_measured">Rack: %1$d × %2$d cm</string>
-    <string name="ar_marker_source_proposed">Proposed markers</string>
-    <string name="ar_marker_source_custom">My markers</string>
     <string name="ar_marker_print_action">Print</string>
-    <string name="ar_marker_photo">Photo</string>
-    <string name="ar_marker_gallery">Gallery</string>
-    <string name="ar_marker_capture_hint">Pick a well-textured, asymmetric image for each marker, then stick it on the rack (≈5 cm).</string>
-    <string name="ar_marker_need_both">Add both markers to continue.</string>
 </resources>

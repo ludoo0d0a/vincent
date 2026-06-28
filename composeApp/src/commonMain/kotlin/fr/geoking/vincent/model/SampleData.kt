@@ -145,7 +145,7 @@ object SampleData {
     const val addedThisMonth = 12
 
     /** Seed racks for the cellar screen — editable at runtime via the Racks store. */
-    fun seedRacks(): List<Rack> = listOf(caveA(), caveB(), refrigeree())
+    fun seedRacks(): List<Rack> = listOf(caveA(), caveB(), refrigeree(), casierX())
 
     private data class Spec(val color: WineColor, val cat: WineCategory, val vintage: String, val price: Int)
 
@@ -194,6 +194,23 @@ object SampleData {
             if (i % 5 == 4) e(rl) else mixB[i % mixB.size].let { c(rl, it.color, it.cat, it.vintage, it.price) }
         }
         return Rack("Cave B", cols, rows, true, cells)
+    }
+
+    // Casier en X — 2×2 squares (4×4 bottles), four bottles per X-bin en quinconce.
+    private fun casierX(): Rack {
+        val cols = 4; val rows = 4
+        val mix = listOf(
+            Spec(WineColor.RED, WineCategory.BORDEAUX, "17", 52),
+            Spec(WineColor.RED, WineCategory.RHONE, "19", 28),
+            Spec(WineColor.WHITE, WineCategory.BOURGOGNE, "21", 31),
+            Spec(WineColor.ROSE, WineCategory.PROVENCE, "23", 16),
+            Spec(WineColor.SPARKLING, WineCategory.CHAMPAGNE, "NM", 44),
+        )
+        val cells = (0 until cols * rows).map { i ->
+            val rl = rowLabel(i / cols)
+            if (i % 7 == 6) e(rl) else mix[i % mix.size].let { c(rl, it.color, it.cat, it.vintage, it.price) }
+        }
+        return Rack("Casier X", cols, rows, false, cells, format = RackFormat.X)
     }
 
     // Réfrigérée — small 4×3, mostly whites/champagne.

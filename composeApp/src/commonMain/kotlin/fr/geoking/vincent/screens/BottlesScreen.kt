@@ -170,15 +170,8 @@ private fun Bottle.matchesAdv(adv: AdvFilters, categoryLabels: Map<WineCategory,
 fun BottlesScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (Bottle) -> Unit,
-    onOpenFavorites: () -> Unit,
+    initialFavoritesOnly: Boolean = false,
 ) {
-    var selected by remember { mutableIntStateOf(0) }
-    var query by remember { mutableStateOf("") }
-    var adv by remember { mutableStateOf(AdvFilters()) }
-    var showFilters by remember { mutableStateOf(false) }
-    var viewMode by remember { mutableStateOf(BottleViewMode.GRID) }
-    var rackIdx by remember { mutableIntStateOf(0) }
-
     val filterItems = listOf(
         Filter(stringResource(Res.string.bottles_filter_all), null),
         Filter(stringResource(WineColor.RED.label), WineColor.RED),
@@ -186,6 +179,14 @@ fun BottlesScreen(
         Filter(stringResource(WineColor.ROSE.label), WineColor.ROSE),
         Filter(stringResource(Res.string.bottles_filter_favorites), null, favOnly = true),
     )
+    val favIndex = filterItems.indexOfFirst { it.favOnly }.coerceAtLeast(0)
+    var selected by remember { mutableIntStateOf(if (initialFavoritesOnly) favIndex else 0) }
+    var query by remember { mutableStateOf("") }
+    var adv by remember { mutableStateOf(AdvFilters()) }
+    var showFilters by remember { mutableStateOf(false) }
+    var viewMode by remember { mutableStateOf(BottleViewMode.GRID) }
+    var rackIdx by remember { mutableIntStateOf(0) }
+
     val f = filterItems[selected]
     val categoryLabels = WineCategory.entries.associateWith { stringResource(it.label).lowercase() }
 
@@ -242,7 +243,7 @@ fun BottlesScreen(
                 trailing = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(
-                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { onOpenFavorites() },
+                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(if (f.favOnly) VincentColors.AccentSoft else VincentColors.Surface2).border(1.dp, if (f.favOnly) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(12.dp)).clickable { selected = if (f.favOnly) 0 else favIndex },
                             contentAlignment = Alignment.Center,
                         ) { Icon(Icons.Filled.Favorite, contentDescription = stringResource(Res.string.my_favorites), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
 
