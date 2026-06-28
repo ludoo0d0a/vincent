@@ -104,6 +104,16 @@
     <string name="detail_compare_prices">Compare prices</string>
     <string name="detail_compare_desc">Check web offers — Vincent does not collect or store these prices.</string>
     <string name="detail_pairings_title">Food-wine pairings</string>
+    <string name="detail_description">Description</string>
+    <string name="detail_grapes">Grape varieties</string>
+    <string name="detail_flavor_profile">Flavour profile</string>
+    <string name="detail_maturity">Maturity</string>
+    <string name="detail_fp_sweetness">Sweetness</string>
+    <string name="detail_fp_acidity">Acidity</string>
+    <string name="detail_fp_tannins">Tannins</string>
+    <string name="detail_fp_alcohol">Alcohol</string>
+    <string name="detail_fp_body">Body</string>
+    <string name="detail_fp_finish">Finish</string>
     <string name="detail_analyzing">Analyzing…</string>
     <string name="detail_suggest_ai">Suggest more pairings (AI)</string>
     <string name="detail_drink_peak">Peak — ready to drink</string>

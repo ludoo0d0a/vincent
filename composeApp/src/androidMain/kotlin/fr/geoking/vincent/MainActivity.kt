@@ -64,6 +64,17 @@ private val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+// Rich wine detail from grapeminds: description, pairing prose, grapes, flavor profile, maturity.
+private val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bottles ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE bottles ADD COLUMN pairingNotes TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE bottles ADD COLUMN grapes TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE bottles ADD COLUMN flavorProfile TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE bottles ADD COLUMN maturity TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 private val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `racks` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `cols` INTEGER NOT NULL, `rows` INTEGER NOT NULL, `staggered` INTEGER NOT NULL, `cellsData` TEXT NOT NULL, `arImagePath` TEXT, `arCalibrationData` TEXT, PRIMARY KEY(`id`))")
@@ -124,7 +135,7 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             VincentDatabase::class.java,
             "vincent.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build()
         val repository = RoomCellarRepository(db.bottleDao())
         val rackRepo = RoomRackRepository(db.rackDao())
         val tastingRepo = RoomTastingRepository(db.tastingDao())

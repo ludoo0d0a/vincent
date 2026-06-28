@@ -43,6 +43,16 @@ enum class BottlePhotoKind(val label: String, val suffix: String) {
     BACK("Dos", "back"),
 }
 
+/** Aroma/structure axes (0–10) from a wine-data provider, shown as bars on the detail screen. */
+data class FlavorProfile(
+    val sweetness: Int,
+    val acidity: Int,
+    val tannins: Int,
+    val alcohol: Int,
+    val body: Int,
+    val finish: Int,
+)
+
 data class Bottle(
     val id: String,
     val domain: String,
@@ -64,6 +74,12 @@ data class Bottle(
     val drinkTo: Int = 0,
     val drinkNow: Float = 0.5f,     // 0..1 position within the drink window
     val tastingNotes: String = "",
+    // Rich provider detail (grapeminds /wines/{id} + /drinking-periods/{id}).
+    val description: String = "",          // overview paragraph
+    val pairingNotes: String = "",         // food-pairing prose (chips live in [pairings])
+    val grapes: List<String> = emptyList(),
+    val flavorProfile: FlavorProfile? = null,
+    val maturity: String = "",             // drink-window statement + young/ripe/storage notes
     val source: AddSource = AddSource.MANUAL,
     val addedLabel: String = "",    // e.g. "09:32" or "Lun."
     val photoBottle: String? = null,

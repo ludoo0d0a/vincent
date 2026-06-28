@@ -73,6 +73,7 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.WineDataSource
+import fr.geoking.vincent.data.WineEnrichment
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
@@ -454,6 +455,8 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     var placeRack by remember(seed) { mutableStateOf(seed?.placeRack) }
     var placeCell by remember(seed) { mutableStateOf(seed?.placeCell) }
     var photos by remember { mutableStateOf<Map<BottlePhotoKind, String?>>(emptyMap()) }
+    // Rich detail (drink window, tasting notes, pairings) fetched when a catalogue suggestion is picked.
+    var enrichment by remember(seed) { mutableStateOf<WineEnrichment?>(null) }
     val draftId = remember { "new-${Cellar.references()}-${System.currentTimeMillis()}" }
     val labelSaver = rememberLabelImageSaver()
     val scope = rememberCoroutineScope()
@@ -475,6 +478,10 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         if (s.vintage.isNotBlank()) vintage = s.vintage
         s.price?.let { price = it.toString() }
         s.bottle?.let { b -> photos = BottlePhotoKind.entries.associateWith { b.photo(it) } }
+        // Catalogue pick: pull drink window + tasting notes in the background (best-effort).
+        val extId = s.externalId
+        if (extId != null) scope.launch { enrichment = WineDataSource.enrich(s.externalSource, extId) }
+        else enrichment = null
     }
 
     LaunchedEffect(seed) {
@@ -518,8 +525,22 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         }
     }
 
-    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
+    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos, enrichment, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
         val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
+        // grapeminds enrichment: turn ageing offsets into absolute years (needs a numeric vintage)
+        // and fold tasting notes + pairing prose into the free-text notes field.
+        val vintageYear = vintage.trim().toIntOrNull()
+        val enr = enrichment
+        val dFrom = enr?.drinkFromYears?.let { off -> vintageYear?.plus(off) } ?: 0
+        val dTo = enr?.drinkToYears?.let { off -> vintageYear?.plus(off) } ?: 0
+        val maturityText = enr?.let {
+            buildString {
+                if (it.maturity.isNotBlank()) append(it.maturity)
+                if (it.young.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Jeune : ${it.young}") }
+                if (it.ripe.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("À maturité : ${it.ripe}") }
+                if (it.storage.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Conservation : ${it.storage}") }
+            }
+        }.orEmpty()
         onBottle(
             Bottle(
                 id = draftId,
@@ -536,6 +557,14 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
                 merchant = "—",
                 purchaseDate = todayLabel,
                 occasion = "",
+                drinkFrom = dFrom,
+                drinkTo = dTo,
+                tastingNotes = enr?.tastingNotes.orEmpty(),
+                description = enr?.description.orEmpty(),
+                pairingNotes = enr?.pairingText.orEmpty(),
+                grapes = enr?.grapes ?: emptyList(),
+                flavorProfile = enr?.flavorProfile,
+                maturity = maturityText,
                 source = AddSource.MANUAL,
                 addedLabel = justNowLabel,
                 photoBottle = photos[BottlePhotoKind.BOTTLE],
@@ -708,6 +737,9 @@ private data class WineSuggestion(
     val bottle: Bottle? = null,
     /** Provider/source label shown on the right of the row (null for cellar matches). */
     val source: String? = null,
+    /** Catalogue id + provider, when the candidate can be enriched (drink window, notes…). */
+    val externalId: String? = null,
+    val externalSource: String? = null,
 )
 
 /** Suggestions for the add form: local cellar bottles first, then the wine catalogue. */
@@ -731,6 +763,8 @@ private suspend fun searchWineSuggestions(query: String): List<WineSuggestion> {
             appellation = (if (p.brand.isNotBlank()) p.name else p.region.orEmpty()).ifBlank { p.name },
             vintage = p.vintage.orEmpty(),
             source = p.source,
+            externalId = p.externalId,
+            externalSource = p.externalSource,
         )
     }
     return (local + catalog)

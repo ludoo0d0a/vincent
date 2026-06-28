@@ -105,6 +105,16 @@
     <string name="detail_compare_prices">Comparer les prix</string>
     <string name="detail_compare_desc">Consultez les offres sur le web — Vincent ne collecte ni ne stocke ces prix.</string>
     <string name="detail_pairings_title">Accords mets-vin</string>
+    <string name="detail_description">Description</string>
+    <string name="detail_grapes">Cépages</string>
+    <string name="detail_flavor_profile">Profil aromatique</string>
+    <string name="detail_maturity">Maturité</string>
+    <string name="detail_fp_sweetness">Sucrosité</string>
+    <string name="detail_fp_acidity">Acidité</string>
+    <string name="detail_fp_tannins">Tanins</string>
+    <string name="detail_fp_alcohol">Alcool</string>
+    <string name="detail_fp_body">Corps</string>
+    <string name="detail_fp_finish">Finale</string>
     <string name="detail_analyzing">Analyse…</string>
     <string name="detail_suggest_ai">Suggérer d\'autres accords (IA)</string>
     <string name="detail_drink_peak">Apogée — à boire</string>

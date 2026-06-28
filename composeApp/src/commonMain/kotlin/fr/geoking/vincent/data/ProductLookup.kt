@@ -1,5 +1,7 @@
 package fr.geoking.vincent.data
 
+import fr.geoking.vincent.model.FlavorProfile
+
 /** A capability a [WineDataProvider] may expose. */
 enum class ProviderCapability {
     /** Resolve an EAN/UPC barcode into a [ProductInfo]. */
@@ -13,6 +15,9 @@ enum class ProviderCapability {
 
     /** Estimate/lookup a market price for a wine query. */
     PRICE,
+
+    /** Fetch rich detail (drink window, tasting notes, pairings…) for a known [ProductInfo.externalId]. */
+    ENRICH,
 }
 
 /** An estimated/looked-up price attached to a product. */
@@ -38,6 +43,31 @@ data class ProductInfo(
     val price: PriceInfo? = null,
     /** Display name of the provider that produced this result (UI/debug). */
     val source: String? = null,
+    /** Stable id of this wine in the provider's catalogue, for a follow-up [WineDataSource.enrich] call. */
+    val externalId: String? = null,
+    /** Id of the provider that owns [externalId] (matches [WineDataProvider.id]). */
+    val externalSource: String? = null,
+)
+
+/**
+ * Rich, on-demand detail for a wine already identified by [ProductInfo.externalId] — fetched
+ * lazily (e.g. when a bottle is added) rather than during search. All fields are optional; a
+ * provider fills what it has. [drinkFromYears]/[drinkToYears] are offsets in years from the
+ * vintage (so the caller turns them into absolute years using the bottle's vintage).
+ */
+data class WineEnrichment(
+    val drinkFromYears: Int? = null,
+    val drinkToYears: Int? = null,
+    val maturity: String = "",       // one-line drink-window statement
+    val young: String = "",          // how it tastes young
+    val ripe: String = "",           // how it tastes mature
+    val storage: String = "",        // storage recommendation
+    val tastingNotes: String = "",
+    val description: String = "",
+    val pairingText: String = "",    // prose food-pairing note
+    val grapes: List<String> = emptyList(),
+    val flavorProfile: FlavorProfile? = null,
+    val source: String? = null,
 )
 
 /**
@@ -54,6 +84,7 @@ interface WineDataProvider {
     suspend fun byLabel(imageBytes: ByteArray): ProductInfo? = null
     suspend fun search(query: String): List<ProductInfo> = emptyList()
     suspend fun price(query: String): PriceInfo? = null
+    suspend fun enrich(externalId: String): WineEnrichment? = null
 }
 
 /** Platform-provided list of available providers (order = priority). */
@@ -87,6 +118,17 @@ object WineDataSource {
     suspend fun price(query: String): PriceInfo? =
         supporting(ProviderCapability.PRICE)
             .firstNotNullOfOrNull { it.price(query) }
+
+    /**
+     * Fetch rich detail for a wine previously surfaced by a provider. Routes to the provider
+     * named by [source] (a [ProductInfo.externalSource]) when it supports enrichment, else to
+     * the first enrich-capable provider. Returns null when none can resolve [externalId].
+     */
+    suspend fun enrich(source: String?, externalId: String): WineEnrichment? {
+        val candidates = supporting(ProviderCapability.ENRICH)
+        val provider = candidates.firstOrNull { it.id == source } ?: candidates.firstOrNull()
+        return provider?.enrich(externalId)
+    }
 }
 
 /**

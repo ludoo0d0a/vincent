@@ -111,6 +111,7 @@ android {
         buildConfigField("String", "INVINTORY_API_KEY", "\"${secret("INVINTORY_API_KEY").ifBlank { "xxx" }}\"")
         buildConfigField("String", "CELLARTRACKER_API_KEY", "\"${secret("CELLARTRACKER_API_KEY").ifBlank { "xxx" }}\"")
         buildConfigField("String", "X_WINES_DATASET_URL", "\"${secret("X_WINES_DATASET_URL").ifBlank { "xxx" }}\"")
+        buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY").ifBlank { "xxx" }}\"")
     }
 
     buildFeatures {
