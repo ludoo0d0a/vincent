@@ -46,10 +46,13 @@ data class RackArCalibration(val corners: List<NormPoint>) {
 enum class ArMode { PHOTO, MARKERS }
 
 /**
- * Persistent AR anchor for [ArMode.MARKERS]: the top-left marker image (the re-localisation
- * beacon) plus the transform from that marker frame to the grid centre and the grid's physical
- * dimensions (derived from the two detected markers). The transform is a translation + a unit
- * quaternion.
+ * Persistent AR anchor for [ArMode.MARKERS]: the top-left marker (the re-localisation beacon) plus
+ * the transform from that marker frame to the grid centre and the grid's physical dimensions
+ * (derived from the two detected markers). The transform is a translation + a unit quaternion.
+ *
+ * The markers are BoofCV square-binary fiducials identified by their decoded numeric ids
+ * ([tlFiducialId] is the origin/beacon, [brFiducialId] the opposite corner), so they are fully
+ * described by their id and never need to be stored as images.
  */
 data class RackArAnchor(
     val markerId: String,
@@ -63,14 +66,15 @@ data class RackArAnchor(
     val qw: Float,
     val gridWidthMeters: Float,
     val gridHeightMeters: Float,
-    /** Custom top-left marker image path; null ⇒ procedurally generated marker. */
-    val tlImagePath: String? = null,
-    /** Custom bottom-right marker image path; null ⇒ procedurally generated marker. */
-    val brImagePath: String? = null,
+    /** Decoded id of the top-left (origin/beacon) square-binary fiducial. */
+    val tlFiducialId: Int = -1,
+    /** Decoded id of the bottom-right square-binary fiducial. */
+    val brFiducialId: Int = -1,
 ) {
     val isValid: Boolean
         get() = markerId.isNotBlank() && markerWidthMeters > 0f &&
-            gridWidthMeters > 0f && gridHeightMeters > 0f
+            gridWidthMeters > 0f && gridHeightMeters > 0f &&
+            tlFiducialId >= 0 && brFiducialId >= 0
 }
 
 /** A named rack: a [cols]×[rows] grid of [RackCell], optionally staggered (quinconce). */

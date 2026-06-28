@@ -17,6 +17,7 @@ firebase-bom = "34.15.0"
 google-services = "4.4.2"
 arcore = "1.53.0"
 sceneview = "4.18.0"
+boofcv = "1.1.4"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
@@ -49,6 +50,8 @@ firebase-appcheck-debug = { module = "com.google.firebase:firebase-appcheck-debu
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 google-arcore = { module = "com.google.ar:core", version.ref = "arcore" }
 sceneview-arsceneview = { module = "io.github.sceneview:arsceneview", version.ref = "sceneview" }
+boofcv-core = { module = "org.boofcv:boofcv-core", version.ref = "boofcv" }
+boofcv-android = { module = "org.boofcv:boofcv-android", version.ref = "boofcv" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

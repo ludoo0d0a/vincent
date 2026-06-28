@@ -434,11 +434,5 @@
     <string name="ar_marker_recorded">Marqueur %1$s enregistré</string>
     <string name="ar_marker_both_found">Deux marqueurs détectés</string>
     <string name="ar_marker_measured">Casier : %1$d × %2$d cm</string>
-    <string name="ar_marker_source_proposed">Marqueurs proposés</string>
-    <string name="ar_marker_source_custom">Mes marqueurs</string>
     <string name="ar_marker_print_action">Imprimer</string>
-    <string name="ar_marker_photo">Photo</string>
-    <string name="ar_marker_gallery">Galerie</string>
-    <string name="ar_marker_capture_hint">Choisissez une image bien texturée et asymétrique pour chaque marqueur, puis collez-la sur le casier (≈5 cm).</string>
-    <string name="ar_marker_need_both">Ajoutez les deux marqueurs pour continuer.</string>
 </resources>

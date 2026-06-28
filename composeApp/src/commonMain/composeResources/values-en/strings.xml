@@ -431,11 +431,5 @@
     <string name="ar_marker_recorded">%1$s marker recorded</string>
     <string name="ar_marker_both_found">Both markers detected</string>
     <string name="ar_marker_measured">Rack: %1$d × %2$d cm</string>
-    <string name="ar_marker_source_proposed">Proposed markers</string>
-    <string name="ar_marker_source_custom">My markers</string>
     <string name="ar_marker_print_action">Print</string>
-    <string name="ar_marker_photo">Photo</string>
-    <string name="ar_marker_gallery">Gallery</string>
-    <string name="ar_marker_capture_hint">Pick a well-textured, asymmetric image for each marker, then stick it on the rack (≈5 cm).</string>
-    <string name="ar_marker_need_both">Add both markers to continue.</string>
 </resources>
