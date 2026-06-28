@@ -22,15 +22,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.model.Rack
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.RackMode
+import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
@@ -117,6 +123,162 @@ fun RackGridView(
             }
         }
     }
+}
+
+/**
+ * Visual rack grid for placement or display — highlights a selected (empty)
+ * cell or a current (occupied) cell.
+ */
+@Composable
+fun PlacementRackGrid(
+    rack: Rack,
+    selectedCell: Int? = null,
+    currentCell: Int? = null,
+    showHint: Boolean = true,
+    onPick: (Int) -> Unit = {},
+) {
+    VCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            rack.cells.chunked(rack.cols).forEachIndexed { rowIndex, rowCells ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        rowLabel(rowIndex),
+                        fontSize = 10.sp,
+                        color = VincentColors.Faint,
+                        modifier = Modifier.width(14.dp),
+                    )
+                    val shiftRight = rack.staggered && rowIndex % 2 == 1
+                    if (shiftRight) Spacer(Modifier.weight(0.5f))
+                    rowCells.forEachIndexed { colIndex, cell ->
+                        val gi = rowIndex * rack.cols + colIndex
+                        val highlight = when {
+                            gi == selectedCell && !cell.occupied -> PlacementCellHighlight.Selected
+                            gi == currentCell && cell.occupied -> PlacementCellHighlight.Current
+                            !cell.occupied -> PlacementCellHighlight.Available
+                            else -> PlacementCellHighlight.Occupied
+                        }
+                        PlacementGridCell(
+                            cell = cell,
+                            spotLabel = cellSpotLabel(gi, rack.cols),
+                            highlight = highlight,
+                            onClick = { if (!cell.occupied) onPick(gi) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (rack.staggered && !shiftRight) Spacer(Modifier.weight(0.5f))
+                }
+            }
+            if (showHint) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    stringResource(Res.string.add_placement_tap_free),
+                    fontSize = 11.sp,
+                    color = VincentColors.Muted,
+                    fontWeight = FontWeight.W500,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PlacementGridCell(
+    cell: RackCell,
+    spotLabel: String,
+    highlight: PlacementCellHighlight,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (highlight) {
+        PlacementCellHighlight.Available,
+        PlacementCellHighlight.Selected,
+        -> {
+            val selected = highlight == PlacementCellHighlight.Selected
+            Box(
+                modifier
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (selected) VincentColors.Accent else VincentColors.AccentSoft)
+                    .border(
+                        width = if (selected) 2.dp else 1.dp,
+                        color = VincentColors.Accent,
+                        shape = RoundedCornerShape(7.dp),
+                    )
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                } else {
+                    Text(
+                        spotLabel,
+                        style = MonoNumber,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.W700,
+                        color = VincentColors.Accent,
+                    )
+                }
+            }
+        }
+        PlacementCellHighlight.Current -> {
+            val wineBorder = cell.color?.glass ?: VincentColors.Accent
+            val tint = lerp(Color.White, cell.color?.glass ?: VincentColors.Accent, 0.22f)
+            Box(
+                modifier
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(tint)
+                    .border(3.dp, wineBorder, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .padding(2.dp)
+                        .border(2.dp, VincentColors.Accent, RoundedCornerShape(6.dp)),
+                )
+                Text(
+                    stringResource(Res.string.add_placement_current),
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.W800,
+                    color = VincentColors.Accent,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 2.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(VincentColors.AccentSoft)
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                )
+            }
+        }
+        PlacementCellHighlight.Occupied -> {
+            val wineBorder = cell.color?.glass ?: VincentColors.Border
+            val tint = lerp(Color.White, cell.color?.glass ?: VincentColors.Accent, 0.22f)
+            Box(
+                modifier
+                    .aspectRatio(1f)
+                    .alpha(0.35f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(tint)
+                    .border(2.dp, wineBorder, RoundedCornerShape(8.dp)),
+            )
+        }
+    }
+}
+
+enum class PlacementCellHighlight {
+    Occupied,
+    Available,
+    Selected,
+    Current,
 }
 
 @Composable

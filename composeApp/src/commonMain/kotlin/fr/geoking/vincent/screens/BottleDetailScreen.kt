@@ -53,10 +53,13 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.ai.foodPairer
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
+import fr.geoking.vincent.model.cellIndexFromSpot
+import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.photo
 import fr.geoking.vincent.model.thumbnailUri
 import kotlinx.coroutines.launch
@@ -65,6 +68,7 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
+import fr.geoking.vincent.ui.PlacementRackGrid
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
@@ -243,13 +247,52 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
 
             // Location
             Section(stringResource(Res.string.detail_location_label)) {
-                Row(
-                    Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(Res.string.detail_location_format, live.cellarSpot.take(1), live.cellarSpot.drop(1)), color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                val placement = remember(live.cellarSpot) {
+                    var found: Pair<Int, Int>? = null
+                    val spot = live.cellarSpot.trim()
+                    if (spot.isNotBlank() && spot != "—") {
+                        for ((ri, rack) in Racks.all.withIndex()) {
+                            val ci = cellIndexFromSpot(spot, rack.cols) ?: continue
+                            if (ci in rack.cells.indices && rack.cells[ci].occupied) {
+                                // Double check if it's actually the same bottle (best effort)
+                                val cell = rack.cells[ci]
+                                if (cell.color == live.color && cell.vintage == live.vintage.takeLast(2)) {
+                                    found = ri to ci
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    found
+                }
+
+                if (placement != null) {
+                    val (ri, ci) = placement
+                    val rack = Racks.all[ri]
+                    Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("${rack.name} · ${cellSpotLabel(ci, rack.cols)}", color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                        }
+                        PlacementRackGrid(
+                            rack = rack,
+                            currentCell = ci,
+                            showHint = false,
+                        )
+                    }
+                } else {
+                    Row(
+                        Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(live.cellarSpot, color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                    }
                 }
             }
 
