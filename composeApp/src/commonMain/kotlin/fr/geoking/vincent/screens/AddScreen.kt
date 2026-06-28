@@ -65,7 +65,7 @@ import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Racks
-import fr.geoking.vincent.data.barcodeLookup
+import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
@@ -152,16 +152,15 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
     }
     var scanMsg by remember { mutableStateOf<ScanMessage?>(null) }
     var aiError by remember { mutableStateOf<String?>(null) }
-    // Barcode → Open Food Facts lookup → prefill the manual form (vintage/price stay
-    // for the user to complete, since EANs rarely encode them).
-    val lookup = remember { barcodeLookup() }
+    // Barcode → wine data providers (Open Food Facts, GWDB…) → prefill the manual
+    // form (vintage/price stay for the user to complete, since EANs rarely encode them).
     val labelSaver = rememberLabelImageSaver()
     var capturedLabelUri by remember { mutableStateOf<String?>(null) }
     val scanBarcode = rememberBarcodeScanner { code ->
         if (code != null) {
             busy = true
             scope.launch {
-                val info = lookup.byBarcode(code)
+                val info = WineDataSource.byBarcode(code)
                 busy = false
                 manualSeed = if (info != null) {
                     scanMsg = if (info.imageUrl != null) ScanMessage.OffSuccessPhoto else ScanMessage.OffSuccess

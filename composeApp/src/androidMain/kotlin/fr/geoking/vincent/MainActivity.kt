@@ -47,6 +47,16 @@ private val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+private val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `xwines` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, " +
+                "`type` TEXT NOT NULL, `grapes` TEXT NOT NULL, `country` TEXT NOT NULL, " +
+                "`region` TEXT NOT NULL, `winery` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        )
+    }
+}
+
 private val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `racks` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `cols` INTEGER NOT NULL, `rows` INTEGER NOT NULL, `staggered` INTEGER NOT NULL, `cellsData` TEXT NOT NULL, `arImagePath` TEXT, `arCalibrationData` TEXT, PRIMARY KEY(`id`))")
@@ -107,7 +117,7 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             VincentDatabase::class.java,
             "vincent.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
         val repository = RoomCellarRepository(db.bottleDao())
         val rackRepo = RoomRackRepository(db.rackDao())
         val tastingRepo = RoomTastingRepository(db.tastingDao())
@@ -115,6 +125,7 @@ class MainActivity : ComponentActivity() {
         val supplierRepo = RoomSupplierRepository(db.supplierDao())
 
         Settings.init(applicationContext)
+        XWinesData.init(applicationContext, db.xWineDao())
         MainScope().launch {
             Cellar.bootstrap(repository)
             Racks.bootstrap(rackRepo)
