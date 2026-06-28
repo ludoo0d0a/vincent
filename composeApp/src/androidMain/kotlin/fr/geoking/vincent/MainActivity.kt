@@ -4,9 +4,9 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.view.WindowCompat
 import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -76,15 +76,15 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // Force dark status/nav icons (light bar appearance) over our light background,
+        // regardless of the device theme. SystemBarStyle.light keeps the bars transparent
+        // for edge-to-edge and is re-applied correctly across configuration changes,
+        // unlike a manual WindowInsetsController tweak set before setContent.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
-
-        // Edge-to-edge icon contrast the modern (non-deprecated) way: dark status/nav
-        // icons over our light background — no setStatusBarColor/setNavigationBarColor.
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
-        }
 
         val db = Room.databaseBuilder(
             applicationContext,
