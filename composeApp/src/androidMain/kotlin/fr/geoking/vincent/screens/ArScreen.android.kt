@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -552,10 +553,18 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
     val brId = remember(rack.id) { brMarkerId(rack.id) }
     // TL is the re-localisation beacon; BR is tracked only for its coloured highlight.
     val tlBitmap = remember(anchor?.markerId, anchor?.tlImagePath) {
-        anchor?.let { it.tlImagePath?.let { p -> BitmapFactory.decodeFile(p) } ?: MarkerImages.bitmap(it.markerId) }
+        anchor?.let {
+            it.tlImagePath?.let { p ->
+                runCatching { File(p).readBytes() }.getOrNull()?.let { bytes -> decodeScaledBitmap(bytes) }
+            } ?: MarkerImages.bitmap(it.markerId)
+        }
     }
     val brBitmap = remember(brId, anchor?.brImagePath) {
-        anchor?.let { it.brImagePath?.let { p -> BitmapFactory.decodeFile(p) } ?: MarkerImages.bitmap(brId) }
+        anchor?.let {
+            it.brImagePath?.let { p ->
+                runCatching { File(p).readBytes() }.getOrNull()?.let { bytes -> decodeScaledBitmap(bytes) }
+            } ?: MarkerImages.bitmap(brId)
+        }
     }
 
     val holder = remember { ArFrameHolder() }
@@ -565,10 +574,8 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
 
     Box(Modifier.fillMaxSize().onSizeChanged { viewSize = it }) {
         if (anchor != null && anchor.isValid && tlBitmap != null && tlId != null) {
-            ARSceneView(
-                modifier = Modifier.fillMaxSize(),
-                planeRenderer = false,
-                sessionConfiguration = { session, config ->
+            val sessionConfig = remember(tlId, tlBitmap, brId, brBitmap, anchor.markerWidthMeters) {
+                { session: com.google.ar.core.Session, config: Config ->
                     try {
                         val db = AugmentedImageDatabase(session)
                         db.addImage(tlId, tlBitmap, anchor.markerWidthMeters)
@@ -579,8 +586,10 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
                     }
                     config.focusMode = Config.FocusMode.AUTO
                     config.lightEstimationMode = Config.LightEstimationMode.DISABLED
-                },
-                onSessionUpdated = { _, frame ->
+                }
+            }
+            val onSessionUpdated = remember(tlId, brId) {
+                { _: com.google.ar.core.Session, frame: com.google.ar.core.Frame ->
                     val cam = frame.camera
                     if (cam.trackingState == TrackingState.TRACKING) {
                         cam.getViewMatrix(holder.view, 0)
@@ -591,7 +600,13 @@ private fun ArMarkerLiveView(rack: Rack, onReconfigure: () -> Unit, onBack: () -
                         holder.brImage = tracked.firstOrNull { it.name == brId }
                         frameTick++
                     }
-                },
+                }
+            }
+            ARSceneView(
+                modifier = Modifier.fillMaxSize(),
+                planeRenderer = false,
+                sessionConfiguration = sessionConfig,
+                onSessionUpdated = onSessionUpdated,
             )
 
             val img = holder.image
@@ -1128,10 +1143,8 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
     var toast by remember { mutableStateOf<String?>(null) }
 
     Box(Modifier.fillMaxSize().onSizeChanged { viewSize = it }) {
-        ARSceneView(
-            modifier = Modifier.fillMaxSize(),
-            planeRenderer = false,
-            sessionConfiguration = { session, config ->
+        val sessionConfig = remember(tlId, tlBitmap, brId, brBitmap) {
+            { session: com.google.ar.core.Session, config: Config ->
                 try {
                     val db = AugmentedImageDatabase(session)
                     db.addImage(tlId, tlBitmap, MARKER_WIDTH_METERS)
@@ -1142,8 +1155,10 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                 }
                 config.focusMode = Config.FocusMode.AUTO
                 config.lightEstimationMode = Config.LightEstimationMode.DISABLED
-            },
-            onSessionUpdated = { _, frame ->
+            }
+        }
+        val onSessionUpdated = remember(tlId, brId) {
+            { _: com.google.ar.core.Session, frame: com.google.ar.core.Frame ->
                 val cam = frame.camera
                 if (cam.trackingState == TrackingState.TRACKING) {
                     cam.getViewMatrix(holder.view, 0)
@@ -1158,7 +1173,13 @@ private fun ArMarkerSetup(rackIndex: Int, rack: Rack, onDone: () -> Unit) {
                     }
                     tick++
                 }
-            },
+            }
+        }
+        ARSceneView(
+            modifier = Modifier.fillMaxSize(),
+            planeRenderer = false,
+            sessionConfiguration = sessionConfig,
+            onSessionUpdated = onSessionUpdated,
         )
 
         val tlPose = if (tick >= 0) holder.tlPose else null
