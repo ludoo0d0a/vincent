@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocalBar
@@ -53,10 +54,13 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.ai.foodPairer
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
+import fr.geoking.vincent.model.cellIndexFromSpot
+import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.photo
 import fr.geoking.vincent.model.thumbnailUri
 import kotlinx.coroutines.launch
@@ -65,12 +69,13 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
+import fr.geoking.vincent.ui.PlacementRackGrid
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
 
 @Composable
-fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
+fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> Unit) {
     val live = Cellar.bottle(bottle.id) ?: bottle
     val qty = live.quantity
     val fav = live.favorite
@@ -95,14 +100,22 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
         Row(
             Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             IconChip(Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack, contentDescription = stringResource(Res.string.back))
-            IconChip(
-                Icons.Filled.Favorite,
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconChip(
+                    Icons.Filled.Edit,
+                    onClick = { onEdit(live) },
+                    contentDescription = stringResource(Res.string.edit_bottle),
+                )
+                IconChip(
+                    Icons.Filled.Favorite,
                 onClick = { Cellar.toggleFavorite(live.id) },
                 tint = if (fav) VincentColors.Accent else VincentColors.Muted,
-                bg = if (fav) VincentColors.AccentSoft else VincentColors.Surface2,
-            )
+                    bg = if (fav) VincentColors.AccentSoft else VincentColors.Surface2,
+                )
+            }
         }
 
         // Hero
@@ -121,14 +134,19 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f).padding(bottom = 4.dp)) {
-                ColorTag(live.color, label = "${stringResource(live.color.label)} · ${live.category.label}")
+                ColorTag(live.color, label = "${stringResource(live.color.label)} · ${stringResource(live.category.label)}")
                 Spacer(Modifier.height(7.dp))
-                Text("${live.domain} ${live.vintage}", fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text("${live.appellation} · ${live.provenance}", fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                val title = listOfNotNull(live.domain.takeIf { it.isNotBlank() }, live.vintage.takeIf { it != "NM" }).joinToString(" ")
+                Text(title.ifBlank { stringResource(Res.string.add_default_domain) }, fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                val sub = listOfNotNull(live.appellation.takeIf { it.isNotBlank() }, live.provenance.takeIf { it.isNotBlank() }).joinToString(" · ")
+                if (sub.isNotBlank()) {
+                    Text(sub, fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 9.dp)) {
                     Stars(live.rating)
                     Spacer(Modifier.width(7.dp))
-                    Text(stringResource(Res.string.detail_stars_count, live.rating.toString().replace('.', ',')), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                    val ratingStr = if (live.rating % 1.0 == 0.0) live.rating.toInt().toString() else live.rating.toString().replace('.', ',')
+                    Text(stringResource(Res.string.detail_stars_count, ratingStr), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
                 }
             }
         }
@@ -243,13 +261,52 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit) {
 
             // Location
             Section(stringResource(Res.string.detail_location_label)) {
-                Row(
-                    Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(Res.string.detail_location_format, live.cellarSpot.take(1), live.cellarSpot.drop(1)), color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                val placement = remember(live.cellarSpot) {
+                    var found: Pair<Int, Int>? = null
+                    val spot = live.cellarSpot.trim()
+                    if (spot.isNotBlank() && spot != "—") {
+                        for ((ri, rack) in Racks.all.withIndex()) {
+                            val ci = cellIndexFromSpot(spot, rack.cols) ?: continue
+                            if (ci in rack.cells.indices && rack.cells[ci].occupied) {
+                                // Double check if it's actually the same bottle (best effort)
+                                val cell = rack.cells[ci]
+                                if (cell.color == live.color && cell.vintage == live.vintage.takeLast(2)) {
+                                    found = ri to ci
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    found
+                }
+
+                if (placement != null) {
+                    val (ri, ci) = placement
+                    val rack = Racks.all[ri]
+                    Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("${rack.name} · ${cellSpotLabel(ci, rack.cols)}", color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                        }
+                        PlacementRackGrid(
+                            rack = rack,
+                            currentCell = ci,
+                            showHint = false,
+                        )
+                    }
+                } else {
+                    Row(
+                        Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(live.cellarSpot, color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                    }
                 }
             }
 

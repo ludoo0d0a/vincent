@@ -112,16 +112,17 @@ private val rackFilters = listOf(
 @Composable
 fun CellarScreen(
     modifier: Modifier = Modifier,
+    rackIdx: Int,
+    onRackIdxChange: (Int) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
     onAddToCell: (RackPlacement) -> Unit = {},
     onOpenAr: (Int) -> Unit = {},
+    onEditRack: (Int) -> Unit = {},
 ) {
-    var rackIdx by remember { mutableIntStateOf(0) }
     val rack = Racks.all[rackIdx.coerceIn(0, Racks.all.lastIndex)]
     var mode by remember { mutableStateOf(RackMode.VINTAGE) }
     var filterIdx by remember { mutableIntStateOf(-1) }
     val filter = rackFilters.getOrNull(filterIdx)
-    var editing by remember { mutableStateOf(false) }
     var selectedIdx by remember(rackIdx) {
         mutableStateOf<Int?>(
             rack.cells.indexOfFirst { it.selected }.takeIf { it >= 0 }
@@ -234,11 +235,11 @@ fun CellarScreen(
                 CellarTabs(
                     names = Racks.all.map { it.name },
                     selected = rackIdx,
-                    onSelect = { rackIdx = it },
-                    onEdit = { editing = true },
+                    onSelect = onRackIdxChange,
+                    onEdit = { onEditRack(rackIdx) },
                     onAdd = {
                         Racks.add(emptyRack("Cave ${('A' + Racks.all.size)}", 4, 4, false))
-                        rackIdx = Racks.all.lastIndex
+                        onRackIdxChange(Racks.all.lastIndex)
                     },
                 )
                 Spacer(Modifier.height(10.dp))
@@ -301,28 +302,6 @@ fun CellarScreen(
             }
         }
 
-        if (editing) {
-            RackEditor(
-                initial = rack,
-                canDelete = Racks.all.size > 1,
-                onCancel = { editing = false },
-                onSave = { name, cols, rows, staggered ->
-                    Racks.update(rackIdx, rack.resized(cols, rows, staggered).copy(name = name))
-                    val updated = Racks.all[rackIdx]
-                    selectedIdx = updated.cells.indexOfFirst { it.occupied }.coerceAtLeast(0)
-                    editing = false
-                },
-                onDuplicate = {
-                    rackIdx = Racks.duplicate(rackIdx)
-                    editing = false
-                },
-                onDelete = {
-                    Racks.remove(rackIdx)
-                    rackIdx = rackIdx.coerceIn(0, Racks.all.lastIndex)
-                    editing = false
-                },
-            )
-        }
     }
 }
 
@@ -800,89 +779,3 @@ private fun PeekAction(
     }
 }
 
-@Composable
-private fun RackEditor(
-    initial: Rack,
-    canDelete: Boolean,
-    onCancel: () -> Unit,
-    onSave: (String, Int, Int, Boolean) -> Unit,
-    onDuplicate: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    var name by remember { mutableStateOf(initial.name) }
-    var cols by remember { mutableIntStateOf(initial.cols) }
-    var rows by remember { mutableIntStateOf(initial.rows) }
-    var staggered by remember { mutableStateOf(initial.staggered) }
-
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(24.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(VincentColors.Surface)
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(stringResource(Res.string.cellar_edit_title), fontSize = 16.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-            OutlinedTextField(
-                value = name, onValueChange = { name = it }, singleLine = true,
-                label = { Text(stringResource(Res.string.cellar_edit_name), fontSize = 12.sp) }, modifier = Modifier.fillMaxWidth(),
-            )
-            Stepper(stringResource(Res.string.cellar_edit_cols), cols, 1..10) { cols = it }
-            Stepper(stringResource(Res.string.cellar_edit_rows), rows, 1..12) { rows = it }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(Res.string.cellar_edit_staggered), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-                    Text(stringResource(Res.string.cellar_edit_staggered_desc), fontSize = 10.5.sp, color = VincentColors.Muted)
-                }
-                Switch(checked = staggered, onCheckedChange = { staggered = it })
-            }
-            Text(stringResource(Res.string.cellar_edit_capacity, cols * rows), fontSize = 11.sp, color = VincentColors.Muted)
-            // Manage: clone or delete this rack.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onDuplicate, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cellar_edit_duplicate)) }
-                OutlinedButton(
-                    onClick = onDelete,
-                    enabled = canDelete,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = VincentColors.Red),
-                ) { Text(stringResource(Res.string.cellar_edit_delete)) }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cellar_edit_cancel)) }
-                Button(
-                    onClick = { onSave(name.ifBlank { initial.name }, cols, rows, staggered) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
-                ) { Text(stringResource(Res.string.cellar_edit_save)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Stepper(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-        StepBtn("−") { if (value > range.first) onChange(value - 1) }
-        Text("$value", Modifier.width(36.dp), style = MonoNumber, color = VincentColors.Fg, textAlign = TextAlign.Center)
-        StepBtn("+") { if (value < range.last) onChange(value + 1) }
-    }
-}
-
-@Composable
-private fun StepBtn(symbol: String, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(32.dp)
-            .clip(RoundedCornerShape(9.dp))
-            .background(VincentColors.Surface2)
-            .border(1.dp, VincentColors.Border, RoundedCornerShape(9.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Text(symbol, fontSize = 17.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg) }
-}
