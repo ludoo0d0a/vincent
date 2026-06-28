@@ -18,7 +18,7 @@ enum class WineColor(
     SPARKLING(Res.string.color_sparkling, VincentColors.Bubbly, Color(0xFFF6F1DC), Color(0xFF7E7327));
 }
 
-/** Major wine regions / categories used for the rack "Catégorie" mode and search. */
+/** Major wine regions used for the rack "Provenance" mode and search. */
 enum class WineCategory(val short: String, val label: StringResource) {
     BORDEAUX("BX", Res.string.cat_bordeaux),
     BOURGOGNE("BG", Res.string.cat_bourgogne),

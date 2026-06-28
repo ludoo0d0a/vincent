@@ -174,7 +174,7 @@
     <string name="cellar_mode_color">Color</string>
     <string name="cellar_mode_price">Price</string>
     <string name="cellar_mode_vintage">Vintage</string>
-    <string name="cellar_mode_category">Category</string>
+    <string name="cellar_mode_category">Provenance</string>
 
     <string name="add_new_bottle">New wine</string>
     <string name="add_subtitle">Add a bottle to your collection</string>
@@ -271,7 +271,7 @@
     <string name="add_field_domain_name">Domain / name</string>
     <string name="add_field_appellation_label">Appellation</string>
     <string name="add_field_color">Color</string>
-    <string name="add_field_category">Category</string>
+    <string name="add_field_category">Provenance</string>
     <string name="add_field_vintage_label">Vintage</string>
     <string name="add_field_price_label">Price (€)</string>
     <string name="add_placement_optional">Location (optional)</string>

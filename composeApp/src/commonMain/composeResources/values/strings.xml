@@ -175,7 +175,7 @@
     <string name="cellar_mode_color">Couleur</string>
     <string name="cellar_mode_price">Prix</string>
     <string name="cellar_mode_vintage">Millésime</string>
-    <string name="cellar_mode_category">Catégorie</string>
+    <string name="cellar_mode_category">Provenance</string>
 
     <string name="add_new_bottle">Nouveau vin</string>
     <string name="add_subtitle">Ajoutez un flacon à votre collection</string>
@@ -272,7 +272,7 @@
     <string name="add_field_domain_name">Domaine / nom</string>
     <string name="add_field_appellation_label">Appellation</string>
     <string name="add_field_color">Couleur</string>
-    <string name="add_field_category">Catégorie</string>
+    <string name="add_field_category">Provenance</string>
     <string name="add_field_vintage_label">Millésime</string>
     <string name="add_field_price_label">Prix (€)</string>
     <string name="add_placement_optional">Emplacement (optionnel)</string>
