@@ -88,6 +88,9 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.ScreenHeader
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
+import fr.geoking.vincent.ui.rackInteriorBase
+import fr.geoking.vincent.ui.rackWineBorderColor
+import fr.geoking.vincent.ui.rackYearOf
 
 /** A range filter applied to the rack (dims non-matching cells). */
 private data class RackFilter(val label: String, val test: (RackCell) -> Boolean)
@@ -97,52 +100,14 @@ private sealed interface RackImportStatus {
     data object WrongType : RackImportStatus
 }
 
-private fun yearOf(cell: RackCell): Int? {
-    val digits = cell.vintage?.filter { it.isDigit() }
-    if (digits.isNullOrEmpty()) return null
-    val n = digits.toInt()
-    return if (n < 100) 2000 + n else n
-}
-
 private val rackFilters = listOf(
-    RackFilter("≤ 2015") { (yearOf(it) ?: Int.MAX_VALUE) <= 2015 },
-    RackFilter("2016–19") { yearOf(it)?.let { y -> y in 2016..2019 } == true },
-    RackFilter("2020 +") { (yearOf(it) ?: 0) >= 2020 },
+    RackFilter("≤ 2015") { (rackYearOf(it) ?: Int.MAX_VALUE) <= 2015 },
+    RackFilter("2016–19") { rackYearOf(it)?.let { y -> y in 2016..2019 } == true },
+    RackFilter("2020 +") { (rackYearOf(it) ?: 0) >= 2020 },
     RackFilter("≤ 25 €") { (it.price ?: Int.MAX_VALUE) <= 25 },
     RackFilter("25–50 €") { it.price?.let { p -> p in 26..50 } == true },
     RackFilter("> 50 €") { (it.price ?: 0) > 50 },
 )
-
-// Cell border ALWAYS encodes the wine colour (whatever the mode/filter).
-private fun wineBorderColor(cell: RackCell): Color = cell.color?.glass ?: VincentColors.Border
-
-// Interior fill encodes the active mode's bucket: wine colour, price group,
-// vintage range or category — so the rack is readable at a glance per mode.
-private fun priceHue(p: Int?): Color = when {
-    p == null -> VincentColors.Muted
-    p <= 25 -> Color(0xFF4CAF82)
-    p <= 50 -> Color(0xFFE0A33A)
-    else -> Color(0xFFC65454)
-}
-
-private fun vintageHue(y: Int?): Color = when {
-    y == null -> VincentColors.Muted
-    y <= 2015 -> Color(0xFF6B4FA0)
-    y <= 2019 -> Color(0xFF4F86C6)
-    else -> Color(0xFF4CA6A6)
-}
-
-private val categoryPalette = listOf(
-    Color(0xFFB5462F), Color(0xFF8E5BB5), Color(0xFF4F86C6),
-    Color(0xFFCB8A3A), Color(0xFF4CA67E), Color(0xFF9AA64C),
-)
-
-private fun interiorBase(cell: RackCell, mode: RackMode): Color = when (mode) {
-    RackMode.COLOR -> cell.color?.glass ?: VincentColors.Accent
-    RackMode.PRICE -> priceHue(cell.price)
-    RackMode.VINTAGE -> vintageHue(yearOf(cell))
-    RackMode.CATEGORY -> cell.category?.let { categoryPalette[it.ordinal % categoryPalette.size] } ?: VincentColors.Muted
-}
 
 @Composable
 fun CellarScreen(
@@ -618,8 +583,8 @@ private fun Cell(
     }
     val matches = filter?.test?.invoke(cell) ?: true
     // Interior follows the active mode; border ALWAYS keeps the wine colour, thick.
-    val tint = lerp(Color.White, interiorBase(cell, mode), 0.22f)
-    val wineBorder = wineBorderColor(cell)
+    val tint = lerp(Color.White, rackInteriorBase(cell, mode), 0.22f)
+    val wineBorder = rackWineBorderColor(cell)
     val label = when (mode) {
         RackMode.COLOR -> ""
         RackMode.PRICE -> "${cell.price}€"

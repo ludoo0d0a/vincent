@@ -129,6 +129,13 @@
     <string name="bottles_filter_favorites">Favorites</string>
     <string name="bottles_no_result">No result for “%s”.</string>
     <string name="bottles_no_result_filter">No bottle for this filter.</string>
+    <string name="view_mode_grid">Grid view</string>
+    <string name="view_mode_compact">Compact list view</string>
+    <string name="view_mode_cellar">Cellar view</string>
+    <plurals name="cellar_results_matching">
+        <item quantity="one">%1$d bottle in “%2$s”</item>
+        <item quantity="other">%1$d bottles in “%2$s”</item>
+    </plurals>
 
     <string name="cellar_title">Racks</string>
     <string name="cellar_subtitle_format">%1$d spots · %2$d occupied</string>

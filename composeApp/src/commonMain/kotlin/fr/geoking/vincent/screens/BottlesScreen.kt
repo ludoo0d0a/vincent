@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -23,9 +24,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.foundation.text.BasicTextField
@@ -47,8 +51,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.StringResource
@@ -57,17 +63,36 @@ import org.jetbrains.compose.resources.pluralStringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.CsvFormat
+import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottleThumb
+import fr.geoking.vincent.ui.RackGridView
+import fr.geoking.vincent.ui.RackSelectorTabs
 import fr.geoking.vincent.ui.ScreenHeader
 import fr.geoking.vincent.ui.Stars
 
 private data class Filter(val label: String, val color: WineColor?, val favOnly: Boolean = false)
+
+/** How the bottle results are laid out. */
+private enum class BottleViewMode { GRID, COMPACT, CELLAR }
+
+/**
+ * Best-effort link between a physical rack cell and a real bottle, matching on
+ * wine colour + price + last two vintage digits (same heuristic as the cellar
+ * peek card). Returns the first bottle from [pool] that fits, or null.
+ */
+private fun RackCell.matchingBottle(pool: List<Bottle>): Bottle? {
+    if (!occupied) return null
+    return pool.firstOrNull {
+        it.color == color && it.price == price && it.vintage.takeLast(2) == vintage?.takeLast(2)
+    }
+}
 
 private sealed interface BottleImportStatus {
     data class Success(val count: Int, val source: String) : BottleImportStatus
@@ -151,6 +176,8 @@ fun BottlesScreen(
     var query by remember { mutableStateOf("") }
     var adv by remember { mutableStateOf(AdvFilters()) }
     var showFilters by remember { mutableStateOf(false) }
+    var viewMode by remember { mutableStateOf(BottleViewMode.GRID) }
+    var rackIdx by remember { mutableIntStateOf(0) }
 
     val filterItems = listOf(
         Filter(stringResource(Res.string.bottles_filter_all), null),
@@ -251,7 +278,12 @@ fun BottlesScreen(
                     FilterButton(adv.activeCount) { showFilters = true }
                 }
                 Spacer(Modifier.height(11.dp))
-                FilterChips(selected, filterItems) { selected = it }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        FilterChips(selected, filterItems) { selected = it }
+                    }
+                    ViewModeToggle(viewMode) { viewMode = it }
+                }
                 if (activeChips.isNotEmpty()) {
                     Spacer(Modifier.height(9.dp))
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -262,24 +294,39 @@ fun BottlesScreen(
             }
 
             // --- Scrolling zone: only the results scroll ---
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 90.dp),
-                verticalArrangement = Arrangement.spacedBy(11.dp),
-            ) {
-                items(list.chunked(2)) { pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                        pair.forEach { b -> BottleCard(b, Modifier.weight(1f)) { onOpenBottle(b) } }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+            val emptyMessage: @Composable () -> Unit = {
+                Text(
+                    if (query.isNotBlank()) stringResource(Res.string.bottles_no_result, query)
+                    else stringResource(Res.string.bottles_no_result_filter),
+                    fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
+                )
+            }
+            when (viewMode) {
+                BottleViewMode.CELLAR -> CellarResults(
+                    list = list,
+                    searchActive = query.isNotBlank() || adv.activeCount > 0 || f.color != null || f.favOnly,
+                    rackIdx = rackIdx,
+                    onSelectRack = { rackIdx = it },
+                    onOpenBottle = onOpenBottle,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 90.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (viewMode == BottleViewMode.COMPACT) 8.dp else 11.dp),
+                ) {
+                    if (viewMode == BottleViewMode.COMPACT) {
+                        items(list) { b -> BottleRow(b) { onOpenBottle(b) } }
+                    } else {
+                        items(list.chunked(2)) { pair ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                                pair.forEach { b -> BottleCard(b, Modifier.weight(1f)) { onOpenBottle(b) } }
+                                if (pair.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
                     }
-                }
-                if (list.isEmpty()) {
-                    item {
-                        Text(
-                            if (query.isNotBlank()) stringResource(Res.string.bottles_no_result, query)
-                            else stringResource(Res.string.bottles_no_result_filter),
-                            fontSize = 13.sp, color = VincentColors.Muted, modifier = Modifier.padding(vertical = 24.dp),
-                        )
+                    if (list.isEmpty()) {
+                        item { emptyMessage() }
                     }
                 }
             }
@@ -463,6 +510,128 @@ fun BottleCard(b: Bottle, modifier: Modifier = Modifier, onClick: () -> Unit) {
             Text("${b.price} €", style = MonoNumber, color = VincentColors.Fg)
             Stars(b.rating)
         }
+    }
+}
+
+/** Compact single-row bottle entry: small thumbnail + key facts on one line. */
+@Composable
+private fun BottleRow(b: Bottle, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(13.dp))
+            .background(VincentColors.Surface)
+            .border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp))
+            .clickable(onClick = onClick)
+            .padding(9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(width = 38.dp, height = 50.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(lerp(Color.White, b.color.glass, 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            BottleThumb(b, Modifier.size(width = 20.dp, height = 44.dp))
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    b.domain,
+                    fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (b.favorite) {
+                    Spacer(Modifier.width(5.dp))
+                    Icon(Icons.Filled.Favorite, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
+                }
+            }
+            Text("${b.appellation} · ${b.vintage}", fontSize = 11.sp, color = VincentColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(3.dp))
+            Stars(b.rating)
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text("${b.price} €", style = MonoNumber, color = VincentColors.Fg)
+            Text("×${b.quantity}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+        }
+    }
+}
+
+/**
+ * Cellar layout of the results: reuses the rack grid, lighting up cells whose
+ * bottle is part of the current search and dimming the rest. With several racks,
+ * a tab row lets the user pick which cellar to inspect.
+ */
+@Composable
+private fun CellarResults(
+    list: List<Bottle>,
+    searchActive: Boolean,
+    rackIdx: Int,
+    onSelectRack: (Int) -> Unit,
+    onOpenBottle: (Bottle) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val racks = Racks.all
+    if (racks.isEmpty()) return
+    val idx = rackIdx.coerceIn(0, racks.lastIndex)
+    val rack = racks[idx]
+    val highlight: (RackCell) -> Boolean = { cell ->
+        if (!searchActive) cell.occupied else cell.matchingBottle(list) != null
+    }
+    val matchCount = rack.cells.count { highlight(it) }
+    Column(
+        modifier
+            .verticalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, bottom = 90.dp),
+    ) {
+        if (racks.size > 1) {
+            RackSelectorTabs(racks.map { it.name }, idx, onSelectRack, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(11.dp))
+        }
+        RackGridView(
+            rack = rack,
+            highlight = highlight,
+            onCellClick = { _, cell -> cell.matchingBottle(Cellar.bottles)?.let(onOpenBottle) },
+        )
+        Spacer(Modifier.height(9.dp))
+        Text(
+            pluralStringResource(Res.plurals.cellar_results_matching, matchCount, matchCount, rack.name),
+            fontSize = 12.sp, color = VincentColors.Muted, fontWeight = FontWeight.W500,
+        )
+    }
+}
+
+@Composable
+private fun ViewModeToggle(mode: BottleViewMode, onSelect: (BottleViewMode) -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(11.dp))
+            .background(VincentColors.Surface2)
+            .border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        ViewModeButton(Icons.Filled.GridView, Res.string.view_mode_grid, mode == BottleViewMode.GRID) { onSelect(BottleViewMode.GRID) }
+        ViewModeButton(Icons.AutoMirrored.Filled.ViewList, Res.string.view_mode_compact, mode == BottleViewMode.COMPACT) { onSelect(BottleViewMode.COMPACT) }
+        ViewModeButton(Icons.Filled.GridOn, Res.string.view_mode_cellar, mode == BottleViewMode.CELLAR) { onSelect(BottleViewMode.CELLAR) }
+    }
+}
+
+@Composable
+private fun ViewModeButton(icon: ImageVector, desc: StringResource, on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (on) VincentColors.Surface else Color.Transparent)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = stringResource(desc), modifier = Modifier.size(18.dp), tint = if (on) VincentColors.Accent else VincentColors.Muted)
     }
 }
 

@@ -130,6 +130,13 @@
     <string name="bottles_filter_favorites">Favoris</string>
     <string name="bottles_no_result">Aucun résultat pour « %s ».</string>
     <string name="bottles_no_result_filter">Aucune bouteille pour ce filtre.</string>
+    <string name="view_mode_grid">Vue grille</string>
+    <string name="view_mode_compact">Vue liste compacte</string>
+    <string name="view_mode_cellar">Vue casiers</string>
+    <plurals name="cellar_results_matching">
+        <item quantity="one">%1$d bouteille dans « %2$s »</item>
+        <item quantity="other">%1$d bouteilles dans « %2$s »</item>
+    </plurals>
 
     <string name="cellar_title">Casiers</string>
     <string name="cellar_subtitle_format">%1$d emplacements · %2$d occupés</string>
