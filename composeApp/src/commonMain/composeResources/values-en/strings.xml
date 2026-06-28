@@ -32,8 +32,8 @@
     <string name="login_error_network">Can\'t connect. Please check your internet connection.</string>
     <string name="login_error_no_account">No Google account found on this device.</string>
     <string name="login_error_config">Sign-in unavailable (missing configuration).</string>
-    <string name="my_cellar">My cellar</string>
-    <string name="cellar_subtitle">Apartment cellar · Paris</string>
+    <string name="my_cellar">Vin\'cent</string>
+    <string name="cellar_subtitle">My wine cellar</string>
     <string name="avg_price">Avg price</string>
     <string name="this_month">This month</string>
     <string name="additions">additions</string>

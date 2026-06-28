@@ -33,8 +33,8 @@
     <string name="login_error_no_account">Aucun compte Google trouvé sur cet appareil.</string>
     <string name="login_error_config">Connexion indisponible (configuration manquante).</string>
     <string name="debug_internal_logs">Logs internes</string>
-    <string name="my_cellar">Ma cave</string>
-    <string name="cellar_subtitle">Cave de l\'appartement · Paris</string>
+    <string name="my_cellar">Vin\'cent</string>
+    <string name="cellar_subtitle">Ma cave à vin</string>
     <string name="avg_price">Prix moyen</string>
     <string name="this_month">Ce mois-ci</string>
     <string name="additions">ajouts</string>
