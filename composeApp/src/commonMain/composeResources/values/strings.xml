@@ -34,7 +34,7 @@
     <string name="login_error_no_account">Aucun compte Google trouvé sur cet appareil.</string>
     <string name="login_error_config">Connexion indisponible (configuration manquante).</string>
     <string name="debug_internal_logs">Logs internes</string>
-    <string name="my_cellar">Vin\'cent</string>
+    <string name="my_cellar">Vin'cent</string>
     <string name="cellar_subtitle">Ma cave à vin</string>
     <string name="avg_price">Prix moyen</string>
     <string name="this_month">Ce mois-ci</string>
@@ -88,13 +88,13 @@
     <string name="detail_tasting">Dégustation</string>
     <string name="detail_drink_window">Fenêtre de consommation</string>
     <string name="detail_drink_from">À boire dès</string>
-    <string name="detail_drink_to">Jusqu\'en</string>
+    <string name="detail_drink_to">Jusqu'en</string>
     <string name="detail_pairings">Accords mets et vins</string>
-    <string name="detail_suggest_pairings">Suggérer plus d\'accords (AI)</string>
+    <string name="detail_suggest_pairings">Suggérer plus d'accords (AI)</string>
     <string name="detail_notes">Notes de dégustation</string>
     <string name="detail_source">Provenance &amp; Achat</string>
     <string name="detail_merchant">Caviste / Magasin</string>
-    <string name="detail_purchase_date">Date d\'achat</string>
+    <string name="detail_purchase_date">Date d'achat</string>
     <string name="detail_occasion">Occasion</string>
     <string name="detail_added_via">Ajouté via %s</string>
 
@@ -116,7 +116,7 @@
     <string name="detail_fp_body">Corps</string>
     <string name="detail_fp_finish">Finale</string>
     <string name="detail_analyzing">Analyse…</string>
-    <string name="detail_suggest_ai">Suggérer d\'autres accords (IA)</string>
+    <string name="detail_suggest_ai">Suggérer d'autres accords (IA)</string>
     <string name="detail_drink_peak">Apogée — à boire</string>
     <string name="detail_source_purchase">Provenance &amp; achat</string>
     <string name="detail_source_label">Provenance</string>
@@ -127,7 +127,7 @@
     <string name="detail_location_format">Cave A · Rangée %s · Case %s</string>
     <string name="detail_serve_minus">Servir −1</string>
     <string name="detail_add_plus">Ajouter +1</string>
-    <string name="detail_identified_ai">IDENTIFIÉ PAR L\'IA</string>
+    <string name="detail_identified_ai">IDENTIFIÉ PAR L'IA</string>
     <string name="detail_stars_count">%s/5</string>
     <string name="detail_no_notes">Aucune note pour le moment.</string>
 
@@ -183,7 +183,7 @@
     <string name="cellar_edit_cols">Colonnes</string>
     <string name="cellar_edit_rows">Rangées</string>
     <string name="cellar_edit_staggered">Quinconce</string>
-    <string name="cellar_edit_staggered_desc">Rangées décalées d\'une demi-case</string>
+    <string name="cellar_edit_staggered_desc">Rangées décalées d'une demi-case</string>
     <string name="cellar_edit_stagger_offset">Première rangée décalée</string>
     <string name="cellar_edit_stagger_offset_desc">Sinon elle démarre dans le coin</string>
     <string name="cellar_edit_format">Format</string>
@@ -215,20 +215,20 @@
     <string name="add_field_price">Prix unitaire (€)</string>
     <string name="add_field_quantity">Quantité</string>
     <string name="add_field_rack">Emplacement (ex: B3)</string>
-    <string name="add_ai_identify">Identifier avec l\'IA</string>
+    <string name="add_ai_identify">Identifier avec l'IA</string>
     <string name="add_ai_estimating">Estimation en cours…</string>
-    <string name="add_confirm">Confirmer l\'ajout</string>
-    <string name="add_scan_off_success_photo">Prérempli depuis Open Food Facts — photo d\'étiquette disponible.</string>
+    <string name="add_confirm">Confirmer l'ajout</string>
+    <string name="add_scan_off_success_photo">Prérempli depuis Open Food Facts — photo d'étiquette disponible.</string>
     <string name="add_scan_off_success">Prérempli depuis Open Food Facts — complétez millésime et prix.</string>
     <string name="add_scan_barcode_not_found">Code-barres %s introuvable — complétez à la main ou utilisez la photo.</string>
-    <string name="add_just_now">à l\'instant</string>
-    <string name="add_today">Aujourd\'hui</string>
+    <string name="add_just_now">à l'instant</string>
+    <string name="add_today">Aujourd'hui</string>
     <string name="add_default_domain">Bouteille</string>
 
     <string name="transfer_title">Importer / Exporter</string>
     <string name="transfer_subtitle">Transférez votre cave en CSV</string>
     <string name="transfer_import_title">Importer une cave</string>
-    <string name="transfer_import_desc">Chargez un export CSV de PLOC, Vivino ou d\'un tableur. Les colonnes sont reconnues automatiquement (couleur, millésime, prix, région…).</string>
+    <string name="transfer_import_desc">Chargez un export CSV de PLOC, Vivino ou d'un tableur. Les colonnes sont reconnues automatiquement (couleur, millésime, prix, région…).</string>
     <string name="transfer_import_button">Choisir un fichier CSV</string>
     <string name="transfer_export_title">Exporter ma cave</string>
     <string name="transfer_export_desc">Génère un fichier CSV de vos %d références (sans les photos) — réimportable dans Vincent ou lisible dans tout tableur.</string>
@@ -253,7 +253,7 @@
 
     <string name="recent_title">Récemment ajoutés</string>
     <string name="recent_subtitle">Vos derniers trésors</string>
-    <string name="recent_today">Aujourd\'hui</string>
+    <string name="recent_today">Aujourd'hui</string>
     <string name="recent_this_week">Cette semaine</string>
     <string name="recent_source_rack_format">%s · casier %s</string>
 
@@ -323,23 +323,23 @@
     <string name="add_parsed_appellation">Appellation</string>
     <string name="add_parsed_estimated_price">Prix estimé</string>
     <string name="add_voice_summary_title">Résumé</string>
-    <string name="add_voice_complete_hint">Touchez un champ à compléter ou discutez avec l\'assistant.</string>
+    <string name="add_voice_complete_hint">Touchez un champ à compléter ou discutez avec l'assistant.</string>
     <string name="add_voice_missing">À compléter</string>
     <string name="add_voice_switch_manual">Éditer · saisie manuelle</string>
     <string name="add_voice_discuss_title">Compléter par la discussion</string>
     <string name="add_voice_discuss_placeholder">Ex. « millésime 2019, 24 € »</string>
     <string name="add_voice_send">Envoyer</string>
-    <string name="add_voice_assistant_done">C\'est noté.</string>
+    <string name="add_voice_assistant_done">C'est noté.</string>
     <string name="add_voice_field_done">OK</string>
-    <string name="add_photo_capture">Photographier l\'étiquette</string>
+    <string name="add_photo_capture">Photographier l'étiquette</string>
     <string name="add_barcode_scan">Scanner le code-barres</string>
     <string name="add_method_barcode">Code-barres</string>
     <string name="add_method_label">Étiquette</string>
-    <string name="add_analyzing_label">Analyse de l\'étiquette…</string>
+    <string name="add_analyzing_label">Analyse de l'étiquette…</string>
     <string name="add_searching_off">Recherche Open Food Facts…</string>
-    <string name="add_frame_label">Cadrez l\'étiquette de la bouteille</string>
+    <string name="add_frame_label">Cadrez l'étiquette de la bouteille</string>
     <string name="add_frame_barcode">Alignez le code-barres — détection automatique</string>
-    <string name="add_identified_ai">IDENTIFIÉ PAR L\'IA</string>
+    <string name="add_identified_ai">IDENTIFIÉ PAR L'IA</string>
     <string name="add_to_cellar">Ajouter à la cave</string>
     <string name="save_changes">Enregistrer les modifications</string>
     <string name="edit_bottle">Éditer la bouteille</string>
@@ -395,9 +395,9 @@
     <string name="settings_internal_logs_toggle">Activer les logs</string>
     <string name="settings_internal_logs_view">Voir les logs</string>
     <string name="update_available">Une nouvelle version est disponible.</string>
-    <string name="update_up_to_date">L\'application est à jour.</string>
+    <string name="update_up_to_date">L'application est à jour.</string>
     <string name="update_downloaded">Mise à jour téléchargée — redémarrage…</string>
-    <string name="update_downloading">Téléchargement de la mise à jour… L\'application redémarrera une fois terminé.</string>
+    <string name="update_downloading">Téléchargement de la mise à jour… L'application redémarrera une fois terminé.</string>
     <string name="update_error">Erreur lors de la vérification de la mise à jour.</string>
     <string name="update_ineligible">Mise à jour disponible mais non éligible.</string>
     <string name="settings_section_app">Application</string>
@@ -431,19 +431,19 @@
     <string name="log_no_result">Aucun résultat</string>
 
     <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.</string>
-    <string name="ai_error_sign_in">Connectez-vous pour utiliser l\'IA.</string>
-    <string name="ai_error_extract_text">Impossible d\'extraire les infos du texte.</string>
-    <string name="ai_error_no_label">Aucun domaine détecté sur l\'étiquette.</string>
+    <string name="ai_error_sign_in">Connectez-vous pour utiliser l'IA.</string>
+    <string name="ai_error_extract_text">Impossible d'extraire les infos du texte.</string>
+    <string name="ai_error_no_label">Aucun domaine détecté sur l'étiquette.</string>
     <string name="ai_error_generic">Identification impossible — réessayez ou passez en manuel.</string>
     <string name="ai_error_http_403">Clé API invalide ou API non activée.%1$s</string>
     <string name="ai_error_http_404">Modèle ou URL introuvable (%1$d).%2$s</string>
     <string name="ai_error_http_429">Quota Gemini dépassé — réessayez plus tard.</string>
-    <string name="ai_error_http_4xx">Requête refusée par l\'IA (%1$d)%2$s</string>
+    <string name="ai_error_http_4xx">Requête refusée par l'IA (%1$d)%2$s</string>
     <string name="ai_error_http_other">Identification impossible (erreur réseau %1$d)%2$s</string>
     <string name="ai_added_label">IA</string>
-    <string name="ai_quota_remaining">%1$d/%2$d analyses IA restantes aujourd\'hui</string>
+    <string name="ai_quota_remaining">%1$d/%2$d analyses IA restantes aujourd'hui</string>
     <string name="ai_error_quota_daily">Limite quotidienne atteinte (%1$d analyses). Réinitialisation demain.</string>
-    <string name="ai_error_quota_burst">Trop de demandes d\'un coup — patientez quelques secondes.</string>
+    <string name="ai_error_quota_burst">Trop de demandes d'un coup — patientez quelques secondes.</string>
     <string name="ai_error_quota_global">Service IA très sollicité — réessayez un peu plus tard.</string>
 
     <!-- AR cellar -->
@@ -453,9 +453,9 @@
     <string name="ar_unsupported">Cet appareil ne prend pas en charge la réalité augmentée (ARCore).</string>
     <string name="ar_install">La réalité augmentée nécessite « Google Play Services for AR ». Installez-le puis réessayez.</string>
     <string name="ar_install_action">Installer</string>
-    <string name="ar_permission">L\'accès à la caméra est nécessaire pour la vue AR.</string>
+    <string name="ar_permission">L'accès à la caméra est nécessaire pour la vue AR.</string>
     <string name="ar_permission_action">Autoriser la caméra</string>
-    <string name="ar_no_setup">Ce casier n\'est pas encore configuré pour l\'AR. Prenez une photo de la façade du casier, puis placez les 4 coins.</string>
+    <string name="ar_no_setup">Ce casier n'est pas encore configuré pour l'AR. Prenez une photo de la façade du casier, puis placez les 4 coins.</string>
     <string name="ar_setup_start">Configurer avec une photo</string>
     <string name="ar_setup_title">Calibrer le casier</string>
     <string name="ar_setup_hint">Déplacez les 4 coins sur la façade du casier.</string>
@@ -468,7 +468,7 @@
     <string name="ar_mode_photo">Photo figée</string>
     <string name="ar_mode_marker">Marqueurs</string>
     <string name="ar_photo_hint">Pincez pour zoomer, glissez pour déplacer.</string>
-    <string name="ar_adjust">Ajuster l\'overlay</string>
+    <string name="ar_adjust">Ajuster l'overlay</string>
     <string name="ar_adjust_hint">Glissez les 4 coins pour aligner les casiers et leurs bouteilles sur la façade.</string>
     <string name="ar_cancel">Annuler</string>
     <string name="ar_marker_searching">Pointez la caméra vers le marqueur…</string>

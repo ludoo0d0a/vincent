@@ -30,10 +30,10 @@
     <string name="sign_in">Sign in</string>
     <string name="login_error">Sign-in error: %s</string>
     <string name="login_error_generic">Sign-in failed. Please try again.</string>
-    <string name="login_error_network">Can\'t connect. Please check your internet connection.</string>
+    <string name="login_error_network">Can't connect. Please check your internet connection.</string>
     <string name="login_error_no_account">No Google account found on this device.</string>
     <string name="login_error_config">Sign-in unavailable (missing configuration).</string>
-    <string name="my_cellar">Vin\'cent</string>
+    <string name="my_cellar">Vin'cent</string>
     <string name="cellar_subtitle">My wine cellar</string>
     <string name="avg_price">Avg price</string>
     <string name="this_month">This month</string>
@@ -448,7 +448,7 @@
     <string name="ar_title">AR cellar</string>
     <string name="ar_back">Back</string>
     <string name="ar_unsupported">This device does not support augmented reality (ARCore).</string>
-    <string name="ar_install">AR requires \"Google Play Services for AR\". Install it and try again.</string>
+    <string name="ar_install">AR requires "Google Play Services for AR". Install it and try again.</string>
     <string name="ar_install_action">Install</string>
     <string name="ar_permission">Camera access is required for the AR view.</string>
     <string name="ar_permission_action">Allow camera</string>
@@ -470,7 +470,7 @@
     <string name="ar_cancel">Cancel</string>
     <string name="ar_marker_searching">Point the camera at the marker…</string>
     <string name="ar_marker_setup_title">Calibrate with two markers</string>
-    <string name="ar_marker_print">Print these two markers (≈5 cm each) and stick them on the rack\'s top-left and bottom-right corners.</string>
+    <string name="ar_marker_print">Print these two markers (≈5 cm each) and stick them on the rack's top-left and bottom-right corners.</string>
     <string name="ar_marker_tl">Top-left</string>
     <string name="ar_marker_br">Bottom-right</string>
     <string name="ar_marker_point_tl">Point the camera at the top-left marker…</string>
