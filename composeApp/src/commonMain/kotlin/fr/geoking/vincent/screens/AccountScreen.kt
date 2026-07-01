@@ -55,10 +55,7 @@ fun AccountScreen(
     onOpenRecent: () -> Unit,
     onOpenBottles: () -> Unit,
     onOpenFavorites: () -> Unit,
-    onOpenTransfer: () -> Unit,
-    onOpenTastings: () -> Unit = {},
-    onOpenProducers: () -> Unit = {},
-    onOpenSuppliers: () -> Unit = {},
+    onOpenDataManagement: () -> Unit,
     onOpenSettings: () -> Unit = {},
     onOpenBottle: (Bottle) -> Unit,
     onSignOut: () -> Unit,
@@ -175,23 +172,9 @@ fun AccountScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
             }
 
-            Spacer(Modifier.height(9.dp))
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface).border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).clickable(onClick = onOpenTransfer).padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(Res.string.transfer_title), Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-                Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
-            }
-
-            SectionHeader(stringResource(Res.string.ploc_data_title))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AccountLink(stringResource(Res.string.ploc_tastings), onOpenTastings)
-                AccountLink(stringResource(Res.string.ploc_producers), onOpenProducers)
-                AccountLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
-            }
-
             SectionHeader(stringResource(Res.string.settings_section_app))
+            AccountLink(stringResource(Res.string.settings_data_management), onOpenDataManagement)
+            Spacer(Modifier.height(8.dp))
             AccountLink(stringResource(Res.string.settings_title), onOpenSettings)
 
             Spacer(Modifier.height(16.dp))

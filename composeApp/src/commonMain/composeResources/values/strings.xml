@@ -424,11 +424,20 @@
     <string name="suppliers_empty">Aucun fournisseur. Importez un fichier CSV de PLOC pour commencer.</string>
 
     <string name="settings_title">Réglages</string>
+    <string name="settings_data_management">Gestion des données</string>
     <string name="settings_language_section">Langue</string>
     <string name="settings_language_system">Langue du système</string>
 
     <string name="log_empty">Aucun log</string>
     <string name="log_no_result">Aucun résultat</string>
+
+    <string name="data_management_title">Gestion des données</string>
+    <string name="data_management_subtitle">Gérez vos imports, exports et référentiels</string>
+    <string name="data_management_section_transfer">Transfert</string>
+    <string name="data_management_section_referentials">Référentiels</string>
+    <string name="data_management_section_offline">Données hors ligne</string>
+    <string name="data_management_racks">Casiers</string>
+    <string name="data_management_racks_subtitle">%d casiers configurés</string>
 
     <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.</string>
     <string name="ai_error_sign_in">Connectez-vous pour utiliser l'IA.</string>

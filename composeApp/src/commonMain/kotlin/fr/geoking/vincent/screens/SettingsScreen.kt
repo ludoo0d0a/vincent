@@ -44,7 +44,6 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.SUPPORTED_LANGUAGES
 import fr.geoking.vincent.data.Settings
 import fr.geoking.vincent.data.Updater
-import fr.geoking.vincent.data.XWinesData
 import fr.geoking.vincent.debug.InternalLog
 import kotlinx.coroutines.launch
 import fr.geoking.vincent.getAppVersion
@@ -55,6 +54,7 @@ import fr.geoking.vincent.ui.SectionHeader
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenLogcat: () -> Unit,
+    onOpenDataManagement: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -84,6 +84,8 @@ fun SettingsScreen(
             }
 
             SectionHeader(stringResource(Res.string.settings_section_app))
+            SettingsLink(stringResource(Res.string.settings_data_management), onOpenDataManagement)
+            Spacer(Modifier.height(8.dp))
             SettingsLink(stringResource(Res.string.update_check)) { Updater.checkForUpdate(true) }
             Spacer(Modifier.height(8.dp))
             SettingsToggle(
@@ -96,70 +98,10 @@ fun SettingsScreen(
                 SettingsLink(stringResource(Res.string.settings_internal_logs_view), onOpenLogcat)
             }
 
-            SectionHeader(stringResource(Res.string.settings_section_data_sources))
-            XWinesRow()
-
             Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
                 Text(getAppVersion(), fontSize = 11.sp, color = VincentColors.Faint, fontWeight = FontWeight.W600)
             }
             Spacer(Modifier.height(24.dp))
-        }
-    }
-}
-
-@Composable
-private fun XWinesRow() {
-    val scope = rememberCoroutineScope()
-    var error by remember { mutableStateOf<String?>(null) }
-    val notConfigured = stringResource(Res.string.settings_xwines_not_configured)
-    val genericError = stringResource(Res.string.settings_xwines_error)
-    val downloading = XWinesData.isDownloading
-    val count = XWinesData.count
-    val updatedLabel = XWinesData.updatedAtLabel
-
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface)
-            .border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(Res.string.settings_xwines_title), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-            val status = when {
-                error != null -> error!!
-                updatedLabel.isBlank() -> stringResource(Res.string.settings_xwines_never)
-                else -> stringResource(Res.string.settings_xwines_count, count) +
-                    "  ·  " + stringResource(Res.string.settings_xwines_updated, updatedLabel)
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(status, fontSize = 11.sp, fontWeight = FontWeight.W500, color = if (error != null) VincentColors.Accent else VincentColors.Faint)
-        }
-        Spacer(Modifier.width(12.dp))
-        val actionLabel = when {
-            downloading -> stringResource(Res.string.settings_xwines_downloading)
-            updatedLabel.isBlank() -> stringResource(Res.string.settings_xwines_download)
-            else -> stringResource(Res.string.settings_xwines_update)
-        }
-        Box(
-            Modifier.clip(RoundedCornerShape(10.dp))
-                .background(if (downloading) VincentColors.Surface2 else VincentColors.AccentSoft)
-                .border(1.dp, if (downloading) VincentColors.Border else VincentColors.Accent, RoundedCornerShape(10.dp))
-                .clickable(enabled = !downloading) {
-                    error = null
-                    scope.launch {
-                        val result = XWinesData.update()
-                        result.exceptionOrNull()?.let { e ->
-                            error = if (e.message?.contains("not configured") == true) notConfigured else genericError
-                        }
-                    }
-                }
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (downloading) {
-                CircularProgressIndicator(Modifier.size(15.dp), color = VincentColors.Accent, strokeWidth = 2.dp)
-            } else {
-                Text(actionLabel, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
-            }
         }
     }
 }

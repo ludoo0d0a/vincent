@@ -58,6 +58,7 @@ import fr.geoking.vincent.screens.LogcatScreen
 import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SettingsScreen
+import fr.geoking.vincent.screens.DataManagementScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
 import fr.geoking.vincent.screens.RackEditScreen
@@ -81,6 +82,7 @@ private sealed interface Dest {
     data class Edit(val bottle: Bottle) : Dest
     data object Account : Dest
     data object Settings : Dest
+    data object DataManagement : Dest
     data object Recent : Dest
     data object Transfer : Dest
     data object Tastings : Dest
@@ -163,10 +165,7 @@ fun App() = VincentTheme {
                     onOpenRecent = { stack.add(Dest.Recent) },
                     onOpenBottles = { bottlesFavOnly = false; tab = Tab.BOTTLES; stack.clear() },
                     onOpenFavorites = { bottlesFavOnly = true; tab = Tab.BOTTLES; stack.clear() },
-                    onOpenTransfer = { stack.add(Dest.Transfer) },
-                    onOpenTastings = { stack.add(Dest.Tastings) },
-                    onOpenProducers = { stack.add(Dest.Producers) },
-                    onOpenSuppliers = { stack.add(Dest.Suppliers) },
+                    onOpenDataManagement = { stack.add(Dest.DataManagement) },
                     onOpenSettings = { stack.add(Dest.Settings) },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                     onSignOut = { Auth.signOut(); guest = false; stack.clear() },
@@ -175,6 +174,15 @@ fun App() = VincentTheme {
                 Dest.Settings -> SettingsScreen(
                     onBack = ::pop,
                     onOpenLogcat = { stack.add(Dest.Logcat) },
+                    onOpenDataManagement = { stack.add(Dest.DataManagement) },
+                )
+
+                Dest.DataManagement -> DataManagementScreen(
+                    onBack = ::pop,
+                    onOpenImportExport = { stack.add(Dest.Transfer) },
+                    onOpenTastings = { stack.add(Dest.Tastings) },
+                    onOpenProducers = { stack.add(Dest.Producers) },
+                    onOpenSuppliers = { stack.add(Dest.Suppliers) },
                 )
 
                 Dest.Transfer -> ImportExportScreen(onBack = ::pop)
