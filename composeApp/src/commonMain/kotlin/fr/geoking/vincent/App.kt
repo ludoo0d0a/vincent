@@ -104,6 +104,7 @@ fun App() = VincentTheme {
     // When opening the Bottles tab from the account favourites card, pre-select the
     // favourites chip; a direct tab tap always shows every bottle.
     var bottlesFavOnly by remember { mutableStateOf(false) }
+    var bottlesFiltersVisible by remember { mutableStateOf(false) }
     var cellarRackIdx by remember { mutableStateOf(0) }
     // Real navigation stack above the tabbed home; back pops one level.
     val stack = remember { mutableStateListOf<Dest>() }
@@ -136,6 +137,8 @@ fun App() = VincentTheme {
                         tab = t
                     },
                     bottlesFavOnly = bottlesFavOnly,
+                    bottlesFiltersVisible = bottlesFiltersVisible,
+                    onBottlesFiltersVisible = { bottlesFiltersVisible = it },
                     cellarRackIdx = cellarRackIdx,
                     onCellarRackIdxChange = { cellarRackIdx = it },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
@@ -149,16 +152,16 @@ fun App() = VincentTheme {
 
                 is Dest.Detail -> BottleDetailScreen(
                     bottle = top.bottle,
-                    onBack = ::pop,
+                    onBack = { stack.clear() },
                     onEdit = { stack.add(Dest.Edit(it)) },
                 )
 
-                is Dest.Add -> AddScreen(onClose = ::pop, initialPlacement = top.placement)
+                is Dest.Add -> AddScreen(onClose = { stack.clear() }, initialPlacement = top.placement)
 
-                is Dest.Edit -> AddScreen(onClose = ::pop, editingBottle = top.bottle)
+                is Dest.Edit -> AddScreen(onClose = { stack.clear() }, editingBottle = top.bottle)
 
                 Dest.Account -> AccountScreen(
-                    onBack = ::pop,
+                    onBack = { stack.clear() },
                     onSignIn = onSignIn,
                     isLoading = googleLoading,
                     errorMsg = googleError,
@@ -172,31 +175,31 @@ fun App() = VincentTheme {
                 )
 
                 Dest.Settings -> SettingsScreen(
-                    onBack = ::pop,
+                    onBack = { stack.clear() },
                     onOpenLogcat = { stack.add(Dest.Logcat) },
                     onOpenDataManagement = { stack.add(Dest.DataManagement) },
                 )
 
                 Dest.DataManagement -> DataManagementScreen(
-                    onBack = ::pop,
+                    onBack = { stack.clear() },
                     onOpenImportExport = { stack.add(Dest.Transfer) },
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
                 )
 
-                Dest.Transfer -> ImportExportScreen(onBack = ::pop)
+                Dest.Transfer -> ImportExportScreen(onBack = { stack.clear() })
 
-                Dest.Tastings -> TastingsScreen(onBack = ::pop)
-                Dest.Producers -> ProducersScreen(onBack = ::pop)
-                Dest.Suppliers -> SuppliersScreen(onBack = ::pop)
-                Dest.Logcat -> LogcatScreen(onBack = ::pop)
+                Dest.Tastings -> TastingsScreen(onBack = { stack.clear() })
+                Dest.Producers -> ProducersScreen(onBack = { stack.clear() })
+                Dest.Suppliers -> SuppliersScreen(onBack = { stack.clear() })
+                Dest.Logcat -> LogcatScreen(onBack = { stack.clear() })
 
-                is Dest.Ar -> ArScreen(rackIndex = top.rackIndex, onBack = ::pop)
+                is Dest.Ar -> ArScreen(rackIndex = top.rackIndex, onBack = { stack.clear() })
 
                 is Dest.RackEdit -> RackEditScreen(
                     rackIndex = top.rackIndex,
-                    onBack = ::pop,
+                    onBack = { stack.clear() },
                     onSwitchedToRack = { index ->
                         cellarRackIdx = index
                         tab = Tab.CELLAR
@@ -204,7 +207,7 @@ fun App() = VincentTheme {
                 )
 
                 Dest.Recent -> RecentScreen(
-                    onBack = ::pop,
+                    onBack = { stack.clear() },
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
                 )
             }
@@ -275,6 +278,8 @@ private fun MainScaffold(
     tab: Tab,
     onTab: (Tab) -> Unit,
     bottlesFavOnly: Boolean,
+    bottlesFiltersVisible: Boolean,
+    onBottlesFiltersVisible: (Boolean) -> Unit,
     cellarRackIdx: Int,
     onCellarRackIdxChange: (Int) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
@@ -312,7 +317,7 @@ private fun MainScaffold(
             }
         },
         floatingActionButton = {
-            if (tab == Tab.HOME || tab == Tab.BOTTLES) {
+            if (tab == Tab.HOME || (tab == Tab.BOTTLES && !bottlesFiltersVisible)) {
                 FloatingActionButton(
                     onClick = onAdd,
                     containerColor = VincentColors.Accent,
@@ -333,7 +338,12 @@ private fun MainScaffold(
                 onOpenAr = onOpenAr,
                 onEditRack = onEditRack
             )
-            Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, initialFavoritesOnly = bottlesFavOnly)
+            Tab.BOTTLES -> BottlesScreen(
+                content,
+                onOpenBottle = onOpenBottle,
+                initialFavoritesOnly = bottlesFavOnly,
+                onFiltersVisible = onBottlesFiltersVisible
+            )
         }
     }
 }
