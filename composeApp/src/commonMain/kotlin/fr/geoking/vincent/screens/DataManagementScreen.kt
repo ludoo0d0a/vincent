@@ -20,15 +20,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,10 +32,8 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Racks
-import fr.geoking.vincent.data.XWinesData
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.SectionHeader
-import kotlinx.coroutines.launch
 
 @Composable
 fun DataManagementScreen(
@@ -80,9 +72,6 @@ fun DataManagementScreen(
                 )
             }
 
-            SectionHeader(stringResource(Res.string.data_management_section_offline))
-            XWinesRow()
-
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -101,62 +90,5 @@ private fun DataLink(label: String, onClick: () -> Unit, sublabel: String? = nul
             }
         }
         Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = VincentColors.Faint, modifier = Modifier.size(13.dp))
-    }
-}
-
-@Composable
-private fun XWinesRow() {
-    val scope = rememberCoroutineScope()
-    var error by remember { mutableStateOf<String?>(null) }
-    val notConfigured = stringResource(Res.string.settings_xwines_not_configured)
-    val genericError = stringResource(Res.string.settings_xwines_error)
-    val downloading = XWinesData.isDownloading
-    val count = XWinesData.count
-    val updatedLabel = XWinesData.updatedAtLabel
-
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface)
-            .border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(Res.string.settings_xwines_title), fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Fg)
-            val status = when {
-                error != null -> error!!
-                updatedLabel.isBlank() -> stringResource(Res.string.settings_xwines_never)
-                else -> stringResource(Res.string.settings_xwines_count, count) +
-                    "  ·  " + stringResource(Res.string.settings_xwines_updated, updatedLabel)
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(status, fontSize = 11.sp, fontWeight = FontWeight.W500, color = if (error != null) VincentColors.Accent else VincentColors.Faint)
-        }
-        Spacer(Modifier.width(12.dp))
-        val actionLabel = when {
-            downloading -> stringResource(Res.string.settings_xwines_downloading)
-            updatedLabel.isBlank() -> stringResource(Res.string.settings_xwines_download)
-            else -> stringResource(Res.string.settings_xwines_update)
-        }
-        Box(
-            Modifier.clip(RoundedCornerShape(10.dp))
-                .background(if (downloading) VincentColors.Surface2 else VincentColors.AccentSoft)
-                .border(1.dp, if (downloading) VincentColors.Border else VincentColors.Accent, RoundedCornerShape(10.dp))
-                .clickable(enabled = !downloading) {
-                    error = null
-                    scope.launch {
-                        val result = XWinesData.update()
-                        result.exceptionOrNull()?.let { e ->
-                            error = if (e.message?.contains("not configured") == true) notConfigured else genericError
-                        }
-                    }
-                }
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (downloading) {
-                CircularProgressIndicator(Modifier.size(15.dp), color = VincentColors.Accent, strokeWidth = 2.dp)
-            } else {
-                Text(actionLabel, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
-            }
-        }
     }
 }

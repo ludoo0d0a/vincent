@@ -77,11 +77,9 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `PRICE`.
 | # | Provider | Capabilities | Auth / key | Status |
 |---|----------|--------------|------------|--------|
 | 1 | **Open Food Facts** | `BARCODE_SCAN` | none (open API) | ✅ active |
-| 2 | **InVintory** | `TEXT_SEARCH`, `LABEL_SCAN` | `INVINTORY_API_KEY` (`x-api-key` header) | ✅ active when key set |
-| 3 | **grapeminds** | `TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH` | `GRAPEMINDS_API_KEY` (`Authorization: Bearer`) | ✅ active when key set (label scan needs Enterprise plan) |
-| 4 | **X-Wines** | `TEXT_SEARCH` (offline, local Room DB) | `X_WINES_DATASET_URL` | ✅ active when URL set |
-| 5 | **CellarTracker** | `TEXT_SEARCH`, `PRICE` | `CELLARTRACKER_API_KEY` | 🚧 wired but not implemented (returns empty) |
-| 6 | **AI Label (Gemini)** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ active |
+| 2 | **grapeminds** | `TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH` | `GRAPEMINDS_API_KEY` (`Authorization: Bearer`) | ✅ active when key set (label scan needs Enterprise plan) |
+| 3 | **CellarTracker** | `TEXT_SEARCH`, `PRICE` | `CELLARTRACKER_API_KEY` | 🚧 wired but not implemented (returns empty) |
+| 4 | **AI Label (Gemini)** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ active |
 | — | **db.wine (GWDB)** | `BARCODE_SCAN` (planned) | `GWDB_API_KEY` + `GWDB_API_SECRET` | ❌ disabled (commented out in `wineDataProviders()`) |
 
 > grapeminds Public API v1 — base `https://api.grapeminds.eu/public/v1`, `Accept-Language` ∈ {de,en,es,fr,it,da}.
@@ -95,7 +93,7 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `PRICE`.
 > bottle detail screen (Description, Grape varieties, Flavour-profile bars, pairing prose, maturity notes).
 > No barcode and no price field; `producers`/`regions`/`region-insights` endpoints exist but aren't wired.
 
-> Real priority: `OpenFoodFacts → InVintory → grapeminds → XWines → CellarTracker → AiLabel`.
+> Real priority: `OpenFoodFacts → grapeminds → CellarTracker → AiLabel`.
 > `GwdbProvider` stays in the file but is excluded from the list (kept for later re-enable).
 
 ### Config keys
@@ -106,8 +104,6 @@ Resolved by the `secret()` function in `composeApp/build.gradle.kts`, in order:
 
 | Key | Role | Default if absent |
 |-----|------|-------------------|
-| `INVINTORY_API_KEY` | InVintory provider | `xxx` |
-| `X_WINES_DATASET_URL` | X-Wines dataset source | `xxx` |
 | `GRAPEMINDS_API_KEY` | grapeminds provider (Bearer token) | `xxx` |
 | `CELLARTRACKER_API_KEY` | CellarTracker provider | `xxx` |
 | `GWDB_API_KEY` / `GWDB_API_SECRET` | db.wine provider (disabled) | `xxx` |

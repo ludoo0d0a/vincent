@@ -36,7 +36,7 @@ data class ProductInfo(
     /** Front label photo (e.g. from Open Food Facts), when one is available. */
     val imageUrl: String? = null,
     // Wine-specific fields, often missing from Open Food Facts but provided by
-    // X-Wines / CellarTracker / the AI label reader.
+    // CellarTracker / the AI label reader.
     val vintage: String? = null,
     val grape: String? = null,
     val region: String? = null,

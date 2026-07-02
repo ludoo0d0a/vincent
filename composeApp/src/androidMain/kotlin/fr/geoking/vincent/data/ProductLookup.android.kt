@@ -113,124 +113,6 @@ private object GwdbProvider : WineDataProvider {
 }
 
 /**
- * InVintory Partner API — catalogue of 1.5M wine labels with free-text search and
- * label recognition (image upload). Auth via the `x-api-key` header. No barcode
- * lookup (InVintory deliberately doesn't use UPC) and no per-wine price field.
- */
-private object InVintoryProvider : WineDataProvider {
-    override val id = "invintory"
-    override val displayName = "InVintory"
-    override val capabilities = setOf(ProviderCapability.TEXT_SEARCH, ProviderCapability.LABEL_SCAN)
-
-    private const val BASE = "https://api.invintorywines.com/partners/v1"
-
-    override suspend fun search(query: String): List<ProductInfo> = withContext(Dispatchers.IO) {
-        val key = BuildConfig.INVINTORY_API_KEY
-        if (!key.isConfigured()) return@withContext emptyList()
-        val q = query.trim()
-        if (q.length < 2) return@withContext emptyList()
-        val urlStr = "$BASE/wines?search_query=${URLEncoder.encode(q, "UTF-8")}&limit=20"
-        val resp = get(urlStr, key) ?: return@withContext emptyList()
-        try {
-            val rows = JSONObject(resp).optJSONArray("rows") ?: return@withContext emptyList()
-            (0 until rows.length()).mapNotNull { i ->
-                rows.optJSONObject(i)?.toProductInfo()
-            }
-        } catch (e: Exception) {
-            HttpDebug.log(label = displayName, method = "GET", url = urlStr, error = "${e.javaClass.simpleName}: ${e.message}")
-            emptyList()
-        }
-    }
-
-    override suspend fun byLabel(imageBytes: ByteArray): ProductInfo? = withContext(Dispatchers.IO) {
-        val key = BuildConfig.INVINTORY_API_KEY
-        if (!key.isConfigured()) return@withContext null
-        val urlStr = "$BASE/wines/actions/scan-image"
-        val started = System.currentTimeMillis()
-        try {
-            val boundary = "----vincent${System.currentTimeMillis()}"
-            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                connectTimeout = 15000
-                readTimeout = 30000
-                setRequestProperty("x-api-key", key)
-                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            }
-            conn.outputStream.use { out ->
-                out.write("--$boundary\r\n".toByteArray())
-                out.write("Content-Disposition: form-data; name=\"image\"; filename=\"label.jpg\"\r\n".toByteArray())
-                out.write("Content-Type: image/jpeg\r\n\r\n".toByteArray())
-                out.write(imageBytes)
-                out.write("\r\n--$boundary--\r\n".toByteArray())
-            }
-            val status = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            if (status !in 200..299) {
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                HttpDebug.log(label = displayName, method = "POST", url = urlStr, statusCode = status, responseBody = err, durationMs = elapsed)
-                return@withContext null
-            }
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            HttpDebug.log(label = displayName, method = "POST", url = urlStr, requestBody = "<image ${imageBytes.size} bytes>", statusCode = status, responseBody = resp, durationMs = elapsed)
-            val root = JSONObject(resp)
-            val year = root.optInt("year", 0).takeIf { it > 0 }?.toString()
-            val results = root.optJSONArray("results") ?: return@withContext null
-            val wine = results.optJSONObject(0)?.optJSONObject("wine") ?: return@withContext null
-            wine.toProductInfo()?.copy(vintage = year)
-        } catch (e: Exception) {
-            HttpDebug.log(label = displayName, method = "POST", url = urlStr, error = "${e.javaClass.simpleName}: ${e.message}")
-            null
-        }
-    }
-
-    private fun get(urlStr: String, key: String): String? {
-        val started = System.currentTimeMillis()
-        return try {
-            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10000
-                readTimeout = 15000
-                setRequestProperty("x-api-key", key)
-                setRequestProperty("Accept", "application/json")
-            }
-            val status = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            if (status !in 200..299) {
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                HttpDebug.log(label = displayName, method = "GET", url = urlStr, statusCode = status, responseBody = err, durationMs = elapsed)
-                return null
-            }
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            HttpDebug.log(label = displayName, method = "GET", url = urlStr, statusCode = status, responseBody = resp, durationMs = elapsed)
-            resp
-        } catch (e: Exception) {
-            HttpDebug.log(label = displayName, method = "GET", url = urlStr, error = "${e.javaClass.simpleName}: ${e.message}")
-            null
-        }
-    }
-
-    private fun JSONObject.toProductInfo(): ProductInfo? {
-        val name = str("name")
-        val producer = str("producer_name")
-        if (name.isEmpty() && producer.isEmpty()) return null
-        return ProductInfo(
-            name = name,
-            brand = producer,
-            country = str("country_name"),
-            category = str("type"),
-            region = str("region_name").takeIf { it.isNotEmpty() },
-            source = displayName,
-        )
-    }
-
-    private fun JSONObject.str(key: String): String {
-        val v = optString(key, "").trim()
-        return if (v == "null") "" else v
-    }
-}
-
-/**
  * grapeminds Public API v1 — wine-specific catalogue (wines, producers, regions)
  * with free-text search and, on Enterprise plans, AI label photo analysis. Auth via
  * an `Authorization: Bearer` token; `Accept-Language` selects the language for region
@@ -450,29 +332,6 @@ private object CellarTrackerProvider : WineDataProvider {
 }
 
 /**
- * X-Wines — embedded open dataset (downloaded on demand, see [XWinesData]). Offers
- * offline text search over wine names/wineries/grapes/regions.
- */
-private object XWinesProvider : WineDataProvider {
-    override val id = "xwines"
-    override val displayName = "X-Wines"
-    override val capabilities = setOf(ProviderCapability.TEXT_SEARCH)
-
-    override suspend fun search(query: String): List<ProductInfo> =
-        XWinesData.search(query).map { w ->
-            ProductInfo(
-                name = w.name,
-                brand = w.winery,
-                country = w.country,
-                category = w.type,
-                grape = w.grapes.takeIf { it.isNotBlank() },
-                region = w.region.takeIf { it.isNotBlank() },
-                source = displayName,
-            )
-        }
-}
-
-/**
  * AI label reader — wraps the Gemini-backed recognizer as a LABEL_SCAN provider so
  * the factory can route label photos uniformly alongside the data sources.
  */
@@ -517,9 +376,7 @@ private fun JSONObject.frontImageUrl(): String? {
 actual fun wineDataProviders(): List<WineDataProvider> = listOf(
     OpenFoodFactsProvider, // free barcode, no key — first
     // GwdbProvider — db.wine disabled for now (kept above for later re-enable)
-    InVintoryProvider,     // text search + label recognition (1.5M labels)
     GrapeMindsProvider,    // text search + AI label analysis (Enterprise) — grapeminds.eu
-    XWinesProvider,        // offline text search
     CellarTrackerProvider, // text search + price
     AiLabelProvider,       // label photo recognition (AI)
 )

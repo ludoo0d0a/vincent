@@ -400,15 +400,6 @@
     <string name="settings_section_app">App</string>
 
     <string name="settings_section_data_sources">Data sources</string>
-    <string name="settings_xwines_title">X-Wines database (offline search)</string>
-    <string name="settings_xwines_download">Download</string>
-    <string name="settings_xwines_update">Update</string>
-    <string name="settings_xwines_downloading">Downloading…</string>
-    <string name="settings_xwines_never">Never downloaded</string>
-    <string name="settings_xwines_count">%d wines available</string>
-    <string name="settings_xwines_updated">Last update: %s</string>
-    <string name="settings_xwines_not_configured">Source not configured</string>
-    <string name="settings_xwines_error">Download failed</string>
 
     <string name="suppliers_title">My suppliers</string>
     <string name="suppliers_subtitle">%d suppliers registered</string>

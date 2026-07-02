@@ -403,15 +403,6 @@
     <string name="settings_section_app">Application</string>
 
     <string name="settings_section_data_sources">Sources de données</string>
-    <string name="settings_xwines_title">Base X-Wines (recherche hors ligne)</string>
-    <string name="settings_xwines_download">Télécharger</string>
-    <string name="settings_xwines_update">Mettre à jour</string>
-    <string name="settings_xwines_downloading">Téléchargement…</string>
-    <string name="settings_xwines_never">Jamais téléchargée</string>
-    <string name="settings_xwines_count">%d vins disponibles</string>
-    <string name="settings_xwines_updated">Dernière mise à jour : %s</string>
-    <string name="settings_xwines_not_configured">Source non configurée</string>
-    <string name="settings_xwines_error">Échec du téléchargement</string>
 
     <string name="suppliers_title">Mes fournisseurs</string>
     <string name="suppliers_subtitle">%d fournisseurs enregistrés</string>
@@ -435,7 +426,6 @@
     <string name="data_management_subtitle">Gérez vos imports, exports et référentiels</string>
     <string name="data_management_section_transfer">Transfert</string>
     <string name="data_management_section_referentials">Référentiels</string>
-    <string name="data_management_section_offline">Données hors ligne</string>
     <string name="data_management_racks">Casiers</string>
     <string name="data_management_racks_subtitle">%d casiers configurés</string>
 
