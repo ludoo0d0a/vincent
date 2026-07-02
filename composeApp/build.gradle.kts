@@ -90,6 +90,11 @@ android {
     namespace = "fr.geoking.vincent"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
+    // deepboof:io (via BoofCV) pulls protobuf-java, which clashes with Firestore's protobuf-javalite.
+    configurations.configureEach {
+        exclude(group = "com.google.protobuf", module = "protobuf-java")
+    }
+
     defaultConfig {
         applicationId = "fr.geoking.vincent"
         minSdk = libs.versions.android.minSdk.get().toInt()
