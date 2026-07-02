@@ -67,6 +67,7 @@ kotlin {
             implementation(libs.androidx.credentials.play.services)
             implementation(libs.google.identity.googleid)
             implementation(libs.firebase.auth)
+            implementation(libs.firebase.firestore)
             implementation(libs.firebase.appcheck)
             implementation(libs.firebase.appcheck.playintegrity)
             implementation(libs.kotlinx.coroutines.play.services)

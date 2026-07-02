@@ -50,6 +50,14 @@ object Cellar {
         }
     }
 
+    /** Reload in-memory state from Room after a cloud merge (keeps photos local). */
+    suspend fun reloadFromRepository() {
+        val r = repo ?: return
+        val persisted = r.loadAll()
+        bottles.clear(); bottles.addAll(persisted)
+        recent.clear(); recent.addAll(persisted.take(6))
+    }
+
     // --- reads (call inside composition to observe changes) ---
 
     fun bottle(id: String): Bottle? = bottles.firstOrNull { it.id == id }
@@ -150,6 +158,9 @@ object Cellar {
 
     private fun persist(b: Bottle) {
         val r = repo ?: return
-        scope.launch { r.upsert(b) }
+        scope.launch {
+            r.upsert(b)
+            cloudSyncPushBottle(b)
+        }
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +41,10 @@ import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.FeatureFlags
 import fr.geoking.vincent.data.Auth
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.CloudSync
+import fr.geoking.vincent.data.cloudSyncRefresh
 import fr.geoking.vincent.getAppVersion
+import fr.geoking.vincent.formatShortDateTime
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.SectionHeader
@@ -113,27 +117,81 @@ fun AccountScreen(
             }
 
             Spacer(Modifier.height(11.dp))
-            if (FeatureFlags.CLOUD_SYNC) {
+            if (FeatureFlags.CLOUD_SYNC && acc != null) {
+                val lastSyncLabel = remember(CloudSync.lastSyncedAt, CloudSync.syncing) {
+                    when {
+                        CloudSync.syncing -> null
+                        CloudSync.lastSyncedAt == null -> "never"
+                        else -> formatShortDateTime(CloudSync.lastSyncedAt!!)
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     VCard(Modifier.weight(1f)) {
                         Column(Modifier.padding(12.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Green, modifier = Modifier.size(12.dp))
+                                if (CloudSync.syncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(12.dp),
+                                        color = VincentColors.Accent,
+                                        strokeWidth = 1.5.dp,
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Green, modifier = Modifier.size(12.dp))
+                                }
                                 Spacer(Modifier.width(5.dp))
                                 Text(stringResource(Res.string.backup), fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
                             }
-                            Text(stringResource(Res.string.up_to_date), fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                            Text(stringResource(Res.string.two_min_ago), fontSize = 10.5.sp, color = VincentColors.Green, fontWeight = FontWeight.W700)
+                            Text(
+                                if (CloudSync.syncing) stringResource(Res.string.sync_in_progress)
+                                else stringResource(Res.string.up_to_date),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.W800,
+                                color = VincentColors.Fg,
+                                modifier = Modifier.padding(top = 5.dp),
+                            )
+                            Text(
+                                when (lastSyncLabel) {
+                                    null -> stringResource(Res.string.sync_in_progress)
+                                    "never" -> stringResource(Res.string.sync_never)
+                                    else -> lastSyncLabel
+                                },
+                                fontSize = 10.5.sp,
+                                color = if (CloudSync.errorMessage != null) VincentColors.Red else VincentColors.Muted,
+                                fontWeight = FontWeight.W600,
+                            )
                         }
                     }
                     VCard(Modifier.weight(1f)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(stringResource(Res.string.cloud_storage), fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
-                            Text("${Cellar.totalBottles()} / 500", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
-                            Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Border)) {
-                                Box(Modifier.fillMaxWidth((Cellar.totalBottles() / 500f).coerceIn(0.02f, 1f)).height(6.dp).clip(RoundedCornerShape(4.dp)).background(VincentColors.Accent))
-                            }
+                            Text(stringResource(Res.string.bottles_label).replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+                            Text("${Cellar.totalBottles()}", fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 5.dp))
+                            Text(
+                                "${Cellar.references()} ${stringResource(Res.string.distinct_wines)}",
+                                fontSize = 10.5.sp,
+                                color = VincentColors.Muted,
+                                fontWeight = FontWeight.W600,
+                            )
+                            Text(
+                                stringResource(Res.string.sync_photos_local),
+                                fontSize = 10.sp,
+                                color = VincentColors.Faint,
+                                fontWeight = FontWeight.W600,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
                         }
+                    }
+                }
+                if (!CloudSync.syncing) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface)
+                            .border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp))
+                            .clickable(onClick = { cloudSyncRefresh() })
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text(stringResource(Res.string.sync_refresh), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
                     }
                 }
             } else {

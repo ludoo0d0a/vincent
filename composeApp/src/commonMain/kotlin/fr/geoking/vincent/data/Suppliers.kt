@@ -19,6 +19,11 @@ object Suppliers {
         all.clear(); all.addAll(persisted)
     }
 
+    suspend fun reloadFromRepository() {
+        val r = repo ?: return
+        all.clear(); all.addAll(r.loadAll())
+    }
+
     fun import(incoming: List<Supplier>): Int {
         incoming.forEach { s ->
             val i = all.indexOfFirst { it.id == s.id }
@@ -30,6 +35,9 @@ object Suppliers {
 
     private fun persist(s: Supplier) {
         val repo = repo ?: return
-        scope.launch { repo.upsert(s) }
+        scope.launch {
+            repo.upsert(s)
+            cloudSyncPushSupplier(s)
+        }
     }
 }

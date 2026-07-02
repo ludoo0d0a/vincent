@@ -14,8 +14,10 @@
     <string name="connected_no_account">Connecté sans compte</string>
     <string name="backup">Sauvegarde</string>
     <string name="up_to_date">À jour</string>
-    <string name="two_min_ago">il y a 2 min</string>
-    <string name="cloud_storage">Stockage cloud</string>
+    <string name="sync_in_progress">Synchronisation…</string>
+    <string name="sync_never">Pas encore synchronisé</string>
+    <string name="sync_photos_local">Photos sur cet appareil</string>
+    <string name="sync_refresh">Synchroniser</string>
     <string name="references">Références</string>
     <string name="distinct_wines">vins distincts</string>
     <string name="last_added">Dernières bouteilles ajoutées</string>

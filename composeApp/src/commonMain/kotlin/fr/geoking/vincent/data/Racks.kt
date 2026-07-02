@@ -31,6 +31,11 @@ object Racks {
         }
     }
 
+    suspend fun reloadFromRepository() {
+        val r = repo ?: return
+        all.clear(); all.addAll(r.loadAll())
+    }
+
     fun update(index: Int, rack: Rack) {
         if (index in all.indices) {
             all[index] = rack
@@ -82,7 +87,10 @@ object Racks {
         if (all.size > 1 && index in all.indices) {
             val removed = all.removeAt(index)
             val r = repo ?: return
-            scope.launch { r.delete(removed.id) }
+            scope.launch {
+                r.delete(removed.id)
+                cloudSyncDeleteRack(removed.id)
+            }
         }
     }
 
@@ -134,6 +142,9 @@ object Racks {
 
     private fun persist(r: Rack) {
         val repo = repo ?: return
-        scope.launch { repo.upsert(r) }
+        scope.launch {
+            repo.upsert(r)
+            cloudSyncPushRack(r)
+        }
     }
 }

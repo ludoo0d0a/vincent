@@ -18,6 +18,7 @@ actual fun bootstrapAuth() {
         InternalLog.i(TAG, "Auth state changed: ${user?.email ?: "signed out"}")
         authScope.launch {
             Auth.account = user?.toGoogleAccount()
+            cloudSyncOnAuthChanged(user?.uid)
         }
     }
 }

@@ -149,12 +149,21 @@ class MainActivity : ComponentActivity() {
         val supplierRepo = RoomSupplierRepository(db.supplierDao())
 
         Settings.init(applicationContext)
+        val syncRepos = CloudSyncRepos(
+            cellar = repository,
+            racks = rackRepo,
+            tastings = tastingRepo,
+            producers = producerRepo,
+            suppliers = supplierRepo,
+        )
+        initCloudSync(applicationContext, syncRepos)
         MainScope().launch {
             Cellar.bootstrap(repository)
             Racks.bootstrap(rackRepo)
             Tastings.bootstrap(tastingRepo)
             Producers.bootstrap(producerRepo)
             Suppliers.bootstrap(supplierRepo)
+            cloudSyncOnReady()
         }
 
         // App Check attests calls to the Gemini proxy Worker. Play Integrity in

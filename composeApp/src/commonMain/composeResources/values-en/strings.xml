@@ -14,8 +14,10 @@
     <string name="connected_no_account">Connected without account</string>
     <string name="backup">Backup</string>
     <string name="up_to_date">Up to date</string>
-    <string name="two_min_ago">2 min ago</string>
-    <string name="cloud_storage">Cloud storage</string>
+    <string name="sync_in_progress">Syncing…</string>
+    <string name="sync_never">Not synced yet</string>
+    <string name="sync_photos_local">Photos on this device</string>
+    <string name="sync_refresh">Sync now</string>
     <string name="references">References</string>
     <string name="distinct_wines">distinct wines</string>
     <string name="last_added">Recently added bottles</string>

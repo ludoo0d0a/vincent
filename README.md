@@ -180,7 +180,12 @@ Keys present in `local.properties` but **not read by the app code** (used by CI/
   on startup it checks Play, shows the update popup, downloads in the background, and
   **auto-completes (restarts) as soon as the download finishes**. Only active for
   Play-installed builds; a no-op in debug/sideload.
-- **Still to wire**: effective cloud sync of the Room data to the account.
+- **Still to wire**: photo sync to cloud storage.
+- **Cloud sync (phase 1, wired).** Signed-in users sync cellar metadata (bottles,
+  racks, tastings, producers, suppliers) to **Firestore** under `users/{uid}/…`.
+  Photos stay on-device only. Merge is last-write-wins per document (`updatedAt`).
+  Deploy rules: `firebase deploy --only firestore:rules --project vincent-499318`
+  (see `firestore.rules`). Enable Firestore in the Firebase console if needed.
 - **Bottles** are drawn vectorially (`ui/WineBottle`) — capsule, body, label — so
   they stay crisp at any size with no bitmap assets. Replaceable with real photos later.
 - **Launcher icon (wired).** The brand PNG `playstore/icon-512.png` (wine glass on a

@@ -19,6 +19,11 @@ object Producers {
         all.clear(); all.addAll(persisted)
     }
 
+    suspend fun reloadFromRepository() {
+        val r = repo ?: return
+        all.clear(); all.addAll(r.loadAll())
+    }
+
     fun import(incoming: List<Producer>): Int {
         incoming.forEach { p ->
             val i = all.indexOfFirst { it.id == p.id }
@@ -30,6 +35,9 @@ object Producers {
 
     private fun persist(p: Producer) {
         val repo = repo ?: return
-        scope.launch { repo.upsert(p) }
+        scope.launch {
+            repo.upsert(p)
+            cloudSyncPushProducer(p)
+        }
     }
 }
