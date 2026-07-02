@@ -40,6 +40,7 @@ import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -172,6 +173,7 @@ fun BottlesScreen(
     onOpenBottle: (Bottle) -> Unit,
     initialFavoritesOnly: Boolean = false,
     onOpenDataManagement: () -> Unit = {},
+    onFiltersVisible: (Boolean) -> Unit = {},
 ) {
     val filterItems = listOf(
         Filter(stringResource(Res.string.bottles_filter_all), null),
@@ -185,6 +187,7 @@ fun BottlesScreen(
     var query by remember { mutableStateOf("") }
     var adv by remember { mutableStateOf(AdvFilters()) }
     var showFilters by remember { mutableStateOf(false) }
+    LaunchedEffect(showFilters) { onFiltersVisible(showFilters) }
     var viewMode by remember { mutableStateOf(BottleViewMode.GRID) }
     var rackIdx by remember { mutableIntStateOf(0) }
 
@@ -626,7 +629,14 @@ private fun AdvancedFilterPanel(
     onApply: (AdvFilters) -> Unit,
     onClose: () -> Unit,
 ) {
+    val predefinedRanges = listOf(
+        0f..5f, 5f..10f, 10f..20f, 20f..50f, 50f..100f, 100f..maxOf(1000f, priceBounds.endInclusive)
+    )
+
     var price by remember { mutableStateOf(initial.price ?: priceBounds) }
+    var showExactPrice by remember {
+        mutableStateOf(initial.price != null && predefinedRanges.none { it.start == initial.price.start && it.endInclusive == initial.price.endInclusive })
+    }
     var selections by remember { mutableStateOf(initial.selections) }
     var picker by remember { mutableStateOf<Crit?>(null) }
 
@@ -660,8 +670,23 @@ private fun AdvancedFilterPanel(
 
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
                 GroupLabel(stringResource(Res.string.search_price_label))
-                PriceRange(priceBounds, price) { price = it }
-                Spacer(Modifier.height(15.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    predefinedRanges.forEach { range ->
+                        val label = if (range.endInclusive > 500f) "> 100 €" else "${range.start.toInt()}–${range.endInclusive.toInt()} €"
+                        val on = !showExactPrice && price.start == range.start && price.endInclusive == range.endInclusive
+                        Chip(label, on) {
+                            showExactPrice = false
+                            price = range
+                        }
+                    }
+                    MoreChip(on = showExactPrice) { showExactPrice = !showExactPrice }
+                }
+
+                if (showExactPrice) {
+                    Spacer(Modifier.height(12.dp))
+                    PriceRange(priceBounds, price) { price = it }
+                }
+                Spacer(Modifier.height(20.dp))
 
                 Crit.entries.forEach { crit ->
                     CritSection(
@@ -717,7 +742,7 @@ private fun CritSection(crit: Crit, selected: Set<String>, onToggle: (String) ->
     (shown + "…").chunked(3).forEach { row ->
         Row(Modifier.padding(bottom = 7.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             row.forEach { item ->
-                if (item == "…") MoreChip(onMore) else Chip(item, item in selected) { onToggle(item) }
+                if (item == "…") MoreChip(on = false, onClick = onMore) else Chip(item, item in selected) { onToggle(item) }
             }
         }
     }
@@ -737,15 +762,15 @@ private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun MoreChip(onClick: () -> Unit) {
+private fun MoreChip(on: Boolean = false, onClick: () -> Unit) {
     Box(
         Modifier.clip(RoundedCornerShape(20.dp))
-            .background(VincentColors.AccentSoft)
-            .border(1.dp, VincentColors.Accent, RoundedCornerShape(20.dp))
+            .background(if (on) VincentColors.Fg else VincentColors.AccentSoft)
+            .border(1.dp, if (on) VincentColors.Fg else VincentColors.Accent, RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 13.dp, vertical = 6.dp),
     ) {
-        Text("…", fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
+        Text("…", fontSize = 13.sp, fontWeight = FontWeight.W800, color = if (on) Color.White else VincentColors.Accent)
     }
 }
 

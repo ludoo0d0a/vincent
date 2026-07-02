@@ -98,11 +98,6 @@ import fr.geoking.vincent.ui.rackYearOf
 /** A range filter applied to the rack (dims non-matching cells). */
 private data class RackFilter(val label: String, val test: (RackCell) -> Boolean)
 
-private sealed interface RackImportStatus {
-    data class Success(val count: Int) : RackImportStatus
-    data object WrongType : RackImportStatus
-}
-
 private val rackFilters = listOf(
     RackFilter("≤ 2015") { (rackYearOf(it) ?: Int.MAX_VALUE) <= 2015 },
     RackFilter("2016–19") { rackYearOf(it)?.let { y -> y in 2016..2019 } == true },

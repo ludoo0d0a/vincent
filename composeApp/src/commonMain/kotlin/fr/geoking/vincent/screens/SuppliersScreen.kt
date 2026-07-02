@@ -3,6 +3,7 @@ package fr.geoking.vincent.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -98,7 +100,6 @@ fun SuppliersScreen(onBack: () -> Unit) {
                     onClick = exportCsv,
                     modifier = Modifier.weight(1f).height(46.dp),
                     shape = RoundedCornerShape(13.dp),
-                    border = border(1.dp, VincentColors.Accent, RoundedCornerShape(13.dp))
                 ) {
                     Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp), tint = VincentColors.Accent)
                     Spacer(Modifier.width(8.dp))
