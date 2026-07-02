@@ -172,6 +172,7 @@ fun BottlesScreen(
     modifier: Modifier = Modifier,
     onOpenBottle: (Bottle) -> Unit,
     initialFavoritesOnly: Boolean = false,
+    onOpenDataManagement: () -> Unit = {},
     onFiltersVisible: (Boolean) -> Unit = {},
 ) {
     val filterItems = listOf(
@@ -212,16 +213,6 @@ fun BottlesScreen(
     val priceMaxRaw = (prices.maxOrNull() ?: 100).toFloat()
     val priceBounds = priceMin..(if (priceMaxRaw > priceMin) priceMaxRaw else priceMin + 1f)
 
-    var importStatus by remember { mutableStateOf<BottleImportStatus?>(null) }
-    val importCsv = rememberCsvImport { text ->
-        val result = CsvFormat.parse(text)
-        importStatus = if (result.type == CsvFormat.ImportType.BOTTLES) {
-            val n = Cellar.importBottles(result.bottles)
-            if (n > 0) BottleImportStatus.Success(n, result.source) else BottleImportStatus.None
-        } else {
-            BottleImportStatus.WrongType
-        }
-    }
 
     // Removable summary chips for every active advanced criterion.
     val activeChips: List<Pair<String, () -> Unit>> = buildList {
@@ -251,25 +242,13 @@ fun BottlesScreen(
                         ) { Icon(Icons.Filled.Favorite, contentDescription = stringResource(Res.string.my_favorites), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
 
                         Box(
-                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { onOpenDataManagement() },
                             contentAlignment = Alignment.Center,
                         ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
                     }
                 },
             )
             Column(Modifier.padding(horizontal = 16.dp)) {
-                when (val status = importStatus) {
-                    is BottleImportStatus.Success -> Box(
-                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                    ) { Text(pluralStringResource(Res.plurals.transfer_import_success, status.count, status.count, "", status.source), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                    BottleImportStatus.None -> Box(
-                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                    ) { Text(stringResource(Res.string.transfer_import_none), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                    BottleImportStatus.WrongType -> Box(
-                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                    ) { Text(stringResource(Res.string.bottles_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                    null -> Unit
-                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                     Box(Modifier.weight(1f)) {
                         SearchField(

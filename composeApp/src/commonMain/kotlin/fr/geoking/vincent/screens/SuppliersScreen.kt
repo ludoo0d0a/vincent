@@ -3,6 +3,7 @@ package fr.geoking.vincent.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +42,7 @@ import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.Suppliers
+import fr.geoking.vincent.data.rememberCsvExport
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.model.Supplier
 import fr.geoking.vincent.theme.VincentColors
@@ -53,6 +56,7 @@ private sealed interface SupplierImportStatus {
 @Composable
 fun SuppliersScreen(onBack: () -> Unit) {
     var importStatus by remember { mutableStateOf<SupplierImportStatus?>(null) }
+    var exportOk by remember { mutableStateOf<Boolean?>(null) }
 
     val importCsv = rememberCsvImport { text ->
         val result = CsvFormat.parse(text)
@@ -61,6 +65,10 @@ fun SuppliersScreen(onBack: () -> Unit) {
         } else {
             SupplierImportStatus.WrongType
         }
+    }
+
+    val exportCsv = rememberCsvExport("vincent-fournisseurs.csv", { CsvFormat.suppliersToCsv(Suppliers.all.toList()) }) { ok ->
+        exportOk = ok
     }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
@@ -77,15 +85,26 @@ fun SuppliersScreen(onBack: () -> Unit) {
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
-            Button(
-                onClick = importCsv,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).height(46.dp),
-                shape = RoundedCornerShape(13.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
-            ) {
-                Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(Res.string.suppliers_import_button), fontWeight = FontWeight.W700)
+            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = importCsv,
+                    modifier = Modifier.weight(1f).height(46.dp),
+                    shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+                ) {
+                    Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(Res.string.import_action), fontWeight = FontWeight.W700)
+                }
+                OutlinedButton(
+                    onClick = exportCsv,
+                    modifier = Modifier.weight(1f).height(46.dp),
+                    shape = RoundedCornerShape(13.dp),
+                ) {
+                    Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp), tint = VincentColors.Accent)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(Res.string.export_suppliers_button), fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                }
             }
 
             when (val status = importStatus) {

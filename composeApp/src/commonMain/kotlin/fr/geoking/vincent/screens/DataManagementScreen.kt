@@ -38,7 +38,8 @@ import fr.geoking.vincent.ui.SectionHeader
 @Composable
 fun DataManagementScreen(
     onBack: () -> Unit,
-    onOpenImportExport: () -> Unit,
+    onOpenWines: () -> Unit,
+    onOpenRacks: () -> Unit,
     onOpenTastings: () -> Unit,
     onOpenProducers: () -> Unit,
     onOpenSuppliers: () -> Unit,
@@ -57,19 +58,21 @@ fun DataManagementScreen(
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
-            SectionHeader(stringResource(Res.string.data_management_section_transfer))
-            DataLink(stringResource(Res.string.transfer_title), onOpenImportExport)
-
-            SectionHeader(stringResource(Res.string.data_management_section_referentials))
+            SectionHeader(stringResource(Res.string.data_management_section_data))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                DataLink(stringResource(Res.string.ploc_tastings), onOpenTastings)
-                DataLink(stringResource(Res.string.ploc_producers), onOpenProducers)
-                DataLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
+                DataLink(
+                    label = stringResource(Res.string.data_management_wines),
+                    sublabel = stringResource(Res.string.data_management_wines_subtitle, fr.geoking.vincent.data.Cellar.totalBottles()),
+                    onClick = onOpenWines
+                )
                 DataLink(
                     label = stringResource(Res.string.data_management_racks),
                     sublabel = stringResource(Res.string.data_management_racks_subtitle, Racks.all.size),
-                    onClick = {} // Currently managed in Cellar screen, but we keep the placeholder
+                    onClick = onOpenRacks
                 )
+                DataLink(stringResource(Res.string.ploc_tastings), onOpenTastings)
+                DataLink(stringResource(Res.string.ploc_producers), onOpenProducers)
+                DataLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
             }
 
             Spacer(Modifier.height(24.dp))
