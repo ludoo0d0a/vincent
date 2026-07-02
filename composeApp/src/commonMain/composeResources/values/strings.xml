@@ -428,8 +428,30 @@
     <string name="data_management_subtitle">Gérez vos imports, exports et référentiels</string>
     <string name="data_management_section_transfer">Transfert</string>
     <string name="data_management_section_referentials">Référentiels</string>
+    <string name="data_management_section_data">Données</string>
+    <string name="data_management_wines">Vins</string>
+    <string name="data_management_wines_subtitle">%d bouteilles en cave</string>
     <string name="data_management_racks">Casiers</string>
     <string name="data_management_racks_subtitle">%d casiers configurés</string>
+
+    <string name="wines_management_title">Gestion des vins</string>
+    <string name="wines_management_subtitle">Importez et exportez votre liste de bouteilles</string>
+    <string name="wines_management_import_title">Importer des vins</string>
+    <string name="wines_management_import_desc">Sélectionnez la source de votre fichier CSV pour importer vos bouteilles.</string>
+
+    <string name="racks_management_title">Gestion des casiers</string>
+    <string name="racks_management_subtitle">Configurez vos casiers par import CSV</string>
+
+    <string name="import_vivino">Vivino</string>
+    <string name="import_cellartracker">CellarTracker</string>
+    <string name="import_ploc">PLOC</string>
+    <string name="import_vincent">Vincent</string>
+
+    <string name="export_wines_button">Exporter les vins en CSV</string>
+    <string name="export_racks_button">Exporter les casiers en CSV</string>
+    <string name="export_tastings_button">Exporter les dégustations en CSV</string>
+    <string name="export_producers_button">Exporter les producteurs en CSV</string>
+    <string name="export_suppliers_button">Exporter les fournisseurs en CSV</string>
 
     <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.</string>
     <string name="ai_error_sign_in">Connectez-vous pour utiliser l'IA.</string>

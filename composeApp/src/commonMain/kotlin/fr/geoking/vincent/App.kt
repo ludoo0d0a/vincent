@@ -53,7 +53,8 @@ import fr.geoking.vincent.screens.BottleDetailScreen
 import fr.geoking.vincent.screens.BottlesScreen
 import fr.geoking.vincent.screens.CellarScreen
 import fr.geoking.vincent.screens.DashboardScreen
-import fr.geoking.vincent.screens.ImportExportScreen
+import fr.geoking.vincent.screens.WinesManagementScreen
+import fr.geoking.vincent.screens.RacksManagementScreen
 import fr.geoking.vincent.screens.LogcatScreen
 import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
@@ -84,7 +85,8 @@ private sealed interface Dest {
     data object Settings : Dest
     data object DataManagement : Dest
     data object Recent : Dest
-    data object Transfer : Dest
+    data object WinesManagement : Dest
+    data object RacksManagement : Dest
     data object Tastings : Dest
     data object Producers : Dest
     data object Suppliers : Dest
@@ -143,6 +145,7 @@ fun App() = VincentTheme {
                     onAdd = { stack.add(Dest.Add()) },
                     onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
+                    onOpenDataManagement = { stack.add(Dest.DataManagement) },
                     onOpenAr = { stack.add(Dest.Ar(it)) },
                     onEditRack = { stack.add(Dest.RackEdit(it)) },
                 )
@@ -179,13 +182,15 @@ fun App() = VincentTheme {
 
                 Dest.DataManagement -> DataManagementScreen(
                     onBack = ::pop,
-                    onOpenImportExport = { stack.add(Dest.Transfer) },
+                    onOpenWines = { stack.add(Dest.WinesManagement) },
+                    onOpenRacks = { stack.add(Dest.RacksManagement) },
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
                 )
 
-                Dest.Transfer -> ImportExportScreen(onBack = ::pop)
+                Dest.WinesManagement -> WinesManagementScreen(onBack = ::pop)
+                Dest.RacksManagement -> RacksManagementScreen(onBack = ::pop)
 
                 Dest.Tastings -> TastingsScreen(onBack = ::pop)
                 Dest.Producers -> ProducersScreen(onBack = ::pop)
@@ -282,6 +287,7 @@ private fun MainScaffold(
     onAdd: () -> Unit,
     onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
+    onOpenDataManagement: () -> Unit,
     onOpenAr: (Int) -> Unit,
     onEditRack: (Int) -> Unit,
 ) {
@@ -331,9 +337,15 @@ private fun MainScaffold(
                 onOpenBottle = onOpenBottle,
                 onAddToCell = onAddToCell,
                 onOpenAr = onOpenAr,
-                onEditRack = onEditRack
+                onEditRack = onEditRack,
+                onOpenDataManagement = onOpenDataManagement
             )
-            Tab.BOTTLES -> BottlesScreen(content, onOpenBottle = onOpenBottle, initialFavoritesOnly = bottlesFavOnly)
+            Tab.BOTTLES -> BottlesScreen(
+                content,
+                onOpenBottle = onOpenBottle,
+                initialFavoritesOnly = bottlesFavOnly,
+                onOpenDataManagement = onOpenDataManagement
+            )
         }
     }
 }

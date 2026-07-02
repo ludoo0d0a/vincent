@@ -25,7 +25,7 @@ object CsvFormat {
         "appellation" to listOf("appellation", "wine name", "wine", "cuvée", "cuvee", "vin"),
         "color" to listOf("color", "colour", "couleur", "wine type", "type"),
         "vintage" to listOf("vintage", "millésime", "millesime", "année", "annee", "year"),
-        "price" to listOf("price", "prix", "prix d'achat", "purchase price"),
+        "price" to listOf("price", "prix", "prix d'achat", "purchase price", "price paid"),
         "quantity" to listOf("quantity", "quantité", "quantite", "qty", "stock", "bottles", "nombre"),
         "rating" to listOf("rating", "note", "your rating", "score", "ma note"),
         "cellarSpot" to listOf("cellarspot", "casier", "emplacement", "location", "bin", "rangement"),
@@ -37,8 +37,8 @@ object CsvFormat {
         "category" to listOf("category", "catégorie", "categorie"),
         "favorite" to listOf("favorite", "favori", "favourite"),
         "pairings" to listOf("pairings", "accords", "accords mets-vin"),
-        "drinkFrom" to listOf("drinkfrom", "apogée début", "drink from"),
-        "drinkTo" to listOf("drinkto", "apogée fin", "drink to", "à boire avant"),
+        "drinkFrom" to listOf("drinkfrom", "apogée début", "drink from", "begin consume"),
+        "drinkTo" to listOf("drinkto", "apogée fin", "drink to", "à boire avant", "end consume"),
         "drinkNow" to listOf("drinknow"),
         "tastingNotes" to listOf("tastingnotes", "notes", "tasting notes", "commentaire"),
         "source" to listOf("source"),
@@ -78,6 +78,43 @@ object CsvFormat {
                 b.pairings.joinToString(";"), b.drinkFrom.toString(), b.drinkTo.toString(),
                 b.drinkNow.toString(), b.tastingNotes, b.source.name, b.addedLabel,
             )
+            appendLine(row.joinToString(",") { esc(it) })
+        }
+    }
+
+    fun racksToCsv(racks: List<Rack>): String = buildString {
+        appendLine(listOf("name", "cols", "rows", "staggered", "staggerOffset", "format").joinToString(",") { esc(it) })
+        racks.forEach { r ->
+            val row = listOf(
+                r.name, r.cols.toString(), r.rows.toString(), r.staggered.toString(),
+                r.staggerOffset.toString(), r.format.name
+            )
+            appendLine(row.joinToString(",") { esc(it) })
+        }
+    }
+
+    fun tastingsToCsv(tastings: List<Tasting>): String = buildString {
+        appendLine(listOf("wineName", "date", "rating", "notes", "color", "vintage").joinToString(",") { esc(it) })
+        tastings.forEach { t ->
+            val row = listOf(
+                t.wineName, t.date, t.rating.toString(), t.notes, t.color?.name ?: "", t.vintage ?: ""
+            )
+            appendLine(row.joinToString(",") { esc(it) })
+        }
+    }
+
+    fun producersToCsv(producers: List<Producer>): String = buildString {
+        appendLine(listOf("name", "region", "country", "website", "email", "phone").joinToString(",") { esc(it) })
+        producers.forEach { p ->
+            val row = listOf(p.name, p.region, p.country, p.website, p.email, p.phone)
+            appendLine(row.joinToString(",") { esc(it) })
+        }
+    }
+
+    fun suppliersToCsv(suppliers: List<Supplier>): String = buildString {
+        appendLine(listOf("name", "type", "website", "email", "phone").joinToString(",") { esc(it) })
+        suppliers.forEach { s ->
+            val row = listOf(s.name, s.type, s.website, s.email, s.phone)
             appendLine(row.joinToString(",") { esc(it) })
         }
     }
@@ -122,6 +159,7 @@ object CsvFormat {
         "id" in header && "domain" in header && "color" in header -> "Vincent"
         header.any { it == "winery" } || header.any { it == "wine name" } -> "Vivino"
         "nom" in header && (header.any { it == "couleur" } || header.any { it == "millésime" } || header.any { it == "date dégustation" }) -> "PLOC"
+        header.any { it == "bin" } || header.any { it == "begin consume" } || header.any { it == "valuation" } -> "CellarTracker"
         else -> "CSV générique"
     }
 

@@ -121,6 +121,7 @@ fun CellarScreen(
     onAddToCell: (RackPlacement) -> Unit = {},
     onOpenAr: (Int) -> Unit = {},
     onEditRack: (Int) -> Unit = {},
+    onOpenDataManagement: () -> Unit = {},
 ) {
     val rack = Racks.all[rackIdx.coerceIn(0, Racks.all.lastIndex)]
     var mode by remember { mutableStateOf(RackMode.VINTAGE) }
@@ -193,16 +194,6 @@ fun CellarScreen(
         }
     }
 
-    var rackImportStatus by remember { mutableStateOf<RackImportStatus?>(null) }
-    val importCsv = rememberCsvImport { text ->
-        val result = CsvFormat.parse(text)
-        rackImportStatus = if (result.type == CsvFormat.ImportType.RACKS) {
-            result.racks.forEach { Racks.add(it) }
-            RackImportStatus.Success(result.racks.size)
-        } else {
-            RackImportStatus.WrongType
-        }
-    }
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -218,7 +209,7 @@ fun CellarScreen(
                             ) { Icon(Icons.Filled.ViewInAr, contentDescription = stringResource(Res.string.ar_open), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
                         }
                         Box(
-                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { importCsv() },
+                            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable { onOpenDataManagement() },
                             contentAlignment = Alignment.Center,
                         ) { Icon(Icons.Filled.FileUpload, contentDescription = stringResource(Res.string.import_action), modifier = Modifier.size(18.dp), tint = VincentColors.Accent) }
                     }
@@ -226,15 +217,6 @@ fun CellarScreen(
             )
 
             Column(Modifier.padding(horizontal = 16.dp)) {
-                when (val status = rackImportStatus) {
-                    is RackImportStatus.Success -> Box(
-                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                    ) { Text(pluralStringResource(Res.plurals.cellar_import_success, status.count, status.count), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                    RackImportStatus.WrongType -> Box(
-                        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.AccentSoft).padding(13.dp),
-                    ) { Text(stringResource(Res.string.cellar_import_wrong_type), fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep) }
-                    null -> Unit
-                }
                 CellarTabs(
                     names = Racks.all.map { it.name },
                     selected = rackIdx,
