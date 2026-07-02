@@ -1,5 +1,6 @@
 rules_version = '2';
-// Deploy: firebase deploy --only firestore:rules --project vincent-499318
+// Deploy from repo root: firebase deploy --only firestore:rules
+// (requires firebase.json + .firebaserc; project default: vincent-499318)
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId}/{document=**} {

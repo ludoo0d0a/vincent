@@ -65,6 +65,10 @@ composeApp/src/
     └── screens/            # the 9 screens
 ```
 
+**Repo root (Firebase CLI):** `firebase.json` (points to `firestore.rules`),
+`.firebaserc` (default project `vincent-499318`). Deploy rules with
+`firebase deploy --only firestore:rules` from the repo root.
+
 ## Wine data providers
 
 All providers implement `WineDataProvider` (`commonMain/.../data/ProductLookup.kt`).
@@ -181,11 +185,20 @@ Keys present in `local.properties` but **not read by the app code** (used by CI/
   **auto-completes (restarts) as soon as the download finishes**. Only active for
   Play-installed builds; a no-op in debug/sideload.
 - **Still to wire**: photo sync to cloud storage.
-- **Cloud sync (phase 1, wired).** Signed-in users sync cellar metadata (bottles,
-  racks, tastings, producers, suppliers) to **Firestore** under `users/{uid}/…`.
-  Photos stay on-device only. Merge is last-write-wins per document (`updatedAt`).
-  Deploy rules: `firebase deploy --only firestore:rules --project vincent-499318`
-  (see `firestore.rules`). Enable Firestore in the Firebase console if needed.
+- **Cloud sync (phase 1, wired).** Signed-in Google users sync cellar **metadata**
+  (bottles, racks, tastings, producers, suppliers) to **Firestore** under
+  `users/{uid}/…` via `data/CloudSync.kt` + `data/CloudSync.android.kt`.
+  Bottle photos and rack AR reference images stay **on-device only**; merge is
+  last-write-wins per document (`updatedAt`). Guest mode stays local-only.
+  Flag: `FeatureFlags.CLOUD_SYNC` (account screen: backup status + “Sync now”).
+  **Firestore setup** (once per project):
+  1. Enable **Firestore** (Native mode) in the [Firebase console](https://console.firebase.google.com/project/vincent-499318/firestore).
+  2. From the repo root (`firebase.json` + `.firebaserc` → project `vincent-499318`):
+     ```bash
+     firebase login
+     firebase deploy --only firestore:rules
+     ```
+     Rules live in `firestore.rules` (each user can only read/write `users/{uid}/…`).
 - **Bottles** are drawn vectorially (`ui/WineBottle`) — capsule, body, label — so
   they stay crisp at any size with no bitmap assets. Replaceable with real photos later.
 - **Launcher icon (wired).** The brand PNG `playstore/icon-512.png` (wine glass on a
@@ -211,6 +224,7 @@ Edit the JSON once; scripts and docs stay in sync.
 | Play — Intégrité / SHA-1 app signing | [keymanagement](https://play.google.com/console/u/0/developers/8648842673731499425/app/4975982411132001122/keymanagement) |
 | Firebase Auth → Google | [authentication/providers](https://console.firebase.google.com/project/vincent-499318/authentication/providers) |
 | Firebase Auth → Users | [authentication/users](https://console.firebase.google.com/project/vincent-499318/authentication/users) |
+| Firestore (data + rules) | [firestore](https://console.firebase.google.com/project/vincent-499318/firestore) |
 | GCP OAuth credentials | [apis/credentials](https://console.cloud.google.com/apis/credentials?project=vincent-499318) |
 
 Package Android : `fr.geoking.vincent` · Play developer `8648842673731499425` ·
