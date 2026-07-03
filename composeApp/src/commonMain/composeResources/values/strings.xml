@@ -52,6 +52,10 @@
     <string name="color_white">Blanc</string>
     <string name="color_rose">Rosé</string>
     <string name="color_sparkling">Pétillant</string>
+
+    <string name="sugar_sec">Sec</string>
+    <string name="sugar_demi_sec">Demi-sec</string>
+    <string name="sugar_moelleux">Moelleux</string>
     <string name="filter">Filtrer</string>
     <string name="refine_search">Affinez votre recherche</string>
     <string name="reset">Réinitialiser</string>
@@ -122,6 +126,8 @@
     <string name="detail_drink_peak">Apogée — à boire</string>
     <string name="detail_source_purchase">Provenance &amp; achat</string>
     <string name="detail_source_label">Provenance</string>
+    <string name="detail_alcohol_label">Alcool</string>
+    <string name="detail_sugar_label">Sucre</string>
     <string name="detail_merchant_label">Caviste</string>
     <string name="detail_purchase_date_label">Acheté le</string>
     <string name="detail_occasion_label">Occasion</string>
@@ -312,6 +318,8 @@
     <string name="add_field_appellation_label">Appellation</string>
     <string name="add_field_color">Couleur</string>
     <string name="add_field_category">Provenance</string>
+    <string name="add_field_alcohol">Alcool (%)</string>
+    <string name="add_field_sugar">Taux de sucre</string>
     <string name="add_field_vintage_label">Millésime</string>
     <string name="add_field_price_label">Prix (€)</string>
     <string name="add_placement_optional">Emplacement (optionnel)</string>

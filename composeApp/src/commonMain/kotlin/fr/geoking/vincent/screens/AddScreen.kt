@@ -435,6 +435,9 @@ private data class ManualSeed(
     val category: WineCategory = WineCategory.BORDEAUX,
     val vintage: String = "",
     val price: String = "",
+    val alcohol: String = "",
+    val sugar: fr.geoking.vincent.model.SugarLevel = fr.geoking.vincent.model.SugarLevel.SEC,
+    val grapes: List<String> = emptyList(),
     val spot: String = "",
     val placeRack: Int? = null,
     val placeCell: Int? = null,
@@ -450,6 +453,9 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     var category by remember { mutableStateOf(WineCategory.BORDEAUX) }
     var vintage by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
+    var alcohol by remember { mutableStateOf("") }
+    var sugar by remember { mutableStateOf(fr.geoking.vincent.model.SugarLevel.SEC) }
+    var grapes by remember { mutableStateOf<List<String>>(emptyList()) }
     var qty by remember { mutableStateOf("1") }
     var spot by remember(seed) { mutableStateOf(seed?.spot.orEmpty()) }
     var placeRack by remember(seed) { mutableStateOf(seed?.placeRack) }
@@ -477,7 +483,11 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         s.category?.let { category = it }
         if (s.vintage.isNotBlank()) vintage = s.vintage
         s.price?.let { price = it.toString() }
-        s.bottle?.let { b -> photos = BottlePhotoKind.entries.associateWith { b.photo(it) } }
+        s.bottle?.let { b ->
+            photos = BottlePhotoKind.entries.associateWith { b.photo(it) }
+            alcohol = if (b.alcoholLevel > 0.0) b.alcoholLevel.toString() else ""
+            sugar = b.sugarLevel
+        }
         // Catalogue pick: pull drink window + tasting notes in the background (best-effort).
         val extId = s.externalId
         if (extId != null) scope.launch { enrichment = WineDataSource.enrich(s.externalSource, extId) }
@@ -488,6 +498,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         seed?.let {
             domain = it.domain; appellation = it.appellation; color = it.color; category = it.category
             vintage = it.vintage; price = it.price
+            alcohol = it.alcohol; sugar = it.sugar; grapes = it.grapes
             if (it.imageUrl != null) photos = photos + (BottlePhotoKind.LABEL to it.imageUrl)
             if (it.spot.isNotBlank()) spot = it.spot
             if (it.placeRack != null && it.placeCell != null) {
@@ -525,7 +536,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         }
     }
 
-    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos, enrichment, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
+    LaunchedEffect(domain, appellation, color, category, vintage, price, alcohol, sugar, grapes, qty, spot, placeRack, placeCell, photos, enrichment, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
         val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
         // grapeminds enrichment: turn ageing offsets into absolute years (needs a numeric vintage)
         // and fold tasting notes + pairing prose into the free-text notes field.
@@ -552,6 +563,8 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
                 price = price.filter { it.isDigit() }.toIntOrNull() ?: 0,
                 quantity = qty.filter { it.isDigit() }.toIntOrNull()?.coerceAtLeast(1) ?: 1,
                 rating = 0.0,
+                alcoholLevel = alcohol.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                sugarLevel = sugar,
                 cellarSpot = spot.trim().uppercase().ifBlank { "—" },
                 provenance = "",
                 merchant = "—",
@@ -562,7 +575,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
                 tastingNotes = enr?.tastingNotes.orEmpty(),
                 description = enr?.description.orEmpty(),
                 pairingNotes = enr?.pairingText.orEmpty(),
-                grapes = enr?.grapes ?: emptyList(),
+                grapes = enr?.grapes ?: grapes,
                 flavorProfile = enr?.flavorProfile,
                 maturity = maturityText,
                 source = AddSource.MANUAL,
@@ -606,7 +619,11 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
             Field(stringResource(Res.string.add_field_vintage_label), vintage, Modifier.weight(1f), numeric = true) { vintage = it }
             Field(stringResource(Res.string.add_field_price_label), price, Modifier.weight(1f), numeric = true) { price = it }
         }
-        Field(stringResource(Res.string.add_field_quantity), qty, numeric = true) { qty = it }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Field(stringResource(Res.string.add_field_alcohol), alcohol, Modifier.weight(1f), numeric = true) { alcohol = it }
+            Field(stringResource(Res.string.add_field_quantity), qty, Modifier.weight(1f), numeric = true) { qty = it }
+        }
+        ChipRow(stringResource(Res.string.add_field_sugar), fr.geoking.vincent.model.SugarLevel.entries, sugar, { stringResource(it.label) }) { sugar = it }
         PlacementSection(
             placeRack = placeRack,
             placeCell = placeCell,
@@ -1044,7 +1061,7 @@ private fun ScanPane(
 private data class VoiceChatMsg(val fromUser: Boolean, val text: String)
 
 /** Editable fields surfaced on the voice summary. */
-private enum class VoiceField { DOMAIN, APPELLATION, COLOR, VINTAGE, PRICE }
+private enum class VoiceField { DOMAIN, APPELLATION, COLOR, VINTAGE, PRICE, ALCOHOL, SUGAR }
 
 @Composable
 private fun VoicePane(
@@ -1121,6 +1138,8 @@ private fun VoiceSummary(
         VoiceField.COLOR -> false
         VoiceField.VINTAGE -> parsed.vintage.isBlank() || parsed.vintage == "NM"
         VoiceField.PRICE -> effectivePrice <= 0
+        VoiceField.ALCOHOL -> parsed.alcoholLevel <= 0.0
+        VoiceField.SUGAR -> false
     }
     val anyMissing = VoiceField.entries.any { missing(it) }
 
@@ -1209,6 +1228,37 @@ private fun VoiceSummary(
             InlineEditField(effectivePrice.takeIf { it > 0 }?.toString().orEmpty(), numeric = true) {
                 onPriceChange(it.filter { c -> c.isDigit() }.toIntOrNull() ?: 0)
             }
+        }
+        SummaryRow(
+            label = stringResource(Res.string.add_field_alcohol),
+            value = if (parsed.alcoholLevel > 0.0) "${parsed.alcoholLevel} %" else "",
+            missing = missing(VoiceField.ALCOHOL),
+            editing = editing == VoiceField.ALCOHOL,
+            onToggle = { toggle(VoiceField.ALCOHOL) },
+        ) {
+            InlineEditField(parsed.alcoholLevel.takeIf { it > 0.0 }?.toString().orEmpty(), numeric = true) {
+                onBottleChange(parsed.copy(alcoholLevel = it.replace(',', '.').toDoubleOrNull() ?: 0.0))
+            }
+        }
+        SummaryRow(
+            label = stringResource(Res.string.add_field_sugar),
+            valueContent = { Text(stringResource(parsed.sugarLevel.label), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg) },
+            missing = false,
+            editing = editing == VoiceField.SUGAR,
+            onToggle = { toggle(VoiceField.SUGAR) },
+        ) {
+            ChipRow("", fr.geoking.vincent.model.SugarLevel.entries, parsed.sugarLevel, { stringResource(it.label) }) {
+                onBottleChange(parsed.copy(sugarLevel = it)); editing = null
+            }
+        }
+        if (parsed.grapes.isNotEmpty()) {
+            SummaryRow(
+                label = stringResource(Res.string.detail_grapes),
+                value = parsed.grapes.joinToString(", "),
+                missing = false,
+                editing = false,
+                onToggle = {},
+            ) {}
         }
     }
 }
