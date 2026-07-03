@@ -43,6 +43,7 @@ fun DataManagementScreen(
     onOpenTastings: () -> Unit,
     onOpenProducers: () -> Unit,
     onOpenSuppliers: () -> Unit,
+    onOpenExternalImport: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -58,6 +59,13 @@ fun DataManagementScreen(
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
+            SectionHeader(stringResource(Res.string.data_management_section_transfer))
+            DataLink(
+                label = stringResource(Res.string.external_import_title),
+                sublabel = stringResource(Res.string.external_import_subtitle),
+                onClick = onOpenExternalImport
+            )
+
             SectionHeader(stringResource(Res.string.data_management_section_data))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 DataLink(

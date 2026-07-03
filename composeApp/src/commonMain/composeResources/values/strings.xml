@@ -52,6 +52,10 @@
     <string name="color_white">Blanc</string>
     <string name="color_rose">Rosé</string>
     <string name="color_sparkling">Pétillant</string>
+
+    <string name="sugar_sec">Sec</string>
+    <string name="sugar_demi_sec">Demi-sec</string>
+    <string name="sugar_moelleux">Moelleux</string>
     <string name="filter">Filtrer</string>
     <string name="refine_search">Affinez votre recherche</string>
     <string name="reset">Réinitialiser</string>
@@ -122,6 +126,8 @@
     <string name="detail_drink_peak">Apogée — à boire</string>
     <string name="detail_source_purchase">Provenance &amp; achat</string>
     <string name="detail_source_label">Provenance</string>
+    <string name="detail_alcohol_label">Alcool</string>
+    <string name="detail_sugar_label">Sucre</string>
     <string name="detail_merchant_label">Caviste</string>
     <string name="detail_purchase_date_label">Acheté le</string>
     <string name="detail_occasion_label">Occasion</string>
@@ -132,6 +138,13 @@
     <string name="detail_identified_ai">IDENTIFIÉ PAR L'IA</string>
     <string name="detail_stars_count">%s/5</string>
     <string name="detail_no_notes">Aucune note pour le moment.</string>
+    <string name="detail_tasting_add">Ajouter une dégustation</string>
+    <string name="detail_tasting_date">Date</string>
+    <string name="detail_tasting_place">Lieu</string>
+    <string name="detail_tasting_notes">Commentaire</string>
+    <string name="detail_tasting_save">Enregistrer</string>
+    <string name="detail_tasting_title">Dégustation</string>
+    <string name="detail_price_auto">Auto</string>
 
     <string name="bottles_title">Mes bouteilles</string>
     <plurals name="bottles_subtitle_format">
@@ -306,6 +319,8 @@
     <string name="add_field_color">Couleur</string>
     <string name="add_field_category">Provenance</string>
     <string name="add_field_aging_potential">Potentiel de garde (années)</string>
+    <string name="add_field_alcohol">Alcool (%)</string>
+    <string name="add_field_sugar">Taux de sucre</string>
     <string name="add_field_vintage_label">Millésime</string>
     <string name="add_field_price_label">Prix (€)</string>
     <string name="add_placement_optional">Emplacement (optionnel)</string>
@@ -440,6 +455,15 @@
     <string name="wines_management_subtitle">Importez et exportez votre liste de bouteilles</string>
     <string name="wines_management_import_title">Importer des vins</string>
     <string name="wines_management_import_desc">Sélectionnez la source de votre fichier CSV pour importer vos bouteilles.</string>
+
+    <string name="external_import_title">Import externe</string>
+    <string name="external_import_subtitle">Récupérez des données depuis Grapeminds ou Wikipedia</string>
+    <string name="external_import_wikipedia_desc">Importez la liste officielle des régions viticoles françaises depuis Wikipedia.</string>
+    <string name="external_import_grapeminds_desc">Accédez au catalogue mondial Grapeminds pour enrichir vos référentiels.</string>
+    <string name="external_import_regions_wikipedia">Importer les régions (Wikipedia)</string>
+    <string name="external_import_regions_grapeminds">Importer les régions (Grapeminds)</string>
+    <string name="external_import_producers_grapeminds">Importer les producteurs (Grapeminds)</string>
+    <string name="external_import_wines_grapeminds">Importer les vins (Grapeminds)</string>
 
     <string name="racks_management_title">Gestion des casiers</string>
     <string name="racks_management_subtitle">Configurez vos casiers par import CSV</string>

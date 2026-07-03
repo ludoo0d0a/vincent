@@ -8,6 +8,7 @@ import fr.geoking.vincent.BuildConfig
 import fr.geoking.vincent.debug.HttpDebug
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.SugarLevel
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 import kotlinx.coroutines.Dispatchers
@@ -46,10 +47,14 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
         val json = generate(
             langDirective() +
-                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, aging_potential, drink_from, drink_to}. " +
+                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
+                "color parmi rouge/blanc/rosé/pétillant. " +
+                "alcohol = nombre (ex: 13.5). " +
+                "sugar parmi sec/demi-sec/moelleux. " +
+                "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
                 "aging_potential = nombre d'années de garde estimé (entier). " +
                 "drink_from/drink_to = années de début/fin de consommation estimées. " +
-                "color parmi rouge/blanc/rosé/pétillant. Titre: \"$title\"",
+                "Titre: \"$title\"",
             imageB64 = null,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
         val bottle = toBottle(json, "ia-${title.hashCode()}")
@@ -65,18 +70,23 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             .put("region", current.provenance)
             .put("vintage", current.vintage)
             .put("price", current.price)
+            .put("alcohol", current.alcoholLevel)
+            .put("sugar", sugarToken(current.sugarLevel))
         val json = generate(
             langDirective() +
                 "Tu aides à compléter la fiche d'un vin par la discussion. " +
                 "Fiche actuelle (JSON): $ctx. " +
                 "Précision de l'utilisateur : \"$instruction\". " +
                 "Renvoie la fiche mise à jour en JSON " +
-                "{domain, appellation, color, region, vintage, category, price, aging_potential, drink_from, drink_to, reply}. " +
+                "{domain, appellation, color, region, vintage, category, price, alcohol, sugar, grapes, aging_potential, drink_from, drink_to, reply}. " +
                 "aging_potential = nombre d'années de garde estimé (entier). " +
                 "drink_from/drink_to = années de début/fin de consommation estimées. " +
                 "color parmi rouge/blanc/rosé/pétillant. " +
                 "price = prix unitaire en euros (entier, 0 si inconnu). " +
                 "vintage = année sur 4 chiffres ou \"NM\" si non millésimé. " +
+                "alcohol = nombre (ex: 13.5). " +
+                "sugar parmi sec/demi-sec/moelleux. " +
+                "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
                 "Conserve les valeurs déjà connues si l'utilisateur ne les change pas. " +
                 "reply = une phrase courte confirmant ce qui a été complété ou demandant la donnée manquante.",
             imageB64 = null,
@@ -84,6 +94,12 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         val reply = json.optString("reply").trim().takeIf { it.isNotEmpty() }
         val updated = toBottle(json, current.id)?.copy(
             price = json.optInt("price", current.price).takeIf { it > 0 } ?: current.price,
+            alcoholLevel = if (json.has("alcohol")) json.optDouble("alcohol") else current.alcoholLevel,
+            sugarLevel = if (json.has("sugar")) sugarOf(json.optString("sugar")) else current.sugarLevel,
+            grapes = json.optJSONArray("grapes")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: current.grapes,
+            agingPotential = if (json.has("aging_potential")) json.optInt("aging_potential", current.agingPotential) else current.agingPotential,
+            drinkFrom = if (json.has("drink_from")) json.optInt("drink_from", current.drinkFrom) else current.drinkFrom,
+            drinkTo = if (json.has("drink_to")) json.optInt("drink_to", current.drinkTo) else current.drinkTo,
             quantity = current.quantity,
             cellarSpot = current.cellarSpot,
             source = current.source,
@@ -100,9 +116,12 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         val json = generate(
             langDirective() +
                 "Lis l'étiquette de cette bouteille et renvoie JSON " +
-                "{domain, appellation, color, region, vintage, category, aging_potential, drink_from, drink_to}. " +
+                "{domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
                 "aging_potential = nombre d'années de garde estimé (entier). " +
-                "drink_from/drink_to = années de début/fin de consommation estimées.",
+                "drink_from/drink_to = années de début/fin de consommation estimées. " +
+                "alcohol = nombre (ex: 13.5). " +
+                "sugar parmi sec/demi-sec/moelleux. " +
+                "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]).",
             imageB64 = b64,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
         val bottle = toBottle(json, "ia-img-${jpeg.size}")
@@ -403,6 +422,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             merchant = "—",
             purchaseDate = getString(Res.string.add_today),
             occasion = "—",
+            alcoholLevel = j.optDouble("alcohol", 0.0),
+            sugarLevel = sugarOf(j.optString("sugar")),
+            grapes = j.optJSONArray("grapes")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
             drinkFrom = j.optInt("drink_from", 0),
             drinkTo = j.optInt("drink_to", 0),
             agingPotential = j.optInt("aging_potential", 0),
@@ -420,6 +442,12 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         WineColor.SPARKLING -> "pétillant"
     }
 
+    private fun sugarToken(sugar: SugarLevel): String = when (sugar) {
+        SugarLevel.SEC -> "sec"
+        SugarLevel.DEMI_SEC -> "demi-sec"
+        SugarLevel.MOELLEUX -> "moelleux"
+    }
+
     private fun colorOf(raw: String): WineColor {
         val v = raw.lowercase()
         return when {
@@ -427,6 +455,15 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             "blanc" in v || "white" in v -> WineColor.WHITE
             "pétill" in v || "petill" in v || "spark" in v || "champ" in v -> WineColor.SPARKLING
             else -> WineColor.RED
+        }
+    }
+
+    private fun sugarOf(raw: String): SugarLevel {
+        val v = raw.lowercase()
+        return when {
+            "demi" in v -> SugarLevel.DEMI_SEC
+            "moel" in v || "doux" in v || "liquor" in v -> SugarLevel.MOELLEUX
+            else -> SugarLevel.SEC
         }
     }
 

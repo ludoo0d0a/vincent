@@ -15,8 +15,8 @@ object CsvFormat {
     private val COLUMNS = listOf(
         "id", "domain", "appellation", "color", "category", "vintage", "price",
         "quantity", "rating", "cellarSpot", "provenance", "merchant", "purchaseDate",
-        "occasion", "favorite", "pairings", "drinkFrom", "drinkTo", "drinkNow",
-        "agingPotential", "tastingNotes", "source", "addedLabel",
+        "occasion", "alcoholLevel", "sugarLevel", "favorite", "pairings", "drinkFrom",
+        "drinkTo", "drinkNow", "agingPotential", "tastingNotes", "source", "addedLabel",
     )
 
     // Header aliases (lower-cased) used to locate a value across app formats.
@@ -33,6 +33,8 @@ object CsvFormat {
         "merchant" to listOf("merchant", "caviste", "magasin", "store", "vendor", "acheté chez"),
         "purchaseDate" to listOf("purchasedate", "purchase date", "date", "date d'achat", "scan date"),
         "occasion" to listOf("occasion", "usage"),
+        "alcoholLevel" to listOf("alcohollevel", "alcohol", "alcool", "degré", "degre"),
+        "sugarLevel" to listOf("sugarlevel", "sugar", "sucre", "taux de sucre"),
         "id" to listOf("id"),
         "category" to listOf("category", "catégorie", "categorie"),
         "favorite" to listOf("favorite", "favori", "favourite"),
@@ -75,10 +77,8 @@ object CsvFormat {
             val row = listOf(
                 b.id, b.domain, b.appellation, b.color.name, b.category.name, b.vintage,
                 b.price.toString(), b.quantity.toString(), b.rating.toString(), b.cellarSpot,
-                b.provenance, b.merchant, b.purchaseDate, b.occasion, b.favorite.toString(),
-                b.pairings.joinToString(";"), b.drinkFrom.toString(), b.drinkTo.toString(),
-                b.drinkNow.toString(), b.agingPotential.toString(), b.tastingNotes,
-                b.source.name, b.addedLabel,
+        "occasion", "alcoholLevel", "sugarLevel", "favorite", "pairings", "drinkFrom",
+        "drinkTo", "drinkNow", "agingPotential", "tastingNotes", "source", "addedLabel",
             )
             appendLine(row.joinToString(",") { esc(it) })
         }
@@ -211,6 +211,8 @@ object CsvFormat {
             merchant = field("merchant", index) ?: "—",
             purchaseDate = field("purchaseDate", index) ?: "—",
             occasion = field("occasion", index) ?: "—",
+            alcoholLevel = field("alcoholLevel", index).toDoubleOr(0.0),
+            sugarLevel = parseSugar(field("sugarLevel", index)),
             favorite = field("favorite", index).toBoolLoose(),
             pairings = field("pairings", index)?.split(";", ",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
             drinkFrom = field("drinkFrom", index).toIntOr(0),
@@ -292,6 +294,15 @@ object CsvFormat {
         }
     }
 
+    private fun parseSugar(raw: String?): SugarLevel {
+        val v = raw?.lowercase() ?: return SugarLevel.SEC
+        return when {
+            "demi" in v -> SugarLevel.DEMI_SEC
+            "moel" in v || "doux" in v || "liquor" in v -> SugarLevel.MOELLEUX
+            else -> SugarLevel.SEC
+        }
+    }
+
     private fun guessCategory(text: String): WineCategory {
         val v = text.lowercase()
         return when {
@@ -318,7 +329,7 @@ object CsvFormat {
 
     /** Quote-aware CSV tokenizer; normalises CRLF and drops fully-blank rows. */
     private fun tokenize(text: String): List<List<String>> {
-        val s = text.replace("\r\n", "\n").replace("\r", "\n")
+        val s = text.removePrefix("\uFEFF").replace("\r\n", "\n").replace("\r", "\n")
         val firstLine = s.substringBefore('\n')
         val separator = if (firstLine.count { it == ';' } > firstLine.count { it == ',' }) ';' else ','
 

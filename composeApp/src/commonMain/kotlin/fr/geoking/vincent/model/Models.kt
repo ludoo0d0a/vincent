@@ -36,6 +36,13 @@ enum class AgingStatus(val label: StringResource, val color: Color) {
     OVERDUE(Res.string.aging_overdue, Color(0xFF6E707A));        // Muted
 }
 
+/** Wine sugar levels (residual sugar). */
+enum class SugarLevel(val label: StringResource) {
+    SEC(Res.string.sugar_sec),
+    DEMI_SEC(Res.string.sugar_demi_sec),
+    MOELLEUX(Res.string.sugar_moelleux);
+}
+
 /** How a buyer acquired a bottle / why it is kept. */
 enum class AddSource(val label: StringResource) {
     VOICE(Res.string.source_voice),
@@ -76,6 +83,8 @@ data class Bottle(
     val merchant: String,           // caviste / magasin
     val purchaseDate: String,
     val occasion: String,
+    val alcoholLevel: Double = 0.0,
+    val sugarLevel: SugarLevel = SugarLevel.SEC,
     val favorite: Boolean = false,
     val pairings: List<String> = emptyList(),
     val drinkFrom: Int = 0,
@@ -161,6 +170,7 @@ data class Tasting(
     val notes: String,
     val color: WineColor? = null,
     val vintage: String? = null,
+    val place: String = "",
 )
 
 data class Producer(
@@ -171,6 +181,13 @@ data class Producer(
     val website: String = "",
     val email: String = "",
     val phone: String = "",
+)
+
+data class Region(
+    val id: String,
+    val name: String,
+    val country: String = "",
+    val description: String = "",
 )
 
 data class Supplier(

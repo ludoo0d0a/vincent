@@ -4,12 +4,36 @@ import fr.geoking.vincent.BuildConfig
 import fr.geoking.vincent.ai.GeminiClient
 import fr.geoking.vincent.model.FlavorProfile
 import fr.geoking.vincent.debug.HttpDebug
+import kotlinx.coroutines.tasks.await
+import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.WineCategory
+import fr.geoking.vincent.model.Region
+import fr.geoking.vincent.model.Producer
+import fr.geoking.vincent.model.Bottle
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.appcheck.FirebaseAppCheck
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+
+
+/** Firebase ID + App Check tokens for Worker proxy routes (no grapeminds API key). */
+private suspend fun proxyAuthHeaders(): Pair<String?, String?> {
+    val appCheckToken = try {
+        FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
+    } catch (_: Exception) {
+        null
+    }
+    val idToken = try {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+    } catch (_: Exception) {
+        null
+    }
+    return idToken to appCheckToken
+}
 
 /** True when an API key is missing or still the build placeholder. */
 private fun String.isConfigured(): Boolean = isNotBlank() && this != "xxx"
@@ -131,9 +155,13 @@ private object GrapeMindsProvider : WineDataProvider {
         ProviderCapability.TEXT_SEARCH,
         ProviderCapability.LABEL_SCAN,
         ProviderCapability.ENRICH,
+        ProviderCapability.LIST_PRODUCERS,
+        ProviderCapability.LIST_REGIONS,
+        ProviderCapability.LIST_WINES,
     )
 
     private const val BASE = "https://api.grapeminds.eu/public/v1"
+    private val PROXY_BASE = "${BuildConfig.AI_PROXY_URL}/v1/grapeminds"
     // Language for region names/descriptions; matches the supported set (de,en,es,fr,it,da).
     private const val LANG = "fr"
 
@@ -215,6 +243,69 @@ private object GrapeMindsProvider : WineDataProvider {
         }
     }
 
+    override suspend fun listProducers(): List<Producer> = withContext(Dispatchers.IO) {
+        val resp = get("$PROXY_BASE/producers?per_page=100", "") ?: return@withContext emptyList()
+        try {
+            val arr = JSONObject(resp).optJSONArray("data") ?: return@withContext emptyList()
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                Producer(
+                    id = "gm-${o.optInt("id")}",
+                    name = o.optString("name"),
+                    country = o.optString("country"),
+                )
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    override suspend fun listRegions(): List<Region> = withContext(Dispatchers.IO) {
+        val resp = get("$PROXY_BASE/regions?per_page=100", "") ?: return@withContext emptyList()
+        try {
+            val arr = JSONObject(resp).optJSONArray("data") ?: return@withContext emptyList()
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                Region(
+                    id = "gm-${o.optInt("id")}",
+                    name = o.optString("name"),
+                    country = o.optString("country"),
+                )
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    override suspend fun listWines(): List<Bottle> = withContext(Dispatchers.IO) {
+        val resp = get("$PROXY_BASE/wines?per_page=50", "") ?: return@withContext emptyList()
+        try {
+            val arr = JSONObject(resp).optJSONArray("data") ?: return@withContext emptyList()
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val p = o.optJSONObject("producer")
+                val r = o.optJSONObject("region")
+                Bottle(
+                    id = "gm-${o.optInt("id")}",
+                    domain = p?.optString("name") ?: "",
+                    appellation = o.optString("display_name"),
+                    color = when(o.optString("color")) {
+                        "white" -> WineColor.WHITE
+                        "rose" -> WineColor.ROSE
+                        "sparkling" -> WineColor.SPARKLING
+                        else -> WineColor.RED
+                    },
+                    category = WineCategory.BORDEAUX, // Fallback
+                    vintage = "NM",
+                    price = 0,
+                    quantity = 1,
+                    rating = 0.0,
+                    cellarSpot = "—",
+                    provenance = r?.optString("name") ?: "",
+                    merchant = "—",
+                    purchaseDate = "",
+                    occasion = "",
+                )
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
     override suspend fun enrich(externalId: String): WineEnrichment? = withContext(Dispatchers.IO) {
         val key = BuildConfig.GRAPEMINDS_API_KEY
         if (!key.isConfigured()) return@withContext null
@@ -255,14 +346,24 @@ private object GrapeMindsProvider : WineDataProvider {
         )
     }
 
-    private fun get(urlStr: String, key: String): String? {
+    private suspend fun get(urlStr: String, key: String): String? {
         val started = System.currentTimeMillis()
         return try {
             val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 10000
                 readTimeout = 15000
-                setRequestProperty("Authorization", "Bearer $key")
+
+                // Use the provided API key if available (direct call).
+                // Otherwise, use the app's session token for proxy calls.
+                if (key.isNotEmpty()) {
+                    setRequestProperty("Authorization", "Bearer $key")
+                } else {
+                    val (idToken, appCheckToken) = proxyAuthHeaders()
+                    idToken?.let { setRequestProperty("Authorization", "Bearer $it") }
+                    appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
+                }
+
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Accept-Language", LANG)
             }
@@ -332,6 +433,43 @@ private object CellarTrackerProvider : WineDataProvider {
 }
 
 /**
+ * Wikipedia provider — fetches wine regions from the proxy.
+ */
+private object WikipediaProvider : WineDataProvider {
+    override val id = "wikipedia"
+    override val displayName = "Wikipedia"
+    override val capabilities = setOf(ProviderCapability.LIST_REGIONS)
+
+    override suspend fun listRegions(): List<Region> = withContext(Dispatchers.IO) {
+        val urlStr = "${BuildConfig.AI_PROXY_URL}/v1/scrape/wikipedia/regions"
+        val started = System.currentTimeMillis()
+        try {
+            val (idToken, appCheckToken) = proxyAuthHeaders()
+            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10000
+                readTimeout = 15000
+                idToken?.let { setRequestProperty("Authorization", "Bearer $it") }
+                appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
+                setRequestProperty("Accept", "application/json")
+            }
+            val status = conn.responseCode
+            val elapsed = System.currentTimeMillis() - started
+            if (status !in 200..299) return@withContext emptyList()
+            val resp = conn.inputStream.bufferedReader().use { it.readText() }
+            val root = JSONObject(resp)
+            val arr = root.optJSONArray("regions") ?: return@withContext emptyList()
+            (0 until arr.length()).map { i ->
+                val name = arr.getString(i)
+                Region(id = "wp-$name", name = name, country = "France")
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+}
+
+/**
  * AI label reader — wraps the Gemini-backed recognizer as a LABEL_SCAN provider so
  * the factory can route label photos uniformly alongside the data sources.
  */
@@ -379,4 +517,5 @@ actual fun wineDataProviders(): List<WineDataProvider> = listOf(
     GrapeMindsProvider,    // text search + AI label analysis (Enterprise) — grapeminds.eu
     CellarTrackerProvider, // text search + price
     AiLabelProvider,       // label photo recognition (AI)
+    WikipediaProvider,     // region scraping
 )
