@@ -25,12 +25,23 @@ object Tastings {
     }
 
     fun import(incoming: List<Tasting>): Int {
-        incoming.forEach { t ->
-            val i = all.indexOfFirst { it.id == t.id }
-            if (i >= 0) all[i] = t else all.add(0, t)
-            persist(t)
-        }
+        incoming.forEach { save(it) }
         return incoming.size
+    }
+
+    fun save(t: Tasting) {
+        val i = all.indexOfFirst { it.id == t.id }
+        if (i >= 0) all[i] = t else all.add(0, t)
+        persist(t)
+    }
+
+    fun delete(id: String) {
+        val i = all.indexOfFirst { it.id == id }
+        if (i >= 0) {
+            all.removeAt(i)
+            val repo = repo ?: return
+            scope.launch { repo.delete(id) }
+        }
     }
 
     private fun persist(t: Tasting) {

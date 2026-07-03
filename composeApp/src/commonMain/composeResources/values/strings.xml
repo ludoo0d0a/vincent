@@ -132,6 +132,13 @@
     <string name="detail_identified_ai">IDENTIFIÉ PAR L'IA</string>
     <string name="detail_stars_count">%s/5</string>
     <string name="detail_no_notes">Aucune note pour le moment.</string>
+    <string name="detail_tasting_add">Ajouter une dégustation</string>
+    <string name="detail_tasting_date">Date</string>
+    <string name="detail_tasting_place">Lieu</string>
+    <string name="detail_tasting_notes">Commentaire</string>
+    <string name="detail_tasting_save">Enregistrer</string>
+    <string name="detail_tasting_title">Dégustation</string>
+    <string name="detail_price_auto">Auto</string>
 
     <string name="bottles_title">Mes bouteilles</string>
     <plurals name="bottles_subtitle_format">
