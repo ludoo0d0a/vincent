@@ -47,11 +47,13 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
         val json = generate(
             langDirective() +
-                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, alcohol, sugar, grapes}. " +
+                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
                 "color parmi rouge/blanc/rosé/pétillant. " +
                 "alcohol = nombre (ex: 13.5). " +
                 "sugar parmi sec/demi-sec/moelleux. " +
                 "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
+                "aging_potential = nombre d'années de garde estimé (entier). " +
+                "drink_from/drink_to = années de début/fin de consommation estimées. " +
                 "Titre: \"$title\"",
             imageB64 = null,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
@@ -76,7 +78,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
                 "Fiche actuelle (JSON): $ctx. " +
                 "Précision de l'utilisateur : \"$instruction\". " +
                 "Renvoie la fiche mise à jour en JSON " +
-                "{domain, appellation, color, region, vintage, category, price, alcohol, sugar, grapes, reply}. " +
+                "{domain, appellation, color, region, vintage, category, price, alcohol, sugar, grapes, aging_potential, drink_from, drink_to, reply}. " +
+                "aging_potential = nombre d'années de garde estimé (entier). " +
+                "drink_from/drink_to = années de début/fin de consommation estimées. " +
                 "color parmi rouge/blanc/rosé/pétillant. " +
                 "price = prix unitaire en euros (entier, 0 si inconnu). " +
                 "vintage = année sur 4 chiffres ou \"NM\" si non millésimé. " +
@@ -93,6 +97,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             alcoholLevel = if (json.has("alcohol")) json.optDouble("alcohol") else current.alcoholLevel,
             sugarLevel = if (json.has("sugar")) sugarOf(json.optString("sugar")) else current.sugarLevel,
             grapes = json.optJSONArray("grapes")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: current.grapes,
+            agingPotential = if (json.has("aging_potential")) json.optInt("aging_potential", current.agingPotential) else current.agingPotential,
+            drinkFrom = if (json.has("drink_from")) json.optInt("drink_from", current.drinkFrom) else current.drinkFrom,
+            drinkTo = if (json.has("drink_to")) json.optInt("drink_to", current.drinkTo) else current.drinkTo,
             quantity = current.quantity,
             cellarSpot = current.cellarSpot,
             source = current.source,
@@ -109,7 +116,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         val json = generate(
             langDirective() +
                 "Lis l'étiquette de cette bouteille et renvoie JSON " +
-                "{domain, appellation, color, region, vintage, category, alcohol, sugar, grapes}. " +
+                "{domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
+                "aging_potential = nombre d'années de garde estimé (entier). " +
+                "drink_from/drink_to = années de début/fin de consommation estimées. " +
                 "alcohol = nombre (ex: 13.5). " +
                 "sugar parmi sec/demi-sec/moelleux. " +
                 "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]).",
@@ -416,6 +425,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             alcoholLevel = j.optDouble("alcohol", 0.0),
             sugarLevel = sugarOf(j.optString("sugar")),
             grapes = j.optJSONArray("grapes")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+            drinkFrom = j.optInt("drink_from", 0),
+            drinkTo = j.optInt("drink_to", 0),
+            agingPotential = j.optInt("aging_potential", 0),
             source = AddSource.SCAN,
             addedLabel = getString(Res.string.ai_added_label),
         )

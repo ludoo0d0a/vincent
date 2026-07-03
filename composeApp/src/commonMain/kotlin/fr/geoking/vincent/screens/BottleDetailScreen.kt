@@ -50,6 +50,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geoking.vincent.getCurrentYear
+import fr.geoking.vincent.model.AgingStatus
+import fr.geoking.vincent.model.agingStatus
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.ai.foodPairer
@@ -161,6 +164,38 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
         }
 
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            val currentYear = getCurrentYear()
+            val status = live.agingStatus(currentYear)
+            if (status != null) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(status.color.copy(alpha = 0.12f))
+                        .border(1.dp, status.color.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(status.color))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        stringResource(status.label),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.W700,
+                        color = status.color
+                    )
+                    if (live.agingPotential > 0) {
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            stringResource(Res.string.aging_potential_years, live.agingPotential),
+                            fontSize = 11.sp,
+                            color = status.color.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.W600
+                        )
+                    }
+                }
+            }
+
             Section(stringResource(Res.string.detail_photos)) {
                 BottlePhotosRow(
                     photos = BottlePhotoKind.entries.associateWith { live.photo(it) },

@@ -318,6 +318,7 @@
     <string name="add_field_appellation_label">Appellation</string>
     <string name="add_field_color">Couleur</string>
     <string name="add_field_category">Provenance</string>
+    <string name="add_field_aging_potential">Potentiel de garde (années)</string>
     <string name="add_field_alcohol">Alcool (%)</string>
     <string name="add_field_sugar">Taux de sucre</string>
     <string name="add_field_vintage_label">Millésime</string>
@@ -339,6 +340,7 @@
     <string name="add_parsed_color">Couleur</string>
     <string name="add_parsed_appellation">Appellation</string>
     <string name="add_parsed_estimated_price">Prix estimé</string>
+    <string name="add_parsed_aging_potential">Garde estimée</string>
     <string name="add_voice_summary_title">Résumé</string>
     <string name="add_voice_complete_hint">Touchez un champ à compléter ou discutez avec l'assistant.</string>
     <string name="add_voice_missing">À compléter</string>
@@ -489,6 +491,11 @@
     <string name="ai_error_http_other">Identification impossible (erreur réseau %1$d)%2$s</string>
     <string name="ai_added_label">IA</string>
     <string name="ai_quota_remaining">%1$d/%2$d analyses IA restantes aujourd'hui</string>
+    <string name="aging_must_keep">Doit être conservé</string>
+    <string name="aging_to_keep">À conserver</string>
+    <string name="aging_drink_now">À boire</string>
+    <string name="aging_overdue">Dépassé depuis longtemps</string>
+    <string name="aging_potential_years">%1$d ans de garde</string>
     <string name="ai_error_quota_daily">Limite quotidienne atteinte (%1$d analyses). Réinitialisation demain.</string>
     <string name="ai_error_quota_burst">Trop de demandes d'un coup — patientez quelques secondes.</string>
     <string name="ai_error_quota_global">Service IA très sollicité — réessayez un peu plus tard.</string>

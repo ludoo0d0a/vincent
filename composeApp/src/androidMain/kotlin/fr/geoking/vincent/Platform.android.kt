@@ -5,3 +5,5 @@ actual fun getAppVersion(): String = "${BuildConfig.VERSION_NAME} (${BuildConfig
 actual fun formatShortDateTime(epochMs: Long): String =
     java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
         .format(java.util.Date(epochMs))
+
+actual fun getCurrentYear(): Int = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)

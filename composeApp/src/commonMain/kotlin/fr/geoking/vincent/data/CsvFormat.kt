@@ -16,7 +16,7 @@ object CsvFormat {
         "id", "domain", "appellation", "color", "category", "vintage", "price",
         "quantity", "rating", "cellarSpot", "provenance", "merchant", "purchaseDate",
         "occasion", "alcoholLevel", "sugarLevel", "favorite", "pairings", "drinkFrom",
-        "drinkTo", "drinkNow", "tastingNotes", "source", "addedLabel",
+        "drinkTo", "drinkNow", "agingPotential", "tastingNotes", "source", "addedLabel",
     )
 
     // Header aliases (lower-cased) used to locate a value across app formats.
@@ -42,6 +42,7 @@ object CsvFormat {
         "drinkFrom" to listOf("drinkfrom", "apogée début", "drink from", "begin consume"),
         "drinkTo" to listOf("drinkto", "apogée fin", "drink to", "à boire avant", "end consume"),
         "drinkNow" to listOf("drinknow"),
+        "agingPotential" to listOf("agingpotential", "potentiel de garde", "aging potential"),
         "tastingNotes" to listOf("tastingnotes", "notes", "tasting notes", "commentaire"),
         "source" to listOf("source"),
         "addedLabel" to listOf("addedlabel"),
@@ -76,10 +77,8 @@ object CsvFormat {
             val row = listOf(
                 b.id, b.domain, b.appellation, b.color.name, b.category.name, b.vintage,
                 b.price.toString(), b.quantity.toString(), b.rating.toString(), b.cellarSpot,
-                b.provenance, b.merchant, b.purchaseDate, b.occasion, b.alcoholLevel.toString(),
-                b.sugarLevel.name, b.favorite.toString(), b.pairings.joinToString(";"),
-                b.drinkFrom.toString(), b.drinkTo.toString(), b.drinkNow.toString(),
-                b.tastingNotes, b.source.name, b.addedLabel,
+        "occasion", "alcoholLevel", "sugarLevel", "favorite", "pairings", "drinkFrom",
+        "drinkTo", "drinkNow", "agingPotential", "tastingNotes", "source", "addedLabel",
             )
             appendLine(row.joinToString(",") { esc(it) })
         }
@@ -219,6 +218,7 @@ object CsvFormat {
             drinkFrom = field("drinkFrom", index).toIntOr(0),
             drinkTo = field("drinkTo", index).toIntOr(0),
             drinkNow = field("drinkNow", index)?.toFloatOrNull() ?: 0.5f,
+            agingPotential = field("agingPotential", index).toIntOr(0),
             tastingNotes = field("tastingNotes", index) ?: "",
             source = field("source", index)?.let { runCatching { AddSource.valueOf(it) }.getOrNull() } ?: AddSource.MANUAL,
             addedLabel = field("addedLabel", index) ?: "importé",
