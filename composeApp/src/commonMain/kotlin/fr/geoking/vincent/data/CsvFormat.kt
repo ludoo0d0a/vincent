@@ -315,7 +315,7 @@ object CsvFormat {
 
     /** Quote-aware CSV tokenizer; normalises CRLF and drops fully-blank rows. */
     private fun tokenize(text: String): List<List<String>> {
-        val s = text.replace("\r\n", "\n").replace("\r", "\n")
+        val s = text.removePrefix("\uFEFF").replace("\r\n", "\n").replace("\r", "\n")
         val firstLine = s.substringBefore('\n')
         val separator = if (firstLine.count { it == ';' } > firstLine.count { it == ',' }) ';' else ','
 
