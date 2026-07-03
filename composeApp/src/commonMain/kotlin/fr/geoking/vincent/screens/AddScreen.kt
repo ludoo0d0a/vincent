@@ -144,6 +144,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     category = b.category,
                     vintage = if (b.vintage == "NM") "" else b.vintage,
                     price = if (b.price > 0) b.price.toString() else "",
+                    agingPotential = if (b.agingPotential > 0) b.agingPotential.toString() else "",
                     spot = b.cellarSpot,
                     placeRack = foundRack,
                     placeCell = foundCell,
@@ -223,6 +224,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                 category = b.category,
                 vintage = if (b.vintage == "NM") "" else b.vintage,
                 price = eff.takeIf { it > 0 }?.toString() ?: "",
+                agingPotential = b.agingPotential.takeIf { it > 0 }?.toString() ?: "",
             )
         }
     }
@@ -435,6 +437,7 @@ private data class ManualSeed(
     val category: WineCategory = WineCategory.BORDEAUX,
     val vintage: String = "",
     val price: String = "",
+    val agingPotential: String = "",
     val spot: String = "",
     val placeRack: Int? = null,
     val placeCell: Int? = null,
@@ -450,6 +453,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     var category by remember { mutableStateOf(WineCategory.BORDEAUX) }
     var vintage by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
+    var agingPotential by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("1") }
     var spot by remember(seed) { mutableStateOf(seed?.spot.orEmpty()) }
     var placeRack by remember(seed) { mutableStateOf(seed?.placeRack) }
@@ -477,7 +481,10 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         s.category?.let { category = it }
         if (s.vintage.isNotBlank()) vintage = s.vintage
         s.price?.let { price = it.toString() }
-        s.bottle?.let { b -> photos = BottlePhotoKind.entries.associateWith { b.photo(it) } }
+        s.bottle?.let { b ->
+            photos = BottlePhotoKind.entries.associateWith { b.photo(it) }
+            agingPotential = if (b.agingPotential > 0) b.agingPotential.toString() else ""
+        }
         // Catalogue pick: pull drink window + tasting notes in the background (best-effort).
         val extId = s.externalId
         if (extId != null) scope.launch { enrichment = WineDataSource.enrich(s.externalSource, extId) }
@@ -487,7 +494,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     LaunchedEffect(seed) {
         seed?.let {
             domain = it.domain; appellation = it.appellation; color = it.color; category = it.category
-            vintage = it.vintage; price = it.price
+            vintage = it.vintage; price = it.price; agingPotential = it.agingPotential
             if (it.imageUrl != null) photos = photos + (BottlePhotoKind.LABEL to it.imageUrl)
             if (it.spot.isNotBlank()) spot = it.spot
             if (it.placeRack != null && it.placeCell != null) {
@@ -525,7 +532,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         }
     }
 
-    LaunchedEffect(domain, appellation, color, category, vintage, price, qty, spot, placeRack, placeCell, photos, enrichment, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
+    LaunchedEffect(domain, appellation, color, category, vintage, price, agingPotential, qty, spot, placeRack, placeCell, photos, enrichment, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
         val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
         // grapeminds enrichment: turn ageing offsets into absolute years (needs a numeric vintage)
         // and fold tasting notes + pairing prose into the free-text notes field.
@@ -552,6 +559,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
                 price = price.filter { it.isDigit() }.toIntOrNull() ?: 0,
                 quantity = qty.filter { it.isDigit() }.toIntOrNull()?.coerceAtLeast(1) ?: 1,
                 rating = 0.0,
+                agingPotential = agingPotential.filter { it.isDigit() }.toIntOrNull() ?: 0,
                 cellarSpot = spot.trim().uppercase().ifBlank { "—" },
                 provenance = "",
                 merchant = "—",
@@ -606,7 +614,10 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
             Field(stringResource(Res.string.add_field_vintage_label), vintage, Modifier.weight(1f), numeric = true) { vintage = it }
             Field(stringResource(Res.string.add_field_price_label), price, Modifier.weight(1f), numeric = true) { price = it }
         }
-        Field(stringResource(Res.string.add_field_quantity), qty, numeric = true) { qty = it }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Field(stringResource(Res.string.add_field_quantity), qty, Modifier.weight(1f), numeric = true) { qty = it }
+            Field(stringResource(Res.string.add_field_aging_potential), agingPotential, Modifier.weight(1f), numeric = true) { agingPotential = it }
+        }
         PlacementSection(
             placeRack = placeRack,
             placeCell = placeCell,
@@ -1044,7 +1055,7 @@ private fun ScanPane(
 private data class VoiceChatMsg(val fromUser: Boolean, val text: String)
 
 /** Editable fields surfaced on the voice summary. */
-private enum class VoiceField { DOMAIN, APPELLATION, COLOR, VINTAGE, PRICE }
+private enum class VoiceField { DOMAIN, APPELLATION, COLOR, VINTAGE, PRICE, AGING }
 
 @Composable
 private fun VoicePane(
@@ -1121,6 +1132,7 @@ private fun VoiceSummary(
         VoiceField.COLOR -> false
         VoiceField.VINTAGE -> parsed.vintage.isBlank() || parsed.vintage == "NM"
         VoiceField.PRICE -> effectivePrice <= 0
+        VoiceField.AGING -> parsed.agingPotential <= 0
     }
     val anyMissing = VoiceField.entries.any { missing(it) }
 
@@ -1208,6 +1220,17 @@ private fun VoiceSummary(
         ) {
             InlineEditField(effectivePrice.takeIf { it > 0 }?.toString().orEmpty(), numeric = true) {
                 onPriceChange(it.filter { c -> c.isDigit() }.toIntOrNull() ?: 0)
+            }
+        }
+        SummaryRow(
+            label = stringResource(Res.string.add_parsed_aging_potential),
+            value = if (parsed.agingPotential > 0) "${parsed.agingPotential} ans" else "",
+            missing = missing(VoiceField.AGING),
+            editing = editing == VoiceField.AGING,
+            onToggle = { toggle(VoiceField.AGING) },
+        ) {
+            InlineEditField(parsed.agingPotential.takeIf { it > 0 }?.toString().orEmpty(), numeric = true) {
+                onBottleChange(parsed.copy(agingPotential = it.filter { c -> c.isDigit() }.toIntOrNull() ?: 0))
             }
         }
     }

@@ -28,6 +28,14 @@ enum class WineCategory(val short: String, val label: StringResource) {
     CHAMPAGNE("CH", Res.string.cat_champagne);
 }
 
+/** The four aging status labels shown on the bottle detail. */
+enum class AgingStatus(val label: StringResource, val color: Color) {
+    MUST_KEEP(Res.string.aging_must_keep, Color(0xFF9B2F2C)),     // Red
+    TO_KEEP(Res.string.aging_to_keep, Color(0xFFD69A3C)),       // Amber
+    DRINK_NOW(Res.string.aging_drink_now, Color(0xFF3E9A68)),    // Green
+    OVERDUE(Res.string.aging_overdue, Color(0xFF6E707A));        // Muted
+}
+
 /** How a buyer acquired a bottle / why it is kept. */
 enum class AddSource(val label: StringResource) {
     VOICE(Res.string.source_voice),
@@ -73,6 +81,7 @@ data class Bottle(
     val drinkFrom: Int = 0,
     val drinkTo: Int = 0,
     val drinkNow: Float = 0.5f,     // 0..1 position within the drink window
+    val agingPotential: Int = 0,    // years from vintage
     val tastingNotes: String = "",
     // Rich provider detail (grapeminds /wines/{id} + /drinking-periods/{id}).
     val description: String = "",          // overview paragraph
@@ -101,6 +110,26 @@ fun Bottle.withPhoto(kind: BottlePhotoKind, uri: String?): Bottle = when (kind) 
 
 /** Best photo to show as a list thumbnail: étiquette → bouteille → dos. */
 fun Bottle.thumbnailUri(): String? = photoLabel ?: photoBottle ?: photoBack
+
+/** Deduces the aging status from the drink window or vintage + potential. */
+fun Bottle.agingStatus(currentYear: Int): AgingStatus? {
+    val v = vintage.toIntOrNull()
+
+    // 1. If we have aging potential, it defines the drink window if not set.
+    val effectiveDrinkFrom = if (drinkFrom > 0) drinkFrom else v?.plus(agingPotential / 2) ?: 0
+    val effectiveDrinkTo = if (drinkTo > 0) drinkTo else v?.plus(agingPotential) ?: 0
+
+    if (effectiveDrinkTo > 0) {
+        return when {
+            currentYear > effectiveDrinkTo -> AgingStatus.OVERDUE
+            currentYear >= effectiveDrinkFrom -> AgingStatus.DRINK_NOW
+            currentYear >= effectiveDrinkFrom - 2 -> AgingStatus.TO_KEEP
+            else -> AgingStatus.MUST_KEEP
+        }
+    }
+
+    return null
+}
 
 /** A single physical slot in a rack grid. */
 data class RackCell(

@@ -46,7 +46,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
     override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
         val json = generate(
             langDirective() +
-                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category}. " +
+                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, aging_potential, drink_from, drink_to}. " +
+                "aging_potential = nombre d'années de garde estimé (entier). " +
+                "drink_from/drink_to = années de début/fin de consommation estimées. " +
                 "color parmi rouge/blanc/rosé/pétillant. Titre: \"$title\"",
             imageB64 = null,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
@@ -69,7 +71,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
                 "Fiche actuelle (JSON): $ctx. " +
                 "Précision de l'utilisateur : \"$instruction\". " +
                 "Renvoie la fiche mise à jour en JSON " +
-                "{domain, appellation, color, region, vintage, category, price, reply}. " +
+                "{domain, appellation, color, region, vintage, category, price, aging_potential, drink_from, drink_to, reply}. " +
+                "aging_potential = nombre d'années de garde estimé (entier). " +
+                "drink_from/drink_to = années de début/fin de consommation estimées. " +
                 "color parmi rouge/blanc/rosé/pétillant. " +
                 "price = prix unitaire en euros (entier, 0 si inconnu). " +
                 "vintage = année sur 4 chiffres ou \"NM\" si non millésimé. " +
@@ -96,7 +100,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
         val json = generate(
             langDirective() +
                 "Lis l'étiquette de cette bouteille et renvoie JSON " +
-                "{domain, appellation, color, region, vintage, category}.",
+                "{domain, appellation, color, region, vintage, category, aging_potential, drink_from, drink_to}. " +
+                "aging_potential = nombre d'années de garde estimé (entier). " +
+                "drink_from/drink_to = années de début/fin de consommation estimées.",
             imageB64 = b64,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
         val bottle = toBottle(json, "ia-img-${jpeg.size}")
@@ -397,6 +403,9 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
             merchant = "—",
             purchaseDate = getString(Res.string.add_today),
             occasion = "—",
+            drinkFrom = j.optInt("drink_from", 0),
+            drinkTo = j.optInt("drink_to", 0),
+            agingPotential = j.optInt("aging_potential", 0),
             source = AddSource.SCAN,
             addedLabel = getString(Res.string.ai_added_label),
         )
