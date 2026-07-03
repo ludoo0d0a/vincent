@@ -370,7 +370,6 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                                 Spacer(Modifier.width(4.dp))
                                 Icon(Icons.Filled.OpenInNew, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
                             }
-                        }
                     }
                 }
             }
