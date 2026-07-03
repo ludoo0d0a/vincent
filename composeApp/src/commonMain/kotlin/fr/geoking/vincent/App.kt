@@ -60,6 +60,7 @@ import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SettingsScreen
 import fr.geoking.vincent.screens.DataManagementScreen
+import fr.geoking.vincent.screens.ExternalImportScreen
 import fr.geoking.vincent.screens.TastingEditScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen

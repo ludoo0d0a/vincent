@@ -4,12 +4,36 @@ import fr.geoking.vincent.BuildConfig
 import fr.geoking.vincent.ai.GeminiClient
 import fr.geoking.vincent.model.FlavorProfile
 import fr.geoking.vincent.debug.HttpDebug
+import kotlinx.coroutines.tasks.await
+import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.WineCategory
+import fr.geoking.vincent.model.Region
+import fr.geoking.vincent.model.Producer
+import fr.geoking.vincent.model.Bottle
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.appcheck.FirebaseAppCheck
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+
+
+/** Firebase ID + App Check tokens for Worker proxy routes (no grapeminds API key). */
+private suspend fun proxyAuthHeaders(): Pair<String?, String?> {
+    val appCheckToken = try {
+        FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
+    } catch (_: Exception) {
+        null
+    }
+    val idToken = try {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+    } catch (_: Exception) {
+        null
+    }
+    return idToken to appCheckToken
+}
 
 /** True when an API key is missing or still the build placeholder. */
 private fun String.isConfigured(): Boolean = isNotBlank() && this != "xxx"
@@ -322,7 +346,7 @@ private object GrapeMindsProvider : WineDataProvider {
         )
     }
 
-    private fun get(urlStr: String, key: String): String? {
+    private suspend fun get(urlStr: String, key: String): String? {
         val started = System.currentTimeMillis()
         return try {
             val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
@@ -335,8 +359,9 @@ private object GrapeMindsProvider : WineDataProvider {
                 if (key.isNotEmpty()) {
                     setRequestProperty("Authorization", "Bearer $key")
                 } else {
-                    Auth.token?.let { setRequestProperty("Authorization", "Bearer $it") }
-                    Auth.appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
+                    val (idToken, appCheckToken) = proxyAuthHeaders()
+                    idToken?.let { setRequestProperty("Authorization", "Bearer $it") }
+                    appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
                 }
 
                 setRequestProperty("Accept", "application/json")
@@ -419,12 +444,13 @@ private object WikipediaProvider : WineDataProvider {
         val urlStr = "${BuildConfig.AI_PROXY_URL}/v1/scrape/wikipedia/regions"
         val started = System.currentTimeMillis()
         try {
+            val (idToken, appCheckToken) = proxyAuthHeaders()
             val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 10000
                 readTimeout = 15000
-                Auth.token?.let { setRequestProperty("Authorization", "Bearer $it") }
-                Auth.appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
+                idToken?.let { setRequestProperty("Authorization", "Bearer $it") }
+                appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
                 setRequestProperty("Accept", "application/json")
             }
             val status = conn.responseCode
