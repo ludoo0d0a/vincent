@@ -21,8 +21,8 @@ object CsvFormat {
 
     // Header aliases (lower-cased) used to locate a value across app formats.
     private val ALIASES = mapOf(
-        "domain" to listOf("domain", "domaine", "winery", "producer", "producteur", "nom", "name"),
-        "appellation" to listOf("appellation", "wine name", "wine", "cuvée", "cuvee", "vin"),
+        "domain" to listOf("domain", "domaine", "winery", "producer", "producteur", "nom", "name", "nom du vin"),
+        "appellation" to listOf("appellation", "wine name", "wine", "cuvée", "cuvee", "vin", "nom du vin"),
         "color" to listOf("color", "colour", "couleur", "wine type", "type"),
         "vintage" to listOf("vintage", "millésime", "millesime", "année", "annee", "year"),
         "price" to listOf("price", "prix", "prix d'achat", "purchase price", "price paid"),
@@ -45,7 +45,7 @@ object CsvFormat {
         "addedLabel" to listOf("addedlabel"),
 
         // Tastings
-        "wineName" to listOf("winename", "vin", "bouteille"),
+        "wineName" to listOf("winename", "vin", "bouteille", "nom du vin"),
         "date" to listOf("date", "date dégustation", "tasting date"),
         "notes" to listOf("notes", "commentaire", "tasting notes"),
 
@@ -59,8 +59,8 @@ object CsvFormat {
         "type" to listOf("type"),
 
         // Racks
-        "cols" to listOf("cols", "colonnes", "nombre de colonnes"),
-        "rows" to listOf("rows", "rangées", "nombre de lignes"),
+        "cols" to listOf("cols", "colonnes", "nombre de colonnes", "colonne"),
+        "rows" to listOf("rows", "rangées", "nombre de lignes", "ligne"),
         "staggered" to listOf("staggered", "quinconce"),
         "staggerOffset" to listOf("staggeroffset", "décalage", "decalage"),
         "format" to listOf("format", "type de casier"),
@@ -158,7 +158,7 @@ object CsvFormat {
     fun detectSource(header: List<String>): String = when {
         "id" in header && "domain" in header && "color" in header -> "Vincent"
         header.any { it == "winery" } || header.any { it == "wine name" } -> "Vivino"
-        "nom" in header && (header.any { it == "couleur" } || header.any { it == "millésime" } || header.any { it == "date dégustation" }) -> "PLOC"
+        ("nom" in header || "nom du vin" in header) && (header.any { it == "couleur" } || header.any { it == "millésime" } || header.any { it == "date dégustation" }) -> "PLOC"
         header.any { it == "bin" } || header.any { it == "begin consume" } || header.any { it == "valuation" } -> "CellarTracker"
         else -> "CSV générique"
     }
@@ -316,6 +316,9 @@ object CsvFormat {
     /** Quote-aware CSV tokenizer; normalises CRLF and drops fully-blank rows. */
     private fun tokenize(text: String): List<List<String>> {
         val s = text.replace("\r\n", "\n").replace("\r", "\n")
+        val firstLine = s.substringBefore('\n')
+        val separator = if (firstLine.count { it == ';' } > firstLine.count { it == ',' }) ';' else ','
+
         val rows = mutableListOf<List<String>>()
         var row = mutableListOf<String>()
         var field = StringBuilder()
@@ -330,7 +333,7 @@ object CsvFormat {
                     else -> field.append(c)
                 }
                 c == '"' -> inQuotes = true
-                c == ',' -> { row.add(field.toString()); field = StringBuilder() }
+                c == separator -> { row.add(field.toString()); field = StringBuilder() }
                 c == '\n' -> { row.add(field.toString()); rows.add(row); row = mutableListOf(); field = StringBuilder() }
                 else -> field.append(c)
             }
