@@ -43,11 +43,15 @@ export default {
       return json({ ok: true, model: env.GEMINI_MODEL || "gemini-flash-latest" });
     }
 
-    if (request.method !== "POST" || (url.pathname !== "/v1/generate" && url.pathname !== "/v1/grapeminds")) {
+    const isGrapeminds = url.pathname.startsWith("/v1/grapeminds");
+    const isWikipedia = url.pathname === "/v1/scrape/wikipedia/regions";
+
+    if (
+      (request.method !== "POST" || (url.pathname !== "/v1/generate" && url.pathname !== "/v1/grapeminds")) &&
+      (request.method !== "GET" || (!isGrapeminds && !isWikipedia))
+    ) {
       return json({ error: { message: "Not found", status: "NOT_FOUND" } }, 404);
     }
-
-    const isGrapeminds = url.pathname === "/v1/grapeminds";
 
     if (!isGrapeminds && !env.GEMINI_API_KEY) {
       return json({ error: { message: "Server missing GEMINI_API_KEY", status: "FAILED_PRECONDITION" } }, 500);
@@ -80,7 +84,17 @@ export default {
       }
     }
 
-    // 3. Parse the request payload.
+    // 3. Handle Wikipedia scraping or Grapeminds GET before parsing standard payload.
+    if (request.method === "GET") {
+      if (isWikipedia) {
+        return handleWikipediaScrape();
+      }
+      if (isGrapeminds) {
+        return handleGrapemindsGet(request, url, env, quotaHeadersFor);
+      }
+    }
+
+    // 3b. Parse the request payload for POST.
     let payload: GeneratePayload;
     try {
       payload = (await request.json()) as GeneratePayload;
@@ -207,6 +221,87 @@ export default {
     return new Response(text, { headers: { ...JSON_HEADERS, ...quotaHeaders, "x-cache": "MISS" } });
   },
 } satisfies ExportedHandler<Env>;
+
+// ---- handlers --------------------------------------------------------------
+
+async function handleWikipediaScrape(): Promise<Response> {
+  const url = "https://fr.wikipedia.org/wiki/Viticulture_en_France";
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return json({ error: "Wikipedia fetch failed" }, 502);
+    const html = await res.text();
+
+    // We look for the "Régions viticoles françaises" palette which is usually a table or a div at the end.
+    // In the text version it appeared clearly. In HTML it's often a .navbox.
+    // For simplicity and since we are "scraping", we'll use a regex to find links in the region list.
+    // The regions are listed after "Produisant du vin d'AOC" and "Ne produisant pas de vin d'AOC".
+
+    const regions: string[] = [];
+    const seen = new Set<string>();
+
+    // This regex looks for the specific structure of the French wine regions palette on Wikipedia.
+    // It's a bit brittle but that's scraping.
+    const paletteMatch = html.match(/Régions viticoles françaises.*?<\/table>/s);
+    if (paletteMatch) {
+      const links = paletteMatch[0].matchAll(/<a href="\/wiki\/.*?" title=".*?">(.*?)<\/a>/g);
+      for (const link of links) {
+        let name = link[1].replace(/Vignoble d[e']\s*/i, "").replace(/Vignoble du\s*/i, "").trim();
+        // Unescape some common HTML entities
+        name = name.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, "\"");
+        if (name && !name.includes("<") && !seen.has(name) && !name.match(/^(AOC|IGP|Vin|Eaux-de-vie|v · m|Modifier|Portail|Liste)$/i)) {
+          regions.push(name);
+          seen.add(name);
+        }
+      }
+    }
+
+    // Fallback if palette not found or empty: try to find the list in the main body.
+    if (regions.length === 0) {
+      const listMatch = html.match(/id="Principaux_vignobles".*?<\/table>/s);
+      if (listMatch) {
+        const rows = listMatch[0].matchAll(/<tr>.*?<td>.*?<a.*?>(.*?)<\/a>/gs);
+        for (const row of rows) {
+          const name = row[1].replace(/vignoble d[e']\s*/i, "").trim();
+          if (name && !seen.has(name)) {
+            regions.push(name);
+            seen.add(name);
+          }
+        }
+      }
+    }
+
+    return json({ regions: regions.sort() });
+  } catch (e) {
+    return json({ error: `Scraping failed: ${msg(e)}` }, 500);
+  }
+}
+
+async function handleGrapemindsGet(request: Request, url: URL, env: Env, quotaHeadersFor: Function): Promise<Response> {
+  // Extract the subpath after /v1/grapeminds
+  let subpath = url.pathname.slice("/v1/grapeminds".length);
+  if (!subpath.startsWith("/")) subpath = "/" + subpath;
+
+  const upstreamUrl = new URL(env.GRAPEMINDS_API_URL + subpath);
+  url.searchParams.forEach((v, k) => upstreamUrl.searchParams.set(k, v));
+
+  const headers: Record<string, string> = {
+    "Authorization": `Bearer ${env.GRAPEMINDS_API_KEY}`,
+    "X-Api-Key": env.GRAPEMINDS_API_KEY,
+    "Accept": "application/json",
+    "Accept-Language": request.headers.get("Accept-Language") || "fr",
+  };
+
+  try {
+    const upstream = await fetch(upstreamUrl.toString(), { headers });
+    const body = await upstream.text();
+    return new Response(body, {
+      status: upstream.status,
+      headers: { ...JSON_HEADERS, "X-Cache": "MISS" }
+    });
+  } catch (e) {
+    return json({ error: `Grapeminds fetch failed: ${msg(e)}` }, 502);
+  }
+}
 
 // ---- helpers ---------------------------------------------------------------
 

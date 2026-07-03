@@ -87,6 +87,7 @@ private sealed interface Dest {
     data object Recent : Dest
     data object WinesManagement : Dest
     data object RacksManagement : Dest
+    data object ExternalImport : Dest
     data object Tastings : Dest
     data object Producers : Dest
     data object Suppliers : Dest
@@ -190,10 +191,12 @@ fun App() = VincentTheme {
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
+                    onOpenExternalImport = { stack.add(Dest.ExternalImport) },
                 )
 
                 Dest.WinesManagement -> WinesManagementScreen(onBack = ::pop)
                 Dest.RacksManagement -> RacksManagementScreen(onBack = ::pop)
+                Dest.ExternalImport -> ExternalImportScreen(onBack = ::pop)
 
                 Dest.Tastings -> TastingsScreen(onBack = { stack.clear() })
                 Dest.Producers -> ProducersScreen(onBack = { stack.clear() })

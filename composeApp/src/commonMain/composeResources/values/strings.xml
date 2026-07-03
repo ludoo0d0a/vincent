@@ -439,6 +439,15 @@
     <string name="wines_management_import_title">Importer des vins</string>
     <string name="wines_management_import_desc">Sélectionnez la source de votre fichier CSV pour importer vos bouteilles.</string>
 
+    <string name="external_import_title">Import externe</string>
+    <string name="external_import_subtitle">Récupérez des données depuis Grapeminds ou Wikipedia</string>
+    <string name="external_import_wikipedia_desc">Importez la liste officielle des régions viticoles françaises depuis Wikipedia.</string>
+    <string name="external_import_grapeminds_desc">Accédez au catalogue mondial Grapeminds pour enrichir vos référentiels.</string>
+    <string name="external_import_regions_wikipedia">Importer les régions (Wikipedia)</string>
+    <string name="external_import_regions_grapeminds">Importer les régions (Grapeminds)</string>
+    <string name="external_import_producers_grapeminds">Importer les producteurs (Grapeminds)</string>
+    <string name="external_import_wines_grapeminds">Importer les vins (Grapeminds)</string>
+
     <string name="racks_management_title">Gestion des casiers</string>
     <string name="racks_management_subtitle">Configurez vos casiers par import CSV</string>
 

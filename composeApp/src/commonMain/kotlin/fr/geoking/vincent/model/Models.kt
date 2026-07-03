@@ -144,6 +144,13 @@ data class Producer(
     val phone: String = "",
 )
 
+data class Region(
+    val id: String,
+    val name: String,
+    val country: String = "",
+    val description: String = "",
+)
+
 data class Supplier(
     val id: String,
     val name: String,

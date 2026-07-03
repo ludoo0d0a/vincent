@@ -1,6 +1,9 @@
 package fr.geoking.vincent.data
 
 import fr.geoking.vincent.model.FlavorProfile
+import fr.geoking.vincent.model.Producer
+import fr.geoking.vincent.model.Region
+import fr.geoking.vincent.model.Bottle
 
 /** A capability a [WineDataProvider] may expose. */
 enum class ProviderCapability {
@@ -18,6 +21,15 @@ enum class ProviderCapability {
 
     /** Fetch rich detail (drink window, tasting notes, pairings…) for a known [ProductInfo.externalId]. */
     ENRICH,
+
+    /** List producers from the provider. */
+    LIST_PRODUCERS,
+
+    /** List regions from the provider. */
+    LIST_REGIONS,
+
+    /** List wines from the provider. */
+    LIST_WINES,
 }
 
 /** An estimated/looked-up price attached to a product. */
@@ -85,6 +97,9 @@ interface WineDataProvider {
     suspend fun search(query: String): List<ProductInfo> = emptyList()
     suspend fun price(query: String): PriceInfo? = null
     suspend fun enrich(externalId: String): WineEnrichment? = null
+    suspend fun listProducers(): List<Producer> = emptyList()
+    suspend fun listRegions(): List<Region> = emptyList()
+    suspend fun listWines(): List<Bottle> = emptyList()
 }
 
 /** Platform-provided list of available providers (order = priority). */
@@ -128,6 +143,24 @@ object WineDataSource {
         val candidates = supporting(ProviderCapability.ENRICH)
         val provider = candidates.firstOrNull { it.id == source } ?: candidates.firstOrNull()
         return provider?.enrich(externalId)
+    }
+
+    suspend fun listProducers(source: String? = null): List<Producer> {
+        val candidates = supporting(ProviderCapability.LIST_PRODUCERS)
+        val provider = candidates.firstOrNull { it.id == source } ?: candidates.firstOrNull()
+        return provider?.listProducers() ?: emptyList()
+    }
+
+    suspend fun listRegions(source: String? = null): List<Region> {
+        val candidates = supporting(ProviderCapability.LIST_REGIONS)
+        val provider = candidates.firstOrNull { it.id == source } ?: candidates.firstOrNull()
+        return provider?.listRegions() ?: emptyList()
+    }
+
+    suspend fun listWines(source: String? = null): List<Bottle> {
+        val candidates = supporting(ProviderCapability.LIST_WINES)
+        val provider = candidates.firstOrNull { it.id == source } ?: candidates.firstOrNull()
+        return provider?.listWines() ?: emptyList()
     }
 }
 

@@ -10,8 +10,9 @@ import androidx.room.RoomDatabase
         TastingEntity::class,
         ProducerEntity::class,
         SupplierEntity::class,
+        RegionEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class VincentDatabase : RoomDatabase() {
@@ -20,4 +21,5 @@ abstract class VincentDatabase : RoomDatabase() {
     abstract fun tastingDao(): TastingDao
     abstract fun producerDao(): ProducerDao
     abstract fun supplierDao(): SupplierDao
+    abstract fun regionDao(): RegionDao
 }
