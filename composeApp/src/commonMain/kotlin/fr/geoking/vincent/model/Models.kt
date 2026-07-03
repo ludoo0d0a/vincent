@@ -132,6 +132,7 @@ data class Tasting(
     val notes: String,
     val color: WineColor? = null,
     val vintage: String? = null,
+    val place: String = "",
 )
 
 data class Producer(

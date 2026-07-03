@@ -131,6 +131,13 @@
     <string name="detail_identified_ai">IDENTIFIED BY AI</string>
     <string name="detail_stars_count">%s/5</string>
     <string name="detail_no_notes">No notes yet.</string>
+    <string name="detail_tasting_add">Add a tasting</string>
+    <string name="detail_tasting_date">Date</string>
+    <string name="detail_tasting_place">Place</string>
+    <string name="detail_tasting_notes">Notes</string>
+    <string name="detail_tasting_save">Save</string>
+    <string name="detail_tasting_title">Tasting</string>
+    <string name="detail_price_auto">Auto</string>
 
     <string name="bottles_title">My bottles</string>
     <plurals name="bottles_subtitle_format">

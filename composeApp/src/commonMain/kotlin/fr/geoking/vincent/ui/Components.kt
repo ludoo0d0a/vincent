@@ -147,13 +147,23 @@ fun ColorTag(color: WineColor, modifier: Modifier = Modifier, label: String = st
 
 /** Simple star rating glyph row, e.g. "★★★★☆". */
 @Composable
-fun Stars(rating: Double, modifier: Modifier = Modifier, color: Color = Color(0xFFD69A3C)) {
+fun Stars(
+    rating: Double,
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFFD69A3C),
+    onClick: (() -> Unit)? = null,
+) {
     val full = rating.toInt().coerceIn(0, 5)
     val text = buildString {
         repeat(full) { append('★') }
         repeat(5 - full) { append('☆') }
     }
-    Text(text, color = color, fontSize = 11.sp, modifier = modifier)
+    Text(
+        text,
+        color = color,
+        fontSize = 11.sp,
+        modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+    )
 }
 
 private val ScreenPad = PaddingValues(horizontal = 16.dp)
