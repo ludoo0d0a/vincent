@@ -17,7 +17,17 @@ actual fun rememberCsvImport(onText: (String) -> Unit): () -> Unit {
         if (uri != null) {
             scope.launch {
                 val text = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+                    try {
+                        // Strict UTF-8 decoding to catch encoding issues
+                        java.nio.charset.Charset.forName("UTF-8").newDecoder()
+                            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                            .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                            .decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+                    } catch (e: Exception) {
+                        // Fallback to Windows-1252 (common for French Excel CSV exports)
+                        String(bytes, java.nio.charset.Charset.forName("Windows-1252"))
+                    }
                 }
                 if (text != null) onText(text)
             }
