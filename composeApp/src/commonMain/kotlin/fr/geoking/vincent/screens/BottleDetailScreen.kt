@@ -292,6 +292,10 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 VCard(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     Column {
                         InfoRow(Icons.Filled.Place, stringResource(Res.string.detail_source_label), live.provenance, divider = true)
+                        if (live.alcoholLevel > 0.0) {
+                            InfoRow(Icons.Filled.LocalBar, stringResource(Res.string.detail_alcohol_label), "${live.alcoholLevel}%", divider = true)
+                        }
+                        InfoRow(Icons.Filled.LocalBar, stringResource(Res.string.detail_sugar_label), stringResource(live.sugarLevel.label), divider = true)
                         InfoRow(Icons.Filled.Storefront, stringResource(Res.string.detail_merchant_label), live.merchant, divider = true)
                         InfoRow(Icons.Filled.CalendarMonth, stringResource(Res.string.detail_purchase_date_label), live.purchaseDate, divider = true)
                         InfoRow(Icons.Filled.LocalBar, stringResource(Res.string.detail_occasion_label), live.occasion, divider = false)

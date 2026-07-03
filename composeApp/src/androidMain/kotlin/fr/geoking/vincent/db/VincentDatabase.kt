@@ -11,10 +11,19 @@ import androidx.room.RoomDatabase
         ProducerEntity::class,
         SupplierEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class VincentDatabase : RoomDatabase() {
+    companion object {
+        val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE bottles ADD COLUMN alcoholLevel REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE bottles ADD COLUMN sugarLevel TEXT NOT NULL DEFAULT 'SEC'")
+            }
+        }
+    }
+
     abstract fun bottleDao(): BottleDao
     abstract fun rackDao(): RackDao
     abstract fun tastingDao(): TastingDao

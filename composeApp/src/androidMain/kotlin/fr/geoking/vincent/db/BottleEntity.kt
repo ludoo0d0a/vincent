@@ -5,6 +5,7 @@ import androidx.room.PrimaryKey
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.FlavorProfile
+import fr.geoking.vincent.model.SugarLevel
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 
@@ -28,6 +29,8 @@ data class BottleEntity(
     val merchant: String,
     val purchaseDate: String,
     val occasion: String,
+    val alcoholLevel: Double = 0.0,
+    val sugarLevel: String = "SEC",
     val favorite: Boolean,
     val pairings: String,
     val drinkFrom: Int,
@@ -64,6 +67,8 @@ fun BottleEntity.toBottle(): Bottle = Bottle(
     merchant = merchant,
     purchaseDate = purchaseDate,
     occasion = occasion,
+    alcoholLevel = alcoholLevel,
+    sugarLevel = runCatching { SugarLevel.valueOf(sugarLevel) }.getOrDefault(SugarLevel.SEC),
     favorite = favorite,
     pairings = if (pairings.isEmpty()) emptyList() else pairings.split(SEP),
     drinkFrom = drinkFrom,
@@ -97,6 +102,8 @@ fun Bottle.toEntity(): BottleEntity = BottleEntity(
     merchant = merchant,
     purchaseDate = purchaseDate,
     occasion = occasion,
+    alcoholLevel = alcoholLevel,
+    sugarLevel = sugarLevel.name,
     favorite = favorite,
     pairings = pairings.joinToString(SEP),
     drinkFrom = drinkFrom,
