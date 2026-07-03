@@ -1224,7 +1224,7 @@ private fun VoiceSummary(
         }
         SummaryRow(
             label = stringResource(Res.string.add_parsed_aging_potential),
-            value = if (parsed.agingPotential > 0) "${parsed.agingPotential} ans" else "",
+            value = if (parsed.agingPotential > 0) stringResource(Res.string.aging_potential_years, parsed.agingPotential) else "",
             missing = missing(VoiceField.AGING),
             editing = editing == VoiceField.AGING,
             onToggle = { toggle(VoiceField.AGING) },
