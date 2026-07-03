@@ -52,7 +52,7 @@ jobs:
             });
 
       - name: Invoke Jules
-        uses: google-labs-code/jules-invoke@v1
+        uses: beksomega/jules-action@v1
         with:
           jules_api_key: ${{ secrets.JULES_API_KEY }}
           starting_branch: ${{ github.event.workflow_run.head_branch }}
