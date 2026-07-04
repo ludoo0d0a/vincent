@@ -67,6 +67,7 @@ import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.matchingBottle
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
@@ -82,18 +83,6 @@ private data class Filter(val label: String, val color: WineColor?, val favOnly:
 
 /** How the bottle results are laid out. */
 private enum class BottleViewMode { GRID, COMPACT, CELLAR }
-
-/**
- * Best-effort link between a physical rack cell and a real bottle, matching on
- * wine colour + price + last two vintage digits (same heuristic as the cellar
- * peek card). Returns the first bottle from [pool] that fits, or null.
- */
-private fun RackCell.matchingBottle(pool: List<Bottle>): Bottle? {
-    if (!occupied) return null
-    return pool.firstOrNull {
-        it.color == color && it.price == price && it.vintage.takeLast(2) == vintage?.takeLast(2)
-    }
-}
 
 private sealed interface BottleImportStatus {
     data class Success(val count: Int, val source: String) : BottleImportStatus
