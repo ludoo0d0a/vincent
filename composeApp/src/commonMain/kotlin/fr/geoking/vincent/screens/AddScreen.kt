@@ -98,7 +98,8 @@ import fr.geoking.vincent.ui.WineBottle
 
 // One "Identifier" screen handles BOTH barcode and label; plus voice and manual.
 private enum class AddMode(val label: org.jetbrains.compose.resources.StringResource) {
-    IDENTIFY(Res.string.add_mode_identify),
+    PHOTO(Res.string.add_mode_photo),
+    SCAN(Res.string.add_mode_scan),
     VOICE(Res.string.add_mode_voice),
     MANUAL(Res.string.add_mode_manual)
 }
@@ -112,7 +113,7 @@ private sealed interface ScanMessage {
 @Composable
 fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, editingBottle: Bottle? = null) {
     // Opened from an empty rack cell → start on the manual form with the spot pre-filled.
-    var mode by remember { mutableStateOf(if (initialPlacement != null || editingBottle != null) AddMode.MANUAL else AddMode.IDENTIFY) }
+    var mode by remember { mutableStateOf(if (initialPlacement != null || editingBottle != null) AddMode.MANUAL else AddMode.PHOTO) }
     val recognizer = wineRecognizer()
     val estimator = priceEstimator()
     val scope = rememberCoroutineScope()
@@ -151,6 +152,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     spot = b.cellarSpot,
                     placeRack = foundRack,
                     placeCell = foundCell,
+                    photos = BottlePhotoKind.entries.associateWith { b.photo(it) }
                 )
             } ?: initialPlacement?.let { p ->
                 val rack = Racks.all.getOrNull(p.rackIndex)
@@ -216,8 +218,8 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
     var chatBusy by remember { mutableStateOf(false) }
     val assistantDone = stringResource(Res.string.add_voice_assistant_done)
 
-    // Pre-fill the manual form from the current (possibly edited) voice result.
-    fun seedManualFromVoice() {
+    // Pre-fill the manual form from the current (possibly edited) voice or scan result.
+    fun seedManualFromCurrent() {
         aiBottle?.let { b ->
             val eff = aiPrice?.amountEur ?: b.price
             manualSeed = ManualSeed(
@@ -231,6 +233,10 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                 alcohol = b.alcoholLevel.takeIf { it > 0.0 }?.toString() ?: "",
                 sugar = b.sugarLevel,
                 grapes = b.grapes,
+                imageUrl = capturedLabelUri, // Legacy field fallback if needed
+                photos = BottlePhotoKind.entries.associateWith { b.photo(it) }.toMutableMap().apply {
+                    if (capturedLabelUri != null) put(BottlePhotoKind.LABEL, capturedLabelUri)
+                }
             )
         }
     }
@@ -249,7 +255,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                 // Stay on the voice summary; the user completes missing data by tapping
                 // a field or chatting, and only switches to the manual form on demand.
                 aiPrice = estimator.estimate(b)
-                seedManualFromVoice()
+                seedManualFromCurrent()
             }
         }
     }
@@ -261,7 +267,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
         aiPrice = null
     }
     val onSwitchToManual: () -> Unit = {
-        seedManualFromVoice()
+        seedManualFromCurrent()
         mode = AddMode.MANUAL
     }
     val onSendChat: (String) -> Unit = { msg ->
@@ -309,7 +315,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (on) VincentColors.Surface else Color.Transparent)
                         .clickable {
                             mode = m
-                            if (m != AddMode.IDENTIFY && m != AddMode.VOICE) aiError = null
+                            if (m != AddMode.PHOTO && m != AddMode.SCAN && m != AddMode.VOICE) aiError = null
                         }.padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) { Text(stringResource(m.label), fontSize = 12.sp, fontWeight = FontWeight.W700, color = if (on) VincentColors.Accent else VincentColors.Muted) }
@@ -342,7 +348,8 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
         Spacer(Modifier.height(12.dp))
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
             when (mode) {
-                AddMode.IDENTIFY -> ScanPane(
+                AddMode.PHOTO -> ScanPane(
+                    isLabel = true,
                     color = aiBottle?.color ?: WineColor.RED,
                     bottle = aiBottle,
                     title = aiBottle?.let { "${it.domain} ${it.vintage}" }.orEmpty(),
@@ -353,6 +360,21 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     errorMsg = aiError,
                     onIdentify = identify,
                     onScanBarcode = scanBarcode,
+                    onSwitchToManual = onSwitchToManual,
+                )
+                AddMode.SCAN -> ScanPane(
+                    isLabel = false,
+                    color = aiBottle?.color ?: WineColor.RED,
+                    bottle = aiBottle,
+                    title = aiBottle?.let { "${it.domain} ${it.vintage}" }.orEmpty(),
+                    subtitle = aiBottle?.let { "${it.appellation} · ${stringResource(it.color.label)}" }.orEmpty(),
+                    priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
+                    busy = busy,
+                    hasResult = aiBottle != null,
+                    errorMsg = aiError,
+                    onIdentify = identify,
+                    onScanBarcode = scanBarcode,
+                    onSwitchToManual = onSwitchToManual,
                 )
                 AddMode.VOICE -> VoicePane(
                     transcript = transcript,
@@ -388,7 +410,8 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                 else -> stringResource(Res.string.add_confirm)
             }
             busy -> stringResource(Res.string.add_analyzing)
-            mode == AddMode.IDENTIFY -> stringResource(Res.string.add_barcode_required)
+            mode == AddMode.PHOTO -> stringResource(Res.string.add_barcode_required)
+            mode == AddMode.SCAN -> stringResource(Res.string.add_barcode_required)
             mode == AddMode.VOICE -> stringResource(Res.string.add_dictate_required)
             else -> stringResource(Res.string.add_confirm)
         }
@@ -451,6 +474,7 @@ private data class ManualSeed(
     val placeRack: Int? = null,
     val placeCell: Int? = null,
     val imageUrl: String? = null,
+    val photos: Map<BottlePhotoKind, String?> = emptyMap(),
 )
 
 /** Manual entry — search cellar + form; emits a Bottle (or null while the name is empty). */
@@ -511,6 +535,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
             vintage = it.vintage; price = it.price; agingPotential = it.agingPotential
             alcohol = it.alcohol; sugar = it.sugar; grapes = it.grapes
             if (it.imageUrl != null) photos = photos + (BottlePhotoKind.LABEL to it.imageUrl)
+            if (it.photos.isNotEmpty()) photos = photos + it.photos
             if (it.spot.isNotBlank()) spot = it.spot
             if (it.placeRack != null && it.placeCell != null) {
                 placeRack = it.placeRack
@@ -922,15 +947,10 @@ private fun <T> ChipRow(
     }
 }
 
-// Inside "Identifier": two distinct capture methods, toggled — barcode (Open Food
-// Facts, auto-detect) vs label photo (AI). Mirrors the two scan screens in the mockup.
-private enum class IdentifyMethod(val label: org.jetbrains.compose.resources.StringResource) {
-    BARCODE(Res.string.add_method_barcode),
-    LABEL(Res.string.add_method_label)
-}
 
 @Composable
 private fun ScanPane(
+    isLabel: Boolean,
     color: WineColor,
     bottle: Bottle?,
     title: String,
@@ -941,9 +961,9 @@ private fun ScanPane(
     errorMsg: String? = null,
     onIdentify: () -> Unit,
     onScanBarcode: (() -> Unit)? = null,
+    onSwitchToManual: () -> Unit,
 ) {
-    var method by remember { mutableStateOf(IdentifyMethod.BARCODE) }
-    val label = method == IdentifyMethod.LABEL
+    val label = isLabel
     Column(Modifier.fillMaxSize()) {
         // Viewfinder + loading animation overlay. Frame adapts to the chosen method.
         Box(
@@ -1023,6 +1043,14 @@ private fun ScanPane(
                         Text(priceLabel, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Green, modifier = Modifier.padding(top = 3.dp))
                     }
                 }
+                Box(
+                    Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.Surface2)
+                        .border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp))
+                        .clickable(onClick = onSwitchToManual),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(Res.string.add_voice_switch_manual), tint = VincentColors.Accent, modifier = Modifier.size(16.dp))
+                }
             }
         } else if (!busy && errorMsg != null) {
             Text(
@@ -1032,22 +1060,6 @@ private fun ScanPane(
             )
         }
 
-        // Method toggle (Code-barres | Étiquette) — clearly separates the two flows.
-        Spacer(Modifier.height(12.dp))
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp)).background(VincentColors.Surface2)
-                .border(1.dp, VincentColors.Border, RoundedCornerShape(11.dp)).padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            IdentifyMethod.entries.forEach { m ->
-                val on = m == method
-                Box(
-                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (on) VincentColors.Surface else Color.Transparent)
-                        .clickable(enabled = !busy) { method = m }.padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center,
-                ) { Text(stringResource(m.label), fontSize = 12.sp, fontWeight = FontWeight.W700, color = if (on) VincentColors.Accent else VincentColors.Muted) }
-            }
-        }
 
         // Single action, scoped to the active method.
         Spacer(Modifier.height(10.dp))
