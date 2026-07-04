@@ -99,10 +99,11 @@ object Cellar {
     // --- mutations (update snapshot state immediately, persist asynchronously) ---
 
     fun addBottle(b: Bottle) {
-        bottles.add(0, b)
-        recent.add(0, b)
+        val updated = if (b.addedAt == 0L) b.copy(addedAt = fr.geoking.vincent.getCurrentTimeMillis()) else b
+        bottles.add(0, updated)
+        recent.add(0, updated)
         addedThisMonth += 1
-        persist(b)
+        persist(updated)
     }
 
     fun updateBottle(updated: Bottle) {
@@ -148,10 +149,12 @@ object Cellar {
 
     /** Merge imported bottles by id (add or replace), persisting each. */
     fun importBottles(incoming: List<Bottle>): Int {
+        val now = fr.geoking.vincent.getCurrentTimeMillis()
         incoming.forEach { b ->
-            val i = bottles.indexOfFirst { it.id == b.id }
-            if (i >= 0) bottles[i] = b else bottles.add(0, b)
-            persist(b)
+            val updated = if (b.addedAt == 0L) b.copy(addedAt = now) else b
+            val i = bottles.indexOfFirst { it.id == updated.id }
+            if (i >= 0) bottles[i] = updated else bottles.add(0, updated)
+            persist(updated)
         }
         return incoming.size
     }

@@ -17,6 +17,7 @@ object CsvFormat {
         "quantity", "rating", "cellarSpot", "provenance", "merchant", "purchaseDate",
         "occasion", "alcoholLevel", "sugarLevel", "favorite", "pairings", "drinkFrom",
         "drinkTo", "drinkNow", "agingPotential", "tastingNotes", "source", "addedLabel",
+        "addedAt",
     )
 
     // Header aliases (lower-cased) used to locate a value across app formats.
@@ -46,6 +47,7 @@ object CsvFormat {
         "tastingNotes" to listOf("tastingnotes", "notes", "tasting notes", "commentaire"),
         "source" to listOf("source"),
         "addedLabel" to listOf("addedlabel"),
+        "addedAt" to listOf("addedat", "date d'ajout", "added date"),
 
         // Tastings
         "wineName" to listOf("winename", "vin", "bouteille", "nom du vin"),
@@ -77,8 +79,11 @@ object CsvFormat {
             val row = listOf(
                 b.id, b.domain, b.appellation, b.color.name, b.category.name, b.vintage,
                 b.price.toString(), b.quantity.toString(), b.rating.toString(), b.cellarSpot,
-        "occasion", "alcoholLevel", "sugarLevel", "favorite", "pairings", "drinkFrom",
-        "drinkTo", "drinkNow", "agingPotential", "tastingNotes", "source", "addedLabel",
+                b.provenance, b.merchant, b.purchaseDate, b.occasion, b.alcoholLevel.toString(),
+                b.sugarLevel.name, b.favorite.toString(), b.pairings.joinToString(";"),
+                b.drinkFrom.toString(), b.drinkTo.toString(), b.drinkNow.toString(),
+                b.agingPotential.toString(), b.tastingNotes, b.source.name, b.addedLabel,
+                b.addedAt.toString(),
             )
             appendLine(row.joinToString(",") { esc(it) })
         }
@@ -222,6 +227,7 @@ object CsvFormat {
             tastingNotes = field("tastingNotes", index) ?: "",
             source = field("source", index)?.let { runCatching { AddSource.valueOf(it) }.getOrNull() } ?: AddSource.MANUAL,
             addedLabel = field("addedLabel", index) ?: "importé",
+            addedAt = field("addedAt", index)?.toLongOrNull() ?: 0L,
         )
     }
 

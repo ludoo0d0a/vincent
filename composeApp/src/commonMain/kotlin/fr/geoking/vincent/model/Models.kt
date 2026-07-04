@@ -103,6 +103,7 @@ data class Bottle(
     val photoBottle: String? = null,
     val photoLabel: String? = null,
     val photoBack: String? = null,
+    val addedAt: Long = 0,
 )
 
 fun Bottle.photo(kind: BottlePhotoKind): String? = when (kind) {

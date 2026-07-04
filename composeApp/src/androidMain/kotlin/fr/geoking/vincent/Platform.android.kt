@@ -7,3 +7,5 @@ actual fun formatShortDateTime(epochMs: Long): String =
         .format(java.util.Date(epochMs))
 
 actual fun getCurrentYear(): Int = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+
+actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
