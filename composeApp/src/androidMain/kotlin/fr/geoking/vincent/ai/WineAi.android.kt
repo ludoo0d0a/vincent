@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.auth.FirebaseAuth
 import fr.geoking.vincent.BuildConfig
+import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.debug.HttpDebug
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
@@ -12,6 +13,9 @@ import fr.geoking.vincent.model.SugarLevel
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.getString
@@ -30,7 +34,62 @@ private const val MODEL = "gemini-flash-latest"
 private const val TAG = "VincentAI"
 
 /** Single Gemini-backed client implementing both seams. */
-object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
+object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer {
+
+    override fun search(bottle: Bottle): Flow<PriceSearchResult> = flow {
+        val links = bottlePriceCompareLinks(bottle)
+        for (link in links) {
+            val content = fetchText(link.url)
+            if (content.isBlank()) {
+                emit(PriceSearchResult(link.label, 0, link.url, false))
+                continue
+            }
+            val q = "${bottle.domain} ${bottle.vintage} ${bottle.appellation}".trim()
+            val json = generate(
+                langDirective() +
+                        "Dans le texte suivant (résultats de recherche), trouve le prix exact (entier en euros) " +
+                        "et l'URL de la fiche produit pour ce vin : \"$q\". " +
+                        "Renvoie JSON {price:int, url:string, found:boolean}. " +
+                        "Si plusieurs résultats, prends le plus pertinent. " +
+                        "Texte: \n\n$content",
+                imageB64 = null,
+            )
+            if (json != null && json.optBoolean("found", false)) {
+                emit(
+                    PriceSearchResult(
+                        label = link.label,
+                        price = json.optInt("price", 0),
+                        url = json.optString("url", link.url),
+                        isFound = true,
+                    ),
+                )
+            } else {
+                emit(PriceSearchResult(link.label, 0, link.url, false))
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    private fun fetchText(url: String): String {
+        return try {
+            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10000
+                readTimeout = 15000
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            }
+            if (conn.responseCode !in 200..299) return ""
+            val html = conn.inputStream.bufferedReader().use { it.readText() }
+            // Basic HTML to Text: remove scripts, styles and tags
+            html.replace(Regex("<script[\\s\\S]*?</script>", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("<style[\\s\\S]*?</style>", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("<[^>]*>"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+                .take(8000) // Gemini context limit safety
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch $url: ${e.message}")
+            ""
+        }
+    }
 
     override suspend fun pairings(bottle: Bottle): List<String> = withContext(Dispatchers.IO) {
         val q = "${bottle.domain} ${bottle.vintage} — ${bottle.color.label}, ${bottle.appellation}"
@@ -482,4 +541,5 @@ object GeminiClient : WineRecognizer, PriceEstimator, FoodPairer {
 
 actual fun wineRecognizer(): WineRecognizer = GeminiClient
 actual fun priceEstimator(): PriceEstimator = GeminiClient
+actual fun priceSearcher(): PriceSearcher = GeminiClient
 actual fun foodPairer(): FoodPairer = GeminiClient

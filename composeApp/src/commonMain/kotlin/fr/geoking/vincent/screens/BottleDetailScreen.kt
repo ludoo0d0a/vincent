@@ -55,8 +55,10 @@ import fr.geoking.vincent.model.AgingStatus
 import fr.geoking.vincent.model.agingStatus
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
+import fr.geoking.vincent.ai.PriceSearchResult
 import fr.geoking.vincent.ai.foodPairer
 import fr.geoking.vincent.ai.priceEstimator
+import fr.geoking.vincent.ai.priceSearcher
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Tastings
@@ -69,6 +71,8 @@ import fr.geoking.vincent.model.cellIndexFromSpot
 import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.photo
 import fr.geoking.vincent.model.thumbnailUri
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
@@ -87,6 +91,7 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
     val fav = live.favorite
     val pairer = foodPairer()
     val estimator = priceEstimator()
+    val searcher = priceSearcher()
     val scope = rememberCoroutineScope()
     val labelSaver = rememberLabelImageSaver()
     var pendingKind by remember { mutableStateOf<BottlePhotoKind?>(null) }
@@ -100,6 +105,9 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
     }
     var suggested by remember { mutableStateOf<List<String>>(emptyList()) }
     var pairingBusy by remember { mutableStateOf(false) }
+    var searching by remember { mutableStateOf(false) }
+    var searchResults by remember { mutableStateOf<List<PriceSearchResult>>(emptyList()) }
+
     val uriHandler = LocalUriHandler.current
     val compareLinks = remember(live.domain, live.vintage, live.appellation) { bottlePriceCompareLinks(live) }
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
@@ -370,41 +378,101 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
             }
 
             Section(stringResource(Res.string.detail_compare_prices)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                val est = estimator.estimate(live)
-                                if (est != null) {
-                                    Cellar.updateBottle(live.copy(price = est.amountEur))
-                                }
-                            }
-                        },
-                        modifier = Modifier.height(34.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = VincentColors.Accent),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                Column(Modifier.padding(top = 8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(Res.string.detail_price_auto), fontSize = 11.sp, fontWeight = FontWeight.W700)
+                        OutlinedButton(
+                            onClick = {
+                                searchResults = emptyList()
+                                scope.launch {
+                                    searcher.search(live)
+                                        .onStart { searching = true }
+                                        .onCompletion { searching = false }
+                                        .collect { res ->
+                                            searchResults = searchResults + res
+                                        }
+                                }
+                            },
+                            modifier = Modifier.height(34.dp),
+                            enabled = !searching,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = VincentColors.Accent),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        ) {
+                            if (searching) {
+                                androidx.compose.material3.CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = VincentColors.Accent)
+                            } else {
+                                Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(Res.string.detail_price_auto), fontSize = 11.sp, fontWeight = FontWeight.W700)
+                        }
+
+                        compareLinks.forEach { link ->
+                                OutlinedButton(
+                                    onClick = { uriHandler.openUri(link.url) },
+                                    modifier = Modifier.height(34.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                ) {
+                                    Text(link.label, fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(Icons.Filled.OpenInNew, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
+                                }
+                        }
                     }
 
-                    compareLinks.forEach { link ->
-                            OutlinedButton(
-                                onClick = { uriHandler.openUri(link.url) },
-                                modifier = Modifier.height(34.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                            ) {
-                                Text(link.label, fontSize = 11.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
-                                Spacer(Modifier.width(4.dp))
-                                Icon(Icons.Filled.OpenInNew, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
+                    if (searching || searchResults.isNotEmpty()) {
+                        VCard(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                            Column(Modifier.padding(8.dp)) {
+                                if (searching) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                                        androidx.compose.material3.CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp, color = VincentColors.Muted)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(Res.string.detail_price_searching), fontSize = 11.sp, color = VincentColors.Muted)
+                                    }
+                                }
+                                searchResults.forEach { res ->
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(res.label, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                                            if (res.isFound) {
+                                                Text(res.url, fontSize = 10.sp, color = VincentColors.Muted, maxLines = 1)
+                                            } else {
+                                                Text(stringResource(Res.string.detail_price_not_found), fontSize = 10.sp, color = VincentColors.Muted)
+                                            }
+                                        }
+                                        if (res.isFound) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("${res.price} €", fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    stringResource(Res.string.detail_price_update),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.W700,
+                                                    color = VincentColors.Accent,
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(VincentColors.AccentSoft)
+                                                        .clickable { Cellar.updateBottle(live.copy(price = res.price)) }
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (res != searchResults.last() || searching) {
+                                        Box(Modifier.fillMaxWidth().height(1.dp).background(VincentColors.Border).padding(vertical = 2.dp))
+                                    }
+                                }
                             }
+                        }
                     }
                 }
             }
