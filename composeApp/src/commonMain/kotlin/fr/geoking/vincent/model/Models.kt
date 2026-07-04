@@ -141,6 +141,18 @@ fun Bottle.agingStatus(currentYear: Int): AgingStatus? {
     return null
 }
 
+/**
+ * Best-effort link between a physical rack cell and a real bottle, matching on
+ * wine colour + price + last two vintage digits (same heuristic as the cellar
+ * peek card). Returns the first bottle from [pool] that fits, or null.
+ */
+fun RackCell.matchingBottle(pool: List<Bottle>): Bottle? {
+    if (!occupied) return null
+    return pool.firstOrNull {
+        it.color == color && it.price == price && it.vintage.takeLast(2) == vintage?.takeLast(2)
+    }
+}
+
 /** A single physical slot in a rack grid. */
 data class RackCell(
     val row: String,

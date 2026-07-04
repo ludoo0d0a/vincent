@@ -76,6 +76,7 @@ import fr.geoking.vincent.data.RackClipboardEntry
 import fr.geoking.vincent.data.RackClipboardMode
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.matchingBottle
 import fr.geoking.vincent.model.Rack
 import fr.geoking.vincent.model.RackCell
 import fr.geoking.vincent.model.RackFormat
@@ -113,6 +114,7 @@ fun CellarScreen(
     rackIdx: Int,
     onRackIdxChange: (Int) -> Unit,
     onOpenBottle: (Bottle) -> Unit,
+    onEditBottle: (Bottle) -> Unit = {},
     onAddToCell: (RackPlacement) -> Unit = {},
     onOpenAr: (Int) -> Unit = {},
     onEditRack: (Int) -> Unit = {},
@@ -177,7 +179,12 @@ fun CellarScreen(
                 }
                 moving = null
             }
-            c != null && c.occupied -> selectedIdx = i
+            c != null && c.occupied -> {
+                if (selectedIdx == i) {
+                    c.matchingBottle(Cellar.bottles)?.let(onEditBottle)
+                }
+                selectedIdx = i
+            }
             clipboard != null -> {
                 selectedIdx = i
                 pasteAt(i)
@@ -265,6 +272,7 @@ fun CellarScreen(
             ) {
                 PeekCard(
                     rack, rackIdx, sel, moving == sel, clipboard, onOpenBottle,
+                    onEditBottle = onEditBottle,
                     onAddBottle = { onAddToCell(RackPlacement(rackIdx, sel)) },
                     onDismiss = { selectedIdx = null },
                     onMove = { moving = if (moving == sel) null else sel },
@@ -621,6 +629,7 @@ private fun PeekCard(
     moving: Boolean,
     clipboard: RackClipboardEntry?,
     onOpenBottle: (Bottle) -> Unit,
+    onEditBottle: (Bottle) -> Unit,
     onAddBottle: () -> Unit,
     onDismiss: () -> Unit,
     onMove: () -> Unit,
@@ -658,9 +667,7 @@ private fun PeekCard(
         return
     }
     // Best-effort link to a real bottle (colour + vintage + price); else info only.
-    val match = Cellar.bottles.firstOrNull {
-        it.color == cell.color && it.price == cell.price && it.vintage.takeLast(2) == cell.vintage?.takeLast(2)
-    }
+    val match = cell.matchingBottle(Cellar.bottles)
     val categoryLabel = cell.category?.let { stringResource(it.label) }
     val colorLabel = cell.color?.let { stringResource(it.label) }
     val title = match?.domain ?: categoryLabel ?: colorLabel ?: stringResource(Res.string.cellar_spot_label, spot)
@@ -693,6 +700,13 @@ private fun PeekCard(
                             leadingIcon = { Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp)) },
                             onClick = { menuOpen = false; onMove() },
                         )
+                        if (match != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.edit_bottle)) },
+                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                onClick = { menuOpen = false; onEditBottle(match) },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.cellar_action_drink)) },
                             leadingIcon = { Icon(Icons.Filled.LocalBar, contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -701,6 +715,15 @@ private fun PeekCard(
                     }
                 }
                 PeekIconButton(Icons.Filled.Close, stringResource(Res.string.cellar_dismiss), onDismiss)
+            }
+            if (match != null && !moving && clipboard == null) {
+                Spacer(Modifier.height(11.dp))
+                PeekAction(
+                    stringResource(Res.string.edit_bottle),
+                    Icons.Filled.Edit,
+                    { onEditBottle(match) },
+                    Modifier.fillMaxWidth()
+                )
             }
             if (moving) {
                 Spacer(Modifier.height(10.dp))
