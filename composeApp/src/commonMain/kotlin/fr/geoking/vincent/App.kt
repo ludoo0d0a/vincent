@@ -60,7 +60,7 @@ import fr.geoking.vincent.screens.LoginScreen
 import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SettingsScreen
 import fr.geoking.vincent.screens.DataManagementScreen
-import fr.geoking.vincent.screens.ExternalImportScreen
+import fr.geoking.vincent.screens.RegionsManagementScreen
 import fr.geoking.vincent.screens.TastingEditScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
@@ -89,7 +89,7 @@ private sealed interface Dest {
     data object Recent : Dest
     data object WinesManagement : Dest
     data object RacksManagement : Dest
-    data object ExternalImport : Dest
+    data object RegionsManagement : Dest
     data object Tastings : Dest
     data object Producers : Dest
     data object Suppliers : Dest
@@ -198,16 +198,16 @@ fun App() = VincentTheme {
                     onOpenTastings = { stack.add(Dest.Tastings) },
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
-                    onOpenExternalImport = { stack.add(Dest.ExternalImport) },
+                    onOpenRegions = { stack.add(Dest.RegionsManagement) },
                 )
 
                 Dest.WinesManagement -> WinesManagementScreen(onBack = ::pop)
                 Dest.RacksManagement -> RacksManagementScreen(onBack = ::pop)
-                Dest.ExternalImport -> ExternalImportScreen(onBack = ::pop)
+                Dest.RegionsManagement -> RegionsManagementScreen(onBack = ::pop)
 
-                Dest.Tastings -> TastingsScreen(onBack = { stack.clear() })
-                Dest.Producers -> ProducersScreen(onBack = { stack.clear() })
-                Dest.Suppliers -> SuppliersScreen(onBack = { stack.clear() })
+                Dest.Tastings -> TastingsScreen(onBack = ::pop)
+                Dest.Producers -> ProducersScreen(onBack = ::pop)
+                Dest.Suppliers -> SuppliersScreen(onBack = ::pop)
                 Dest.Logcat -> LogcatScreen(onBack = { stack.clear() })
 
                 is Dest.Ar -> ArScreen(rackIndex = top.rackIndex, onBack = { stack.clear() })

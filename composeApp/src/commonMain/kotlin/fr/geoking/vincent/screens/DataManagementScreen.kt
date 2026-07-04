@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -29,11 +27,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.Producers
+import fr.geoking.vincent.data.Racks
+import fr.geoking.vincent.data.Regions
+import fr.geoking.vincent.data.Suppliers
+import fr.geoking.vincent.data.Tastings
+import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.DataScreenHeader
+import fr.geoking.vincent.ui.SectionHeader
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
-import fr.geoking.vincent.data.Racks
-import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.SectionHeader
 
 @Composable
 fun DataManagementScreen(
@@ -43,44 +48,48 @@ fun DataManagementScreen(
     onOpenTastings: () -> Unit,
     onOpenProducers: () -> Unit,
     onOpenSuppliers: () -> Unit,
-    onOpenExternalImport: () -> Unit,
+    onOpenRegions: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
-        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back), modifier = Modifier.size(18.dp), tint = VincentColors.Fg) }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(stringResource(Res.string.data_management_title), fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                Text(stringResource(Res.string.data_management_subtitle), fontSize = 11.5.sp, color = VincentColors.Muted)
-            }
-        }
+        DataScreenHeader(
+            title = stringResource(Res.string.data_management_title),
+            subtitle = stringResource(Res.string.data_management_subtitle),
+            onBack = onBack,
+        )
 
         Column(Modifier.padding(horizontal = 16.dp)) {
-            SectionHeader(stringResource(Res.string.data_management_section_transfer))
-            DataLink(
-                label = stringResource(Res.string.external_import_title),
-                sublabel = stringResource(Res.string.external_import_subtitle),
-                onClick = onOpenExternalImport
-            )
-
             SectionHeader(stringResource(Res.string.data_management_section_data))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 DataLink(
                     label = stringResource(Res.string.data_management_wines),
-                    sublabel = stringResource(Res.string.data_management_wines_subtitle, fr.geoking.vincent.data.Cellar.totalBottles()),
-                    onClick = onOpenWines
+                    sublabel = stringResource(Res.string.data_management_wines_subtitle, Cellar.totalBottles()),
+                    onClick = onOpenWines,
                 )
                 DataLink(
                     label = stringResource(Res.string.data_management_racks),
                     sublabel = stringResource(Res.string.data_management_racks_subtitle, Racks.all.size),
-                    onClick = onOpenRacks
+                    onClick = onOpenRacks,
                 )
-                DataLink(stringResource(Res.string.ploc_tastings), onOpenTastings)
-                DataLink(stringResource(Res.string.ploc_producers), onOpenProducers)
-                DataLink(stringResource(Res.string.ploc_suppliers), onOpenSuppliers)
+                DataLink(
+                    label = stringResource(Res.string.data_management_tastings),
+                    sublabel = pluralStringResource(Res.plurals.tastings_subtitle, Tastings.all.size, Tastings.all.size),
+                    onClick = onOpenTastings,
+                )
+                DataLink(
+                    label = stringResource(Res.string.data_management_producers),
+                    sublabel = stringResource(Res.string.data_management_producers_subtitle, Producers.all.size),
+                    onClick = onOpenProducers,
+                )
+                DataLink(
+                    label = stringResource(Res.string.data_management_suppliers),
+                    sublabel = stringResource(Res.string.data_management_suppliers_subtitle, Suppliers.all.size),
+                    onClick = onOpenSuppliers,
+                )
+                DataLink(
+                    label = stringResource(Res.string.data_management_regions),
+                    sublabel = pluralStringResource(Res.plurals.regions_management_subtitle, Regions.all.size, Regions.all.size),
+                    onClick = onOpenRegions,
+                )
             }
 
             Spacer(Modifier.height(24.dp))

@@ -139,6 +139,7 @@
     <string name="detail_stars_count">%s/5</string>
     <string name="detail_no_notes">Aucune note pour le moment.</string>
     <string name="detail_tasting_add">Ajouter une dégustation</string>
+    <string name="detail_tasting_empty">Aucune dégustation enregistrée.</string>
     <string name="detail_tasting_date">Date</string>
     <string name="detail_tasting_place">Lieu</string>
     <string name="detail_tasting_notes">Commentaire</string>
@@ -251,12 +252,12 @@
     <string name="transfer_import_desc">Chargez un export CSV de PLOC, Vivino ou d'un tableur. Les colonnes sont reconnues automatiquement (couleur, millésime, prix, région…).</string>
     <string name="transfer_import_button">Choisir un fichier CSV</string>
     <string name="transfer_export_title">Exporter ma cave</string>
-    <string name="transfer_export_desc">Génère un fichier CSV de vos %d références (sans les photos) — réimportable dans Vincent ou lisible dans tout tableur.</string>
+    <string name="transfer_export_desc">Génère un fichier CSV de vos %1$d références (sans les photos) — réimportable dans Vincent ou lisible dans tout tableur.</string>
     <string name="transfer_export_button">Exporter en CSV</string>
     <string name="transfer_formats_supported">Formats pris en charge</string>
     <plurals name="transfer_import_success">
-        <item quantity="one">Importé : %1$d bouteille · source détectée « %3$s »</item>
-        <item quantity="other">Importé : %1$d bouteilles · source détectée « %3$s »</item>
+        <item quantity="one">Importé : %1$d bouteille · source « %2$s »</item>
+        <item quantity="other">Importé : %1$d bouteilles · source « %2$s »</item>
     </plurals>
     <string name="transfer_import_none">Aucune donnée reconnue dans ce fichier.</string>
     <plurals name="data_import_done">
@@ -387,30 +388,30 @@
     <string name="transfer_export_screen_title">Exporter ma cave</string>
     <string name="bottles_import_wrong_type">Le fichier ne semble pas être un export de bouteilles.</string>
     <plurals name="cellar_import_success">
-        <item quantity="one">Importé : %d casier</item>
-        <item quantity="other">Importé : %d casiers</item>
+        <item quantity="one">Importé : %1$d casier</item>
+        <item quantity="other">Importé : %1$d casiers</item>
     </plurals>
     <string name="cellar_import_wrong_type">Le fichier ne semble pas être un export de casiers.</string>
 
     <string name="tastings_title">Mes dégustations</string>
     <plurals name="tastings_subtitle">
-        <item quantity="one">%d fiche enregistrée</item>
-        <item quantity="other">%d fiches enregistrées</item>
+        <item quantity="one">%1$d fiche enregistrée</item>
+        <item quantity="other">%1$d fiches enregistrées</item>
     </plurals>
     <string name="tastings_import_button">Importer des dégustations</string>
     <plurals name="tastings_import_success">
-        <item quantity="one">Importé : %d dégustation</item>
-        <item quantity="other">Importé : %d dégustations</item>
+        <item quantity="one">Importé : %1$d dégustation</item>
+        <item quantity="other">Importé : %1$d dégustations</item>
     </plurals>
     <string name="tastings_import_wrong_type">Le fichier ne semble pas être un export de dégustations.</string>
     <string name="tastings_empty">Aucune dégustation. Importez un fichier CSV de PLOC pour commencer.</string>
 
     <string name="producers_title">Mes producteurs</string>
-    <string name="producers_subtitle">%d producteurs enregistrés</string>
+    <string name="producers_subtitle">%1$d producteurs enregistrés</string>
     <string name="producers_import_button">Importer des producteurs</string>
     <plurals name="producers_import_success">
-        <item quantity="one">Importé : %d producteur</item>
-        <item quantity="other">Importé : %d producteurs</item>
+        <item quantity="one">Importé : %1$d producteur</item>
+        <item quantity="other">Importé : %1$d producteurs</item>
     </plurals>
     <string name="producers_import_wrong_type">Le fichier ne semble pas être un export de producteurs.</string>
     <string name="producers_empty">Aucun producteur. Importez un fichier CSV de PLOC pour commencer.</string>
@@ -429,11 +430,11 @@
     <string name="settings_section_data_sources">Sources de données</string>
 
     <string name="suppliers_title">Mes fournisseurs</string>
-    <string name="suppliers_subtitle">%d fournisseurs enregistrés</string>
+    <string name="suppliers_subtitle">%1$d fournisseurs enregistrés</string>
     <string name="suppliers_import_button">Importer des fournisseurs</string>
     <plurals name="suppliers_import_success">
-        <item quantity="one">Importé : %d fournisseur</item>
-        <item quantity="other">Importé : %d fournisseurs</item>
+        <item quantity="one">Importé : %1$d fournisseur</item>
+        <item quantity="other">Importé : %1$d fournisseurs</item>
     </plurals>
     <string name="suppliers_import_wrong_type">Le fichier ne semble pas être un export de fournisseurs.</string>
     <string name="suppliers_empty">Aucun fournisseur. Importez un fichier CSV de PLOC pour commencer.</string>
@@ -452,9 +453,23 @@
     <string name="data_management_section_referentials">Référentiels</string>
     <string name="data_management_section_data">Données</string>
     <string name="data_management_wines">Vins</string>
-    <string name="data_management_wines_subtitle">%d bouteilles en cave</string>
+    <string name="data_management_wines_subtitle">%1$d bouteilles en cave</string>
     <string name="data_management_racks">Casiers</string>
-    <string name="data_management_racks_subtitle">%d casiers configurés</string>
+    <string name="data_management_racks_subtitle">%1$d casiers configurés</string>
+    <string name="data_management_tastings">Dégustations</string>
+    <string name="data_management_producers">Producteurs</string>
+    <string name="data_management_producers_subtitle">%1$d producteurs enregistrés</string>
+    <string name="data_management_suppliers">Fournisseurs</string>
+    <string name="data_management_suppliers_subtitle">%1$d fournisseurs enregistrés</string>
+    <string name="data_management_regions">Régions</string>
+    <plurals name="regions_management_subtitle">
+        <item quantity="one">%1$d région enregistrée</item>
+        <item quantity="other">%1$d régions enregistrées</item>
+    </plurals>
+    <string name="regions_management_title">Régions viticoles</string>
+    <string name="regions_management_import_desc">Importez des régions depuis Wikipedia ou Grapeminds.</string>
+    <string name="data_import_loading">Chargement et analyse en cours…</string>
+    <string name="data_import_empty">Aucune donnée trouvée.</string>
 
     <string name="wines_management_title">Gestion des vins</string>
     <string name="wines_management_subtitle">Importez et exportez votre liste de bouteilles</string>

@@ -10,26 +10,31 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-actual fun rememberCsvImport(onText: (String) -> Unit): () -> Unit {
+actual fun rememberCsvImport(onLoading: (Boolean) -> Unit, onText: (String) -> Unit): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             scope.launch {
-                val text = withContext(Dispatchers.IO) {
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
-                    try {
-                        // Strict UTF-8 decoding to catch encoding issues
-                        java.nio.charset.Charset.forName("UTF-8").newDecoder()
-                            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
-                            .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
-                            .decode(java.nio.ByteBuffer.wrap(bytes)).toString()
-                    } catch (e: Exception) {
-                        // Fallback to Windows-1252 (common for French Excel CSV exports)
-                        String(bytes, java.nio.charset.Charset.forName("Windows-1252"))
+                onLoading(true)
+                try {
+                    val text = withContext(Dispatchers.IO) {
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+                        try {
+                            // Strict UTF-8 decoding to catch encoding issues
+                            java.nio.charset.Charset.forName("UTF-8").newDecoder()
+                                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                                .decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+                        } catch (e: Exception) {
+                            // Fallback to Windows-1252 (common for French Excel CSV exports)
+                            String(bytes, java.nio.charset.Charset.forName("Windows-1252"))
+                        }
                     }
+                    if (text != null) onText(text)
+                } finally {
+                    onLoading(false)
                 }
-                if (text != null) onText(text)
             }
         }
     }

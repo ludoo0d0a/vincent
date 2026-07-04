@@ -132,6 +132,7 @@
     <string name="detail_stars_count">%s/5</string>
     <string name="detail_no_notes">No notes yet.</string>
     <string name="detail_tasting_add">Add a tasting</string>
+    <string name="detail_tasting_empty">No tastings recorded yet.</string>
     <string name="detail_tasting_date">Date</string>
     <string name="detail_tasting_place">Place</string>
     <string name="detail_tasting_notes">Notes</string>
@@ -244,12 +245,12 @@
     <string name="transfer_import_desc">Load a CSV export from PLOC, Vivino or a spreadsheet. Columns are auto-detected (color, vintage, price, region…).</string>
     <string name="transfer_import_button">Choose CSV file</string>
     <string name="transfer_export_title">Export my cellar</string>
-    <string name="transfer_export_desc">Generates a CSV file of your %d references (without photos) — re-importable in Vincent or readable in any spreadsheet.</string>
+    <string name="transfer_export_desc">Generates a CSV file of your %1$d references (without photos) — re-importable in Vincent or readable in any spreadsheet.</string>
     <string name="transfer_export_button">Export to CSV</string>
     <string name="transfer_formats_supported">Supported formats</string>
     <plurals name="transfer_import_success">
-        <item quantity="one">Imported: %1$d bottle · source detected “%3$s”</item>
-        <item quantity="other">Imported: %1$d bottles · source detected “%3$s”</item>
+        <item quantity="one">Imported: %1$d bottle · source “%2$s”</item>
+        <item quantity="other">Imported: %1$d bottles · source “%2$s”</item>
     </plurals>
     <string name="transfer_import_none">No data recognized in this file.</string>
     <plurals name="data_import_done">
@@ -393,7 +394,7 @@
     <string name="tastings_empty">No tastings yet. Import a PLOC CSV file to get started.</string>
 
     <string name="producers_title">My producers</string>
-    <string name="producers_subtitle">%d producers registered</string>
+    <string name="producers_subtitle">%1$d producers registered</string>
     <string name="producers_import_button">Import producers</string>
     <plurals name="producers_import_success">
         <item quantity="one">Imported: %d producer</item>
@@ -416,7 +417,7 @@
     <string name="settings_section_data_sources">Data sources</string>
 
     <string name="suppliers_title">My suppliers</string>
-    <string name="suppliers_subtitle">%d suppliers registered</string>
+    <string name="suppliers_subtitle">%1$d suppliers registered</string>
     <string name="suppliers_import_button">Import suppliers</string>
     <plurals name="suppliers_import_success">
         <item quantity="one">Imported: %d supplier</item>
@@ -431,6 +432,44 @@
 
     <string name="log_empty">No logs</string>
     <string name="log_no_result">No result</string>
+
+    <string name="data_management_title">Data management</string>
+    <string name="data_management_subtitle">Manage imports, exports and reference data</string>
+    <string name="data_management_section_data">Data</string>
+    <string name="data_management_wines">Wines</string>
+    <string name="data_management_wines_subtitle">%1$d bottles in cellar</string>
+    <string name="data_management_racks">Racks</string>
+    <string name="data_management_racks_subtitle">%1$d racks configured</string>
+    <string name="data_management_tastings">Tastings</string>
+    <string name="data_management_producers">Producers</string>
+    <string name="data_management_producers_subtitle">%1$d producers registered</string>
+    <string name="data_management_suppliers">Suppliers</string>
+    <string name="data_management_suppliers_subtitle">%1$d suppliers registered</string>
+    <string name="data_management_regions">Regions</string>
+    <plurals name="regions_management_subtitle">
+        <item quantity="one">%1$d region registered</item>
+        <item quantity="other">%1$d regions registered</item>
+    </plurals>
+    <string name="regions_management_title">Wine regions</string>
+    <string name="regions_management_import_desc">Import regions from Wikipedia or Grapeminds.</string>
+    <string name="data_import_loading">Loading and parsing…</string>
+    <string name="data_import_empty">No data found.</string>
+
+    <string name="wines_management_title">Wine management</string>
+    <string name="wines_management_subtitle">Import and export your bottle list</string>
+    <string name="wines_management_import_title">Import wines</string>
+    <string name="wines_management_import_desc">Select the source of your CSV file to import your bottles.</string>
+    <string name="racks_management_title">Rack management</string>
+    <string name="racks_management_subtitle">Configure racks via CSV import</string>
+    <string name="import_vivino">Vivino</string>
+    <string name="import_cellartracker">CellarTracker</string>
+    <string name="import_ploc">PLOC</string>
+    <string name="import_vincent">Vincent</string>
+    <string name="export_wines_button">Export wines to CSV</string>
+    <string name="export_racks_button">Export racks to CSV</string>
+    <string name="export_tastings_button">Export tastings to CSV</string>
+    <string name="export_producers_button">Export producers to CSV</string>
+    <string name="export_suppliers_button">Export suppliers to CSV</string>
 
     <string name="ai_error_no_key">Missing Gemini API key. Add GEMINI_API_KEY to local.properties.</string>
     <string name="ai_error_sign_in">Sign in to use AI features.</string>
