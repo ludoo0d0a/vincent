@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Place
@@ -35,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,13 +59,10 @@ import fr.geoking.vincent.ai.priceSearcher
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Tastings
-import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
-import fr.geoking.vincent.model.cellIndexFromSpot
-import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.photo
 import fr.geoking.vincent.model.thumbnailUri
 import kotlinx.coroutines.flow.onCompletion
@@ -76,7 +73,6 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
-import fr.geoking.vincent.ui.PlacementRackGrid
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
@@ -169,9 +165,19 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
         }
 
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Section(stringResource(Res.string.detail_photos)) {
+            val photos = BottlePhotoKind.entries.associateWith { live.photo(it) }
+            val hasPhotos = photos.values.any { !it.isNullOrBlank() }
+            var photosExpanded by remember(live.id) { mutableStateOf(hasPhotos) }
+            LaunchedEffect(hasPhotos) {
+                if (hasPhotos) photosExpanded = true
+            }
+            CollapsibleSection(
+                title = stringResource(Res.string.detail_photos),
+                expanded = photosExpanded,
+                onToggle = { photosExpanded = !photosExpanded },
+            ) {
                 BottlePhotosRow(
-                    photos = BottlePhotoKind.entries.associateWith { live.photo(it) },
+                    photos = photos,
                     onCapture = { kind -> pendingKind = kind; capture() },
                     modifier = Modifier.padding(top = 6.dp),
                 )
@@ -285,59 +291,6 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                         InfoRow(Icons.Filled.Storefront, stringResource(Res.string.detail_merchant_label), live.merchant, divider = true)
                         InfoRow(Icons.Filled.CalendarMonth, stringResource(Res.string.detail_purchase_date_label), live.purchaseDate, divider = true)
                         InfoRow(Icons.Filled.LocalBar, stringResource(Res.string.detail_occasion_label), live.occasion, divider = false)
-                    }
-                }
-            }
-
-            // Location
-            Section(stringResource(Res.string.detail_location_label)) {
-                val placement = remember(live.cellarSpot) {
-                    var found: Pair<Int, Int>? = null
-                    val spot = live.cellarSpot.trim()
-                    if (spot.isNotBlank() && spot != "—") {
-                        for ((ri, rack) in Racks.all.withIndex()) {
-                            val ci = cellIndexFromSpot(spot, rack.cols) ?: continue
-                            if (ci in rack.cells.indices && rack.cells[ci].occupied) {
-                                // Double check if it's actually the same bottle (best effort)
-                                val cell = rack.cells[ci]
-                                if (cell.color == live.color && cell.vintage == live.vintage.takeLast(2)) {
-                                    found = ri to ci
-                                    break
-                                }
-                            }
-                        }
-                    }
-                    found
-                }
-
-                Box(Modifier.clickable { onMove(live) }) {
-                    if (placement != null) {
-                        val (ri, ci) = placement
-                        val rack = Racks.all[ri]
-                        Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                Modifier.clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("${rack.name} · ${cellSpotLabel(ci, rack.cols)}", color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
-                            }
-                            PlacementRackGrid(
-                                rack = rack,
-                                currentCell = ci,
-                                showHint = false,
-                            )
-                        }
-                    } else {
-                        Row(
-                            Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.AccentSoft).padding(horizontal = 11.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.GridView, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(live.cellarSpot, color = VincentColors.Accent, fontWeight = FontWeight.W700, fontSize = 12.sp)
-                        }
                     }
                 }
             }
@@ -530,6 +483,26 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     Column {
         Text(title, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
         content()
+    }
+}
+
+@Composable
+private fun CollapsibleSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onToggle),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(title, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+            Text(if (expanded) "▾" else "▸", fontSize = 12.sp, color = VincentColors.Muted)
+        }
+        if (expanded) content()
     }
 }
 
