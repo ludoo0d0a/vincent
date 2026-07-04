@@ -29,6 +29,14 @@ interface PriceEstimator {
     suspend fun estimate(bottle: Bottle): PriceEstimate?
 }
 
+/** Result of a specific site price search. */
+data class PriceSearchResult(val label: String, val price: Int, val url: String, val isFound: Boolean)
+
+/** Searches for a bottle's price across multiple websites. */
+interface PriceSearcher {
+    fun search(bottle: Bottle): kotlinx.coroutines.flow.Flow<PriceSearchResult>
+}
+
 /** Suggests food pairings for a bottle. */
 interface FoodPairer {
     suspend fun pairings(bottle: Bottle): List<String>
@@ -37,4 +45,5 @@ interface FoodPairer {
 // Platform providers (Android = Gemini Flash). Other targets can return no-ops.
 expect fun wineRecognizer(): WineRecognizer
 expect fun priceEstimator(): PriceEstimator
+expect fun priceSearcher(): PriceSearcher
 expect fun foodPairer(): FoodPairer
