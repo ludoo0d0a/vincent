@@ -150,11 +150,11 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
                 "reply = une phrase courte confirmant ce qui a été complété ou demandant la donnée manquante.",
             imageB64 = null,
         ) ?: return@withContext RecognizeOutcome(error = lastError)
-        val reply = json.optString("reply").trim().takeIf { it.isNotEmpty() }
+        val reply = json.str("reply").takeIf { it.isNotEmpty() }
         val updated = toBottle(json, current.id)?.copy(
             price = json.optInt("price", current.price).takeIf { it > 0 } ?: current.price,
             alcoholLevel = if (json.has("alcohol")) json.optDouble("alcohol") else current.alcoholLevel,
-            sugarLevel = if (json.has("sugar")) sugarOf(json.optString("sugar")) else current.sugarLevel,
+            sugarLevel = if (json.has("sugar")) sugarOf(json.str("sugar")) else current.sugarLevel,
             grapes = json.optJSONArray("grapes")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: current.grapes,
             agingPotential = if (json.has("aging_potential")) json.optInt("aging_potential", current.agingPotential) else current.agingPotential,
             drinkFrom = if (json.has("drink_from")) json.optInt("drink_from", current.drinkFrom) else current.drinkFrom,
@@ -461,18 +461,23 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         }
     }
 
+    private fun JSONObject.str(key: String): String {
+        val v = optString(key, "").trim()
+        return if (v == "null") "" else v
+    }
+
     private suspend fun toBottle(j: JSONObject, id: String): Bottle? {
-        val domain = j.optString("domain").trim()
+        val domain = j.str("domain")
         if (domain.isEmpty()) return null
-        val region = j.optString("region")
-        val appellation = j.optString("appellation").ifBlank { region }
+        val region = j.str("region")
+        val appellation = j.str("appellation").ifBlank { region }
         return Bottle(
             id = id,
             domain = domain,
             appellation = appellation,
-            color = colorOf(j.optString("color")),
-            category = categoryOf("$region $appellation ${j.optString("category")}"),
-            vintage = j.optString("vintage").ifBlank { "NM" },
+            color = colorOf(j.str("color")),
+            category = categoryOf("$region $appellation ${j.str("category")}"),
+            vintage = j.str("vintage").ifBlank { "NM" },
             price = 0,
             quantity = 1,
             rating = 0.0,
@@ -482,7 +487,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             purchaseDate = getString(Res.string.add_today),
             occasion = "—",
             alcoholLevel = j.optDouble("alcohol", 0.0),
-            sugarLevel = sugarOf(j.optString("sugar")),
+            sugarLevel = sugarOf(j.str("sugar")),
             grapes = j.optJSONArray("grapes")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
             drinkFrom = j.optInt("drink_from", 0),
             drinkTo = j.optInt("drink_to", 0),
