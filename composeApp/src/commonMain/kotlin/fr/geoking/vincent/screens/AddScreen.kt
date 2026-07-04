@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import fr.geoking.vincent.getCurrentYear
 import fr.geoking.vincent.ai.AiUsage
 import fr.geoking.vincent.ai.PriceEstimate
 import fr.geoking.vincent.ai.priceEstimator
@@ -652,15 +653,13 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         )
         ChipRow(stringResource(Res.string.add_field_color), WineColor.entries, color, { stringResource(it.label) }) { color = it }
         ChipRow(stringResource(Res.string.add_field_category), WineCategory.entries, category, { stringResource(it.label) }) { category = it }
+        VintageSelector(vintage) { vintage = it }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Field(stringResource(Res.string.add_field_vintage_label), vintage, Modifier.weight(1f), numeric = true) { vintage = it }
             Field(stringResource(Res.string.add_field_price_label), price, Modifier.weight(1f), numeric = true) { price = it }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Field(stringResource(Res.string.add_field_alcohol), alcohol, Modifier.weight(1f), numeric = true) { alcohol = it }
             Field(stringResource(Res.string.add_field_quantity), qty, Modifier.weight(1f), numeric = true) { qty = it }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Field(stringResource(Res.string.add_field_alcohol), alcohol, Modifier.weight(1f), numeric = true) { alcohol = it }
             Field(stringResource(Res.string.add_field_aging_potential), agingPotential, Modifier.weight(1f), numeric = true) { agingPotential = it }
         }
         ChipRow(stringResource(Res.string.add_field_sugar), fr.geoking.vincent.model.SugarLevel.entries, sugar, { stringResource(it.label) }) { sugar = it }
@@ -691,12 +690,12 @@ private fun PlacementSection(
     var open by remember { mutableStateOf(initialOpen) }
     var browse by remember(placeRack) { mutableStateOf(placeRack ?: 0) }
     val placed = placeRack != null && placeCell != null
-    val placedLabel = if (placed) {
-        val r = Racks.all.getOrNull(placeRack!!)
-        if (r != null) "${r.name} · ${cellSpotLabel(placeCell!!, r.cols)}" else "—"
+    val placedLabel = if (placeRack != null && placeCell != null) {
+        val r = Racks.all.getOrNull(placeRack)
+        if (r != null) "${r.name} · ${cellSpotLabel(placeCell, r.cols)}" else "—"
     } else null
-    val placedSpot = if (placed) {
-        Racks.all.getOrNull(placeRack!!)?.let { cellSpotLabel(placeCell!!, it.cols) }
+    val placedSpot = if (placeRack != null && placeCell != null) {
+        Racks.all.getOrNull(placeRack)?.let { cellSpotLabel(placeCell, it.cols) }
     } else null
 
     Column {
@@ -750,8 +749,8 @@ private fun PlacementSection(
                         onPick(browse, ci, label)
                     },
                 )
-                if (placed && placedSpot != null) {
-                    val rackName = Racks.all.getOrNull(placeRack!!)?.name.orEmpty()
+                if (placed && placedSpot != null && placeRack != null) {
+                    val rackName = Racks.all.getOrNull(placeRack)?.name.orEmpty()
                     Text(
                         stringResource(Res.string.add_placement_chosen_format, rackName, placedSpot),
                         fontSize = 10.5.sp,
@@ -1242,7 +1241,7 @@ private fun VoiceSummary(
             editing = editing == VoiceField.VINTAGE,
             onToggle = { toggle(VoiceField.VINTAGE) },
         ) {
-            InlineEditField(parsed.vintage.takeIf { it != "NM" }.orEmpty(), numeric = true) {
+            VintageSelector(parsed.vintage, showLabel = false) {
                 onBottleChange(parsed.copy(vintage = it.trim().ifBlank { "NM" }))
             }
         }
@@ -1441,5 +1440,80 @@ private fun ChatBubble(msg: VoiceChatMsg) {
                 .then(if (msg.fromUser) Modifier else Modifier.border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         )
+    }
+}
+
+/** Quick vintage selector: "NM", last 5 years as chips, and "..." for advanced entry. */
+@Composable
+private fun VintageSelector(
+    selected: String,
+    showLabel: Boolean = true,
+    onSelect: (String) -> Unit,
+) {
+    val quickYears = remember {
+        val y = getCurrentYear()
+        listOf("NM") + (y downTo y - 4).map { it.toString() }
+    }
+    // Advanced mode: explicit via "..." or whenever the value isn't in quick chips.
+    var advancedMode by remember(selected) { mutableStateOf(selected.isNotBlank() && selected !in quickYears) }
+    // Manual text reflects the selected value while in advanced mode.
+    var manualText by remember(selected) { mutableStateOf(if (selected !in quickYears) selected else "") }
+
+    Column {
+        if (showLabel) {
+            Text(
+                stringResource(Res.string.add_field_vintage_label),
+                fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
+                modifier = Modifier.padding(bottom = 6.dp, start = 2.dp),
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            quickYears.forEach { year ->
+                val on = year == selected && !advancedMode
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp))
+                        .background(if (on) VincentColors.Accent else VincentColors.Surface2)
+                        .border(1.dp, if (on) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(10.dp))
+                        .clickable {
+                            advancedMode = false
+                            onSelect(year)
+                        }.padding(horizontal = 13.dp, vertical = 9.dp),
+                ) {
+                    Text(
+                        year, fontSize = 12.sp, fontWeight = FontWeight.W600,
+                        color = if (on) Color.White else VincentColors.Fg,
+                    )
+                }
+            }
+            Box(
+                Modifier.clip(RoundedCornerShape(10.dp))
+                    .background(if (advancedMode) VincentColors.Accent else VincentColors.Surface2)
+                    .border(1.dp, if (advancedMode) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(10.dp))
+                    .clickable { advancedMode = !advancedMode }
+                    .padding(horizontal = 13.dp, vertical = 9.dp),
+            ) {
+                Text(
+                    "...", fontSize = 12.sp, fontWeight = FontWeight.W600,
+                    color = if (advancedMode) Color.White else VincentColors.Fg,
+                )
+            }
+        }
+        if (advancedMode) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = manualText,
+                onValueChange = {
+                    manualText = it
+                    onSelect(it)
+                },
+                singleLine = true,
+                label = { Text(stringResource(Res.string.add_field_vintage), fontSize = 12.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
