@@ -575,12 +575,11 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
 
     LaunchedEffect(domain, appellation, color, category, vintage, price, agingPotential, alcohol, sugar, grapes, qty, spot, placeRack, placeCell, photos, enrichment, defaultDomain, todayLabel, justNowLabel, categoryFallback) {
         val placement = placeRack?.let { r -> placeCell?.let { c -> r to c } }
-        // grapeminds enrichment: turn ageing offsets into absolute years (needs a numeric vintage)
-        // and fold tasting notes + pairing prose into the free-text notes field.
+        // grapeminds enrichment: resolve drink window (API may return offsets or absolute years).
         val vintageYear = vintage.trim().toIntOrNull()
         val enr = enrichment
-        val dFrom = enr?.drinkFromYears?.let { off -> vintageYear?.plus(off) } ?: 0
-        val dTo = enr?.drinkToYears?.let { off -> vintageYear?.plus(off) } ?: 0
+        val dFrom = enr?.drinkFromYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: 0
+        val dTo = enr?.drinkToYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: 0
         val maturityText = enr?.let {
             buildString {
                 if (it.maturity.isNotBlank()) append(it.maturity)
@@ -779,6 +778,13 @@ private fun Field(
         keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
         modifier = modifier.fillMaxWidth(),
     )
+}
+
+/** grapeminds `/drinking-periods` may return offsets from vintage (e.g. 5) or absolute years (e.g. 2028). */
+private fun resolveGrapemindsDrinkYear(raw: Int, vintageYear: Int?): Int {
+    if (raw <= 0) return 0
+    if (raw >= 1900) return raw
+    return vintageYear?.plus(raw) ?: 0
 }
 
 /** A wine candidate surfaced by [AutocompleteField], from the cellar or the wine catalogue. */

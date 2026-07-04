@@ -64,8 +64,8 @@ data class ProductInfo(
 /**
  * Rich, on-demand detail for a wine already identified by [ProductInfo.externalId] — fetched
  * lazily (e.g. when a bottle is added) rather than during search. All fields are optional; a
- * provider fills what it has. [drinkFromYears]/[drinkToYears] are offsets in years from the
- * vintage (so the caller turns them into absolute years using the bottle's vintage).
+ * provider fills what it has. [drinkFromYears]/[drinkToYears] are either offsets in years
+ * from the vintage, or absolute calendar years when the value is ≥ 1900 (grapeminds API).
  */
 data class WineEnrichment(
     val drinkFromYears: Int? = null,

@@ -232,7 +232,7 @@ private object GrapeMindsProvider : WineDataProvider {
                         region = label.str("region_name").takeIf { it.isNotEmpty() },
                         source = displayName,
                         externalId = candidateId,
-                        externalSource = candidateId?.let { id },
+                        externalSource = if (candidateId != null) id else null,
                     )
                 }
             }
@@ -244,66 +244,35 @@ private object GrapeMindsProvider : WineDataProvider {
     }
 
     override suspend fun listProducers(): List<Producer> = withContext(Dispatchers.IO) {
-        val resp = get("$PROXY_BASE/producers?per_page=100", "") ?: return@withContext emptyList()
-        try {
-            val arr = JSONObject(resp).optJSONArray("data") ?: return@withContext emptyList()
-            (0 until arr.length()).mapNotNull { i ->
-                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+        fetchPaginated("$PROXY_BASE/producers", perPage = 100, maxPages = 10, key = "")
+            .mapNotNull { o ->
+                val name = o.str("name")
+                if (name.isEmpty()) return@mapNotNull null
+                val title = o.str("title")
                 Producer(
                     id = "gm-${o.optInt("id")}",
-                    name = o.optString("name"),
-                    country = o.optString("country"),
+                    name = if (title.isNotEmpty()) "$title $name" else name,
+                    country = "",
                 )
             }
-        } catch (e: Exception) { emptyList() }
     }
 
     override suspend fun listRegions(): List<Region> = withContext(Dispatchers.IO) {
-        val resp = get("$PROXY_BASE/regions?per_page=100", "") ?: return@withContext emptyList()
-        try {
-            val arr = JSONObject(resp).optJSONArray("data") ?: return@withContext emptyList()
-            (0 until arr.length()).mapNotNull { i ->
-                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+        fetchPaginated("$PROXY_BASE/regions", perPage = 100, maxPages = 25, key = "")
+            .mapNotNull { o ->
+                val name = o.str("name")
+                if (name.isEmpty()) return@mapNotNull null
                 Region(
                     id = "gm-${o.optInt("id")}",
-                    name = o.optString("name"),
-                    country = o.optString("country"),
+                    name = name,
+                    country = o.str("country"),
                 )
             }
-        } catch (e: Exception) { emptyList() }
     }
 
     override suspend fun listWines(): List<Bottle> = withContext(Dispatchers.IO) {
-        val resp = get("$PROXY_BASE/wines?per_page=50", "") ?: return@withContext emptyList()
-        try {
-            val arr = JSONObject(resp).optJSONArray("data") ?: return@withContext emptyList()
-            (0 until arr.length()).mapNotNull { i ->
-                val o = arr.optJSONObject(i) ?: return@mapNotNull null
-                val p = o.optJSONObject("producer")
-                val r = o.optJSONObject("region")
-                Bottle(
-                    id = "gm-${o.optInt("id")}",
-                    domain = p?.optString("name") ?: "",
-                    appellation = o.optString("display_name"),
-                    color = when(o.optString("color")) {
-                        "white" -> WineColor.WHITE
-                        "rose" -> WineColor.ROSE
-                        "sparkling" -> WineColor.SPARKLING
-                        else -> WineColor.RED
-                    },
-                    category = WineCategory.BORDEAUX, // Fallback
-                    vintage = "NM",
-                    price = 0,
-                    quantity = 1,
-                    rating = 0.0,
-                    cellarSpot = "—",
-                    provenance = r?.optString("name") ?: "",
-                    merchant = "—",
-                    purchaseDate = "",
-                    occasion = "",
-                )
-            }
-        } catch (e: Exception) { emptyList() }
+        fetchPaginated("$PROXY_BASE/wines", perPage = 100, maxPages = 5, key = "")
+            .mapNotNull { o -> o.toImportBottle() }
     }
 
     override suspend fun enrich(externalId: String): WineEnrichment? = withContext(Dispatchers.IO) {
@@ -330,7 +299,7 @@ private object GrapeMindsProvider : WineDataProvider {
             )
         }
         WineEnrichment(
-            // from/to are years of ageing from the vintage (e.g. drink 5–20 years after).
+            // Raw from/to from API — offsets from vintage or absolute calendar years (see AddScreen).
             drinkFromYears = drink?.optInt("from", -1)?.takeIf { it >= 0 },
             drinkToYears = drink?.optInt("to", -1)?.takeIf { it >= 0 },
             maturity = drink?.str("statement") ?: "",
@@ -383,24 +352,77 @@ private object GrapeMindsProvider : WineDataProvider {
         }
     }
 
+    /** Follows grapeminds pagination (`meta.last_page`) up to [maxPages]. */
+    private suspend fun fetchPaginated(basePath: String, perPage: Int, maxPages: Int, key: String): List<JSONObject> {
+        val items = mutableListOf<JSONObject>()
+        var page = 1
+        while (page <= maxPages) {
+            val sep = if (basePath.contains("?")) "&" else "?"
+            val resp = get("$basePath${sep}per_page=$perPage&page=$page", key) ?: break
+            val root = runCatching { JSONObject(resp) }.getOrNull() ?: break
+            val data = root.optJSONArray("data") ?: break
+            if (data.length() == 0) break
+            for (i in 0 until data.length()) {
+                data.optJSONObject(i)?.let { items.add(it) }
+            }
+            val lastPage = root.optJSONObject("meta")?.optInt("last_page", page) ?: page
+            if (page >= lastPage) break
+            page++
+        }
+        return items
+    }
+
     /** Maps a grapeminds wine object (search row / photo candidate) to [ProductInfo]. */
     private fun JSONObject.toProductInfo(): ProductInfo? {
         val producer = optJSONObject("producer")
         val region = optJSONObject("region")
         // display_name is "Producer, Wine Region IGT"; producer.name is the cleaner brand.
+        // /wines/search returns flat producer_name fields instead of a nested producer object.
         val name = str("display_name")
-        val brand = producer?.str("name") ?: ""
+        val brand = producer?.str("name")
+            ?: str("producer_name").ifBlank { str("producer_display_name") }
         if (name.isEmpty() && brand.isEmpty()) return null
         val wineId = optInt("id", 0).takeIf { it > 0 }?.toString()
         return ProductInfo(
             name = name,
             brand = brand,
-            country = region?.str("country")?.uppercase() ?: "",
+            country = region?.str("country")?.uppercase() ?: str("country").uppercase(),
             category = str("color"), // red / white / rose
-            region = region?.str("name")?.takeIf { it.isNotEmpty() },
+            region = region?.str("name")?.takeIf { it.isNotEmpty() } ?: str("region_name").takeIf { it.isNotEmpty() },
             source = displayName,
             externalId = wineId,
-            externalSource = wineId?.let { id },
+            externalSource = if (wineId != null) id else null,
+        )
+    }
+
+    private fun JSONObject.toImportBottle(): Bottle? {
+        val p = optJSONObject("producer")
+        val r = optJSONObject("region")
+        val domain = p?.str("name") ?: p?.str("display_name") ?: ""
+        val appellation = str("display_name")
+        if (domain.isEmpty() && appellation.isEmpty()) return null
+        val subType = str("sub_type")
+        val colorStr = str("color")
+        return Bottle(
+            id = "gm-${optInt("id")}",
+            domain = domain,
+            appellation = appellation,
+            color = when {
+                subType == "sparkling" -> WineColor.SPARKLING
+                colorStr == "white" -> WineColor.WHITE
+                colorStr == "rose" -> WineColor.ROSE
+                else -> WineColor.RED
+            },
+            category = WineCategory.BORDEAUX,
+            vintage = optInt("vintage", 0).takeIf { it > 0 }?.toString() ?: "NM",
+            price = 0,
+            quantity = 1,
+            rating = 0.0,
+            cellarSpot = "—",
+            provenance = r?.str("name") ?: "",
+            merchant = "—",
+            purchaseDate = "",
+            occasion = "",
         )
     }
 

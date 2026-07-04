@@ -281,7 +281,8 @@ async function handleGrapemindsGet(request: Request, url: URL, env: Env, quotaHe
   let subpath = url.pathname.slice("/v1/grapeminds".length);
   if (!subpath.startsWith("/")) subpath = "/" + subpath;
 
-  const upstreamUrl = new URL(env.GRAPEMINDS_API_URL + subpath);
+  const base = (env.GRAPEMINDS_API_URL || "https://api.grapeminds.eu/public/v1").replace(/\/$/, "");
+  const upstreamUrl = new URL(base + subpath);
   url.searchParams.forEach((v, k) => upstreamUrl.searchParams.set(k, v));
 
   const headers: Record<string, string> = {
