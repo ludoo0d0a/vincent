@@ -205,7 +205,7 @@ fun BottlesScreen(
             b.appellation.lowercase().contains(q) ||
             categoryLabels[b.category]?.contains(q) == true ||
             b.vintage.lowercase().contains(q)
-    }
+    }.sortedByDescending { it.addedAt }
     val list = base.filter { it.matchesAdv(adv, categoryLabels) }
 
     val prices = Cellar.bottles.map { it.price }

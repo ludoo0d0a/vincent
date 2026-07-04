@@ -49,6 +49,7 @@ data class BottleEntity(
     val imageUri: String = "",
     val photoBottleUri: String = "",
     val photoBackUri: String = "",
+    val addedAt: Long = 0,
 )
 
 private const val SEP = "" // unit separator — won't appear in labels
@@ -87,6 +88,7 @@ fun BottleEntity.toBottle(): Bottle = Bottle(
     photoBottle = photoBottleUri.takeIf { it.isNotBlank() },
     photoLabel = imageUri.takeIf { it.isNotBlank() },
     photoBack = photoBackUri.takeIf { it.isNotBlank() },
+    addedAt = addedAt,
 )
 
 fun Bottle.toEntity(): BottleEntity = BottleEntity(
@@ -123,6 +125,7 @@ fun Bottle.toEntity(): BottleEntity = BottleEntity(
     imageUri = photoLabel.orEmpty(),
     photoBottleUri = photoBottle.orEmpty(),
     photoBackUri = photoBack.orEmpty(),
+    addedAt = addedAt,
 )
 
 /** FlavorProfile ↔ a compact "s,a,t,al,b,f" string (empty when absent). */

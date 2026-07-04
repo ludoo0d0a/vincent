@@ -6,3 +6,5 @@ expect fun getAppVersion(): String
 expect fun formatShortDateTime(epochMs: Long): String
 
 expect fun getCurrentYear(): Int
+
+expect fun getCurrentTimeMillis(): Long

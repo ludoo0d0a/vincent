@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         SupplierEntity::class,
         RegionEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class VincentDatabase : RoomDatabase() {
@@ -27,6 +27,12 @@ abstract class VincentDatabase : RoomDatabase() {
         val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE bottles ADD COLUMN agingPotential INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE bottles ADD COLUMN addedAt INTEGER NOT NULL DEFAULT 0")
             }
         }
     }
