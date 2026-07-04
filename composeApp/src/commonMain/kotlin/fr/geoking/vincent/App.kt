@@ -163,7 +163,7 @@ fun App() = VincentTheme {
                     bottle = top.bottle,
                     onBack = { stack.clear() },
                     onEdit = { stack.add(Dest.Edit(it)) },
-                    onAddTasting = { stack.add(Dest.TastingEdit(it)) },
+                    onTasting = { bottle, tastingId -> stack.add(Dest.TastingEdit(bottle, tastingId)) },
                     onMove = { stack.add(Dest.Placement(it)) },
                 )
 
