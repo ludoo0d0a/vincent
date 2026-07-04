@@ -21,44 +21,47 @@ object CsvFormat {
 
     // Header aliases (lower-cased) used to locate a value across app formats.
     private val ALIASES = mapOf(
-        "domain" to listOf("domain", "domaine", "winery", "producer", "producteur", "nom", "name", "nom du vin"),
+        "domain" to listOf("domain", "domaine", "winery", "nom du vin", "producer", "producteur", "nom", "name"),
         "appellation" to listOf("appellation", "wine name", "wine", "cuvée", "cuvee", "vin", "nom du vin"),
         "color" to listOf("color", "colour", "couleur", "wine type", "type"),
         "vintage" to listOf("vintage", "millésime", "millesime", "année", "annee", "year"),
         "price" to listOf("price", "prix", "prix d'achat", "purchase price", "price paid"),
-        "quantity" to listOf("quantity", "quantité", "quantite", "qty", "stock", "bottles", "nombre"),
+        "quantity" to listOf("quantity", "quantité", "quantite", "qty", "stock", "stock (en cave)", "bottles", "nombre"),
         "rating" to listOf("rating", "note", "your rating", "score", "ma note"),
         "cellarSpot" to listOf("cellarspot", "casier", "emplacement", "location", "bin", "rangement"),
         "provenance" to listOf("provenance", "region", "région", "country", "pays", "origine"),
         "merchant" to listOf("merchant", "caviste", "magasin", "store", "vendor", "acheté chez"),
         "purchaseDate" to listOf("purchasedate", "purchase date", "date", "date d'achat", "scan date"),
         "occasion" to listOf("occasion", "usage"),
-        "alcoholLevel" to listOf("alcohollevel", "alcohol", "alcool", "degré", "degre"),
+        "alcoholLevel" to listOf("alcohollevel", "alcohol", "alcool", "degré", "degre", "degré d'alcool"),
         "sugarLevel" to listOf("sugarlevel", "sugar", "sucre", "taux de sucre"),
-        "id" to listOf("id"),
+        "id" to listOf("id", "idvin", "idcontact"),
         "category" to listOf("category", "catégorie", "categorie"),
         "favorite" to listOf("favorite", "favori", "favourite"),
         "pairings" to listOf("pairings", "accords", "accords mets-vin"),
+        "grapes" to listOf("grapes", "cépages", "cepages"),
         "drinkFrom" to listOf("drinkfrom", "apogée début", "drink from", "begin consume"),
         "drinkTo" to listOf("drinkto", "apogée fin", "drink to", "à boire avant", "end consume"),
         "drinkNow" to listOf("drinknow"),
         "agingPotential" to listOf("agingpotential", "potentiel de garde", "aging potential"),
-        "tastingNotes" to listOf("tastingnotes", "notes", "tasting notes", "commentaire"),
+        "tastingNotes" to listOf("tastingnotes", "notes", "tasting notes", "commentaire", "commentaires"),
         "source" to listOf("source"),
         "addedLabel" to listOf("addedlabel"),
 
         // Tastings
-        "wineName" to listOf("winename", "vin", "bouteille", "nom du vin"),
+        "wineName" to listOf("winename", "vin", "bouteille", "nom du vin", "nom"),
         "date" to listOf("date", "date dégustation", "tasting date"),
-        "notes" to listOf("notes", "commentaire", "tasting notes"),
+        "notes" to listOf("notes", "commentaire", "commentaires", "tasting notes"),
+        "rating" to listOf("rating", "note", "your rating", "score", "ma note"),
+        "place" to listOf("place", "lieu"),
 
         // Producers / Suppliers
         "name" to listOf("name", "nom", "raison sociale"),
-        "region" to listOf("region", "région"),
+        "region" to listOf("region", "région", "ville"),
         "country" to listOf("country", "pays"),
         "website" to listOf("website", "site web", "url"),
         "email" to listOf("email", "e-mail", "courriel"),
-        "phone" to listOf("phone", "téléphone", "tel"),
+        "phone" to listOf("phone", "téléphone", "portable", "tel"),
         "type" to listOf("type"),
 
         // Racks
@@ -140,16 +143,28 @@ object CsvFormat {
     fun parse(text: String): ImportResult {
         val rows = tokenize(text)
         if (rows.isEmpty()) return ImportResult(ImportType.UNKNOWN, source = "Inconnu")
-        val header = rows.first().map { it.trim().lowercase() }
+        val header = rows.first().map {
+            var h = it.trim().lowercase()
+            if (h.startsWith("\"") && h.endsWith("\"")) {
+                h = h.substring(1, h.length - 1).replace("\"\"", "\"")
+            }
+            h
+        }
         val index = HashMap<String, Int>()
-        header.forEachIndexed { i, h -> index.putIfAbsent(h, i) }
+        header.forEachIndexed { i, h ->
+            if (h.isNotEmpty()) index.putIfAbsent(h, i)
+        }
 
         val source = detectSource(header)
         val type = detectType(header)
 
         return when (type) {
             ImportType.BOTTLES -> ImportResult(type, bottles = rows.drop(1).mapNotNull { it.toBottle(index) }, source = source)
-            ImportType.RACKS -> ImportResult(type, racks = rows.drop(1).mapNotNull { it.toRack(index) }, source = source)
+            ImportType.RACKS -> {
+                val racks = if (source == "PLOC") parsePlocRacks(rows, index)
+                            else rows.drop(1).mapNotNull { it.toRack(index) }
+                ImportResult(type, racks = racks, source = source)
+            }
             ImportType.TASTINGS -> ImportResult(type, tastings = rows.drop(1).mapNotNull { it.toTasting(index) }, source = source)
             ImportType.PRODUCERS -> ImportResult(type, producers = rows.drop(1).mapNotNull { it.toProducer(index) }, source = source)
             ImportType.SUPPLIERS -> ImportResult(type, suppliers = rows.drop(1).mapNotNull { it.toSupplier(index) }, source = source)
@@ -157,18 +172,46 @@ object CsvFormat {
         }
     }
 
+    private fun parsePlocRacks(rows: List<List<String>>, index: Map<String, Int>): List<Rack> {
+        val dataRows = rows.drop(1)
+        val grouped = dataRows.groupBy { (it.field("name", index) ?: "Inconnu").trim() }
+        return grouped.map { (name, cells) ->
+            val maxRow = cells.maxOfOrNull { it.field("rows", index)?.toIntOrNull() ?: 1 } ?: 1
+            val maxCol = cells.maxOfOrNull { it.field("cols", index)?.toIntOrNull() ?: 1 } ?: 1
+
+            // Reconstruct cells
+            val rackCells = MutableList(maxRow * maxCol) { RackCell(rowLabel(it / maxCol), false) }
+            cells.forEach { row ->
+                val r = (row.field("rows", index)?.toIntOrNull() ?: 1) - 1
+                val c = (row.field("cols", index)?.toIntOrNull() ?: 1) - 1
+                val wineName = row.field("wineName", index)
+                if (r in 0 until maxRow && c in 0 until maxCol) {
+                    val idx = r * maxCol + c
+                    if (!wineName.isNullOrBlank()) {
+                        // We don't have full bottle info here, just name/vintage
+                        rackCells[idx] = RackCell(rowLabel(r), true, vintage = row.field("vintage", index))
+                    }
+                }
+            }
+            Rack(name, maxCol, maxRow, false, rackCells)
+        }
+    }
+
     fun detectSource(header: List<String>): String = when {
         "id" in header && "domain" in header && "color" in header -> "Vincent"
         header.any { it == "winery" } || header.any { it == "wine name" } -> "Vivino"
-        ("nom" in header || "nom du vin" in header) && (header.any { it == "couleur" } || header.any { it == "millésime" } || header.any { it == "date dégustation" }) -> "PLOC"
+        ("nom" in header || "nom du vin" in header || "idvin" in header) &&
+            (header.any { it == "couleur" } || header.any { it == "millésime" } || header.any { it == "date dégustation" } || "ligne" in header || "contact principal" in header) -> "PLOC"
         header.any { it == "bin" } || header.any { it == "begin consume" } || header.any { it == "valuation" } -> "CellarTracker"
         else -> "CSV générique"
     }
 
     fun detectType(header: List<String>): ImportType = when {
+        "ligne" in header && "colonne" in header -> ImportType.RACKS
+        "contact principal" in header -> ImportType.PRODUCERS
+        header.any { it in ALIASES["date"]!! } && (header.any { it in ALIASES["notes"]!! } || header.any { it == "emotiploc" }) -> ImportType.TASTINGS
         header.any { it in ALIASES["domain"]!! } && header.any { it in ALIASES["vintage"]!! } -> ImportType.BOTTLES
         header.any { it in ALIASES["cols"]!! } || (header.any { it == "nom" } && header.size <= 5) -> ImportType.RACKS
-        header.any { it in ALIASES["date"]!! } && header.any { it in ALIASES["notes"]!! } -> ImportType.TASTINGS
         header.any { it == "région" } -> ImportType.PRODUCERS
         header.any { it == "type" } && header.any { it == "nom" } -> ImportType.SUPPLIERS
         else -> ImportType.BOTTLES // Default to bottles if ambiguous
@@ -177,10 +220,14 @@ object CsvFormat {
     private fun List<String>.field(key: String, index: Map<String, Int>): String? {
         val aliases = ALIASES[key] ?: return null
         for (a in aliases) {
-            val i = index[a] ?: continue
+            val alias = a.lowercase().trim()
+            val i = index[alias] ?: continue
             if (i < size) {
-                val v = this[i].trim()
-                if (v.isNotEmpty()) return v
+                var v = this[i].trim()
+                if (v.startsWith("\"") && v.endsWith("\"")) {
+                    v = v.substring(1, v.length - 1).replace("\"\"", "\"")
+                }
+                if (v.isNotEmpty() && v != "\"\"") return v
             }
         }
         return null
@@ -215,6 +262,7 @@ object CsvFormat {
             sugarLevel = parseSugar(field("sugarLevel", index)),
             favorite = field("favorite", index).toBoolLoose(),
             pairings = field("pairings", index)?.split(";", ",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
+            grapes = field("grapes", index)?.split(";", ",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
             drinkFrom = field("drinkFrom", index).toIntOr(0),
             drinkTo = field("drinkTo", index).toIntOr(0),
             drinkNow = field("drinkNow", index)?.toFloatOrNull() ?: 0.5f,
@@ -254,6 +302,7 @@ object CsvFormat {
             notes = notes,
             color = parseColor(field("color", index)),
             vintage = field("vintage", index),
+            place = field("place", index) ?: "",
         )
     }
 
@@ -330,7 +379,7 @@ object CsvFormat {
     /** Quote-aware CSV tokenizer; normalises CRLF and drops fully-blank rows. */
     private fun tokenize(text: String): List<List<String>> {
         val s = text.removePrefix("\uFEFF").replace("\r\n", "\n").replace("\r", "\n")
-        val firstLine = s.substringBefore('\n')
+        val firstLine = s.lineSequence().firstOrNull { it.isNotBlank() } ?: ""
         val separator = if (firstLine.count { it == ';' } > firstLine.count { it == ',' }) ';' else ','
 
         val rows = mutableListOf<List<String>>()
