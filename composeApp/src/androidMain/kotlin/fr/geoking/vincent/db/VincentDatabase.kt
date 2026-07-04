@@ -33,6 +33,7 @@ abstract class VincentDatabase : RoomDatabase() {
         val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE bottles ADD COLUMN addedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE tastings ADD COLUMN place TEXT NOT NULL DEFAULT ''")
             }
         }
     }

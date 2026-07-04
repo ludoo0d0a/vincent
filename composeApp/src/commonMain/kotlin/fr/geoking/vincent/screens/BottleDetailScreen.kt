@@ -82,7 +82,7 @@ import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
 
 @Composable
-fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> Unit, onAddTasting: (Bottle) -> Unit, onMove: (Bottle) -> Unit) {
+fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> Unit, onTasting: (Bottle, String?) -> Unit, onMove: (Bottle) -> Unit) {
     val live = Cellar.bottle(bottle.id) ?: bottle
     val qty = live.quantity
     val fav = live.favorite
@@ -158,7 +158,7 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                     Text(sub, fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 9.dp)) {
-                    Stars(live.rating, onClick = { onAddTasting(live) })
+                    Stars(live.rating, onClick = { onTasting(live, null) })
                     if (live.rating > 0.0) {
                         Spacer(Modifier.width(7.dp))
                         val ratingStr = if (live.rating % 1.0 == 0.0) live.rating.toInt().toString() else live.rating.toString().replace('.', ',')
@@ -445,11 +445,22 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
             val bottleTastings = remember(live.id, Tastings.all.toList()) {
                 Tastings.all.filter { it.bottleId == live.id }.sortedByDescending { it.date }
             }
-            if (bottleTastings.isNotEmpty()) {
-                Section(stringResource(Res.string.detail_tasting)) {
+            Section(stringResource(Res.string.detail_tasting)) {
+                if (bottleTastings.isEmpty()) {
+                    Text(
+                        stringResource(Res.string.detail_tasting_empty),
+                        fontSize = 12.sp,
+                        color = VincentColors.Muted,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                } else {
                     Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         bottleTastings.forEach { tasting ->
-                            VCard(Modifier.fillMaxWidth()) {
+                            VCard(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onTasting(live, tasting.id) },
+                            ) {
                                 Column(Modifier.padding(12.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
@@ -467,6 +478,13 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                             }
                         }
                     }
+                }
+                OutlinedButton(
+                    onClick = { onTasting(live, null) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(40.dp),
+                    shape = RoundedCornerShape(11.dp),
+                ) {
+                    Text(stringResource(Res.string.detail_tasting_add), fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
                 }
             }
 

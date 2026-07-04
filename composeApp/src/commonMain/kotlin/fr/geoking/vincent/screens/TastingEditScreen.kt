@@ -85,6 +85,10 @@ fun TastingEditScreen(
         }
 
         Column(Modifier.weight(1f).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val subtitle = listOfNotNull(bottle.domain.takeIf { it.isNotBlank() }, bottle.vintage.takeIf { it != "NM" }).joinToString(" ")
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, fontSize = 13.sp, fontWeight = FontWeight.W600, color = VincentColors.Muted)
+            }
             OutlinedTextField(
                 value = date,
                 onValueChange = { date = it },
@@ -121,6 +125,7 @@ fun TastingEditScreen(
 
         Button(
             onClick = {
+                if (rating <= 0.0) return@Button
                 val t = Tasting(
                     id = tastingId ?: "tasting-${System.currentTimeMillis()}",
                     bottleId = bottle.id,
@@ -141,6 +146,7 @@ fun TastingEditScreen(
 
                 onClose()
             },
+            enabled = rating > 0.0,
             modifier = Modifier.fillMaxWidth().padding(16.dp).height(48.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),

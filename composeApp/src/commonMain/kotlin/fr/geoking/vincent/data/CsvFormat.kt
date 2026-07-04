@@ -55,7 +55,7 @@ object CsvFormat {
         "date" to listOf("date", "date dégustation", "tasting date"),
         "notes" to listOf("notes", "commentaire", "commentaires", "tasting notes"),
         "rating" to listOf("rating", "note", "your rating", "score", "ma note"),
-        "place" to listOf("place", "lieu"),
+        "place" to listOf("place", "lieu", "location"),
 
         // Producers / Suppliers
         "name" to listOf("name", "nom", "raison sociale"),
@@ -104,10 +104,10 @@ object CsvFormat {
     }
 
     fun tastingsToCsv(tastings: List<Tasting>): String = buildString {
-        appendLine(listOf("wineName", "date", "rating", "notes", "color", "vintage").joinToString(",") { esc(it) })
+        appendLine(listOf("wineName", "date", "rating", "notes", "color", "vintage", "place").joinToString(",") { esc(it) })
         tastings.forEach { t ->
             val row = listOf(
-                t.wineName, t.date, t.rating.toString(), t.notes, t.color?.name ?: "", t.vintage ?: ""
+                t.wineName, t.date, t.rating.toString(), t.notes, t.color?.name ?: "", t.vintage ?: "", t.place
             )
             appendLine(row.joinToString(",") { esc(it) })
         }
@@ -308,7 +308,7 @@ object CsvFormat {
             notes = notes,
             color = parseColor(field("color", index)),
             vintage = field("vintage", index),
-            place = field("place", index) ?: "",
+            place = field("place", index).orEmpty(),
         )
     }
 

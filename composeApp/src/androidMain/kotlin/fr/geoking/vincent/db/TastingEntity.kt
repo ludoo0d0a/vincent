@@ -15,6 +15,7 @@ data class TastingEntity(
     val notes: String,
     val color: String?,
     val vintage: String?,
+    val place: String = "",
 )
 
 fun TastingEntity.toTasting(): Tasting = Tasting(
@@ -26,6 +27,7 @@ fun TastingEntity.toTasting(): Tasting = Tasting(
     notes = notes,
     color = color?.let { WineColor.valueOf(it) },
     vintage = vintage,
+    place = place,
 )
 
 fun Tasting.toEntity(): TastingEntity = TastingEntity(
@@ -37,4 +39,5 @@ fun Tasting.toEntity(): TastingEntity = TastingEntity(
     notes = notes,
     color = color?.name,
     vintage = vintage,
+    place = place,
 )

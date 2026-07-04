@@ -395,6 +395,7 @@ private fun TastingEntity.toCloudMap(updatedAt: Long): Map<String, Any> = buildM
     put("notes", notes)
     color?.let { put("color", it) }
     vintage?.let { put("vintage", it) }
+    if (place.isNotBlank()) put("place", place)
     put(FIELD_UPDATED_AT, updatedAt)
 }
 
@@ -482,6 +483,7 @@ private fun DocumentSnapshot.toCloudTasting(): CloudDoc<Tasting>? {
         notes = getString("notes").orEmpty(),
         color = getString("color"),
         vintage = getString("vintage"),
+        place = getString("place").orEmpty(),
     )
     return CloudDoc(entity.toTasting(), updatedAt)
 }
