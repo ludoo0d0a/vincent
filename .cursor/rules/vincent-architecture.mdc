@@ -1,0 +1,45 @@
+---
+description: Vincent project map — read before exploring the codebase
+alwaysApply: true
+---
+
+# Vincent — architecture
+
+Kotlin Multiplatform wine cellar app. **UI in `commonMain`**, Android-only target wired.
+Package: `fr.geoking.vincent`. Full docs: `README.md`.
+
+## Before exploring
+
+1. Read `README.md` (Architecture, Wine data providers, Notes) for the answer.
+2. Open the **specific file** listed below — do not scan the whole tree.
+3. Only grep/read broadly when the question spans multiple subsystems.
+
+## Key files
+
+| Concern | File |
+|---------|------|
+| Root nav + bottom tabs | `composeApp/src/commonMain/.../App.kt` |
+| Back gesture | `Navigation.kt` (expect/actual) |
+| In-memory state (SSOT) | `data/Cellar.kt` |
+| Domain models | `model/Models.kt`, `model/SampleData.kt` |
+| Persistence seam | `data/CellarRepository.kt` → `androidMain/.../db/RoomCellarRepository.kt` |
+| Android bootstrap | `androidMain/.../MainActivity.kt` (Room + auth + updates) |
+| Theme (lie-de-vin) | `theme/Theme.kt` |
+| Shared UI widgets | `ui/` (`WineBottle`, `Components.kt`, …) |
+| Feature flags | `FeatureFlags.kt` |
+| Cloud sync | `data/CloudSync.kt` + `CloudSync.android.kt` |
+| Firebase rules | `firestore.rules` (project `vincent-499318`) |
+| CI / release | `.github/workflows/`, `scripts/setup-release.sh` |
+| Landing page | `website/` (Cloudflare Pages) |
+| AI proxy worker | `worker/` |
+
+## Stack
+
+Kotlin 2.3 · Compose MP 1.11 · Material 3 · Room (KSP) · JDK 21 · min SDK 24.
+
+## Conventions
+
+- Mutate cellar via `Cellar` API (`addBottle`, `adjustQuantity`, `toggleFavorite`) — screens stay reactive.
+- Platform code: `expect` in `commonMain`, `actual` in `androidMain`.
+- Secrets via `secret()` in `composeApp/build.gradle.kts` → `local.properties` (gitignored).
+- `local.properties` must never be committed.

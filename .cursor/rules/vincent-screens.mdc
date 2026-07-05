@@ -1,0 +1,42 @@
+---
+description: Vincent screens and navigation
+globs: composeApp/src/**/screens/**
+alwaysApply: false
+---
+
+# Vincent — screens
+
+Navigation lives in `App.kt`: bottom tabs (Home · Racks · Bottles · Search) + stack overlays.
+
+## Main tabs
+
+| Tab | File |
+|-----|------|
+| Dashboard | `DashboardScreen.kt` |
+| Racks (Colour/Price/Vintage/Category) | `CellarScreen.kt` |
+| Bottle list/grid | `BottlesScreen.kt` |
+| Search & filters | `SearchScreen.kt` |
+
+## Overlays (from `App.kt` `Dest`)
+
+| Screen | File |
+|--------|------|
+| Bottle detail | `BottleDetailScreen.kt` |
+| Add (scan/photo/voice/manual) | `AddScreen.kt` |
+| Edit bottle | `BottleEditScreen.kt` |
+| Login | `LoginScreen.kt` |
+| Account | `AccountScreen.kt` |
+| Settings | `SettingsScreen.kt` |
+| Import/Export CSV | `DataManagementScreen.kt` |
+| Recents | `RecentScreen.kt` |
+| AR rack view | `ArScreen.kt` (+ `ArScreen.android.kt`) |
+| Rack edit | `RackEditScreen.kt` |
+| Tastings | `TastingsScreen.kt`, `TastingEditScreen.kt` |
+| Management | `WinesManagementScreen.kt`, `RacksManagementScreen.kt`, `RegionsManagementScreen.kt`, `ProducersScreen.kt`, `SuppliersScreen.kt` |
+| Debug logcat | `LogcatScreen.kt` |
+
+## Patterns
+
+- Screens read from `Cellar` (derived lists) and call narrow mutation APIs.
+- Add flow: barcode → `ProductLookup` / photo → `WineRecognizer` / voice → `Dictation` + AI / manual form → confirm.
+- Do not duplicate navigation logic — extend `Dest` in `App.kt`.

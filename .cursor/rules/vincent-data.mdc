@@ -1,0 +1,49 @@
+---
+description: Vincent data layer, providers, AI, persistence
+globs: composeApp/src/**/{data,ai,db,model}/**
+alwaysApply: false
+---
+
+# Vincent — data & providers
+
+## State & persistence
+
+- **`Cellar.kt`** — in-memory SSOT (Compose snapshot state); all UI reads/writes here.
+- **`CellarRepository`** (common) → **`RoomCellarRepository`** (android) over `VincentDatabase`.
+- Entities/DAOs in `androidMain/.../db/` (`BottleEntity`, `BottleDao`, migrations in `VincentDatabase.kt`).
+- Enums stored by name — no TypeConverter.
+
+## Wine lookup (`ProductLookup.kt`)
+
+Providers implement `WineDataProvider`. Order set in `ProductLookup.android.kt` → `wineDataProviders()`:
+
+1. Open Food Facts (`BARCODE_SCAN`) — no key
+2. grapeminds (`TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH`) — `GRAPEMINDS_API_KEY`
+3. CellarTracker (`TEXT_SEARCH`, `PRICE`) — stub, returns empty
+4. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
+
+Routing: barcode → first non-null; text search → merge results. `WineDataSource.enrich()` fills rich fields from grapeminds.
+
+## AI (`ai/`)
+
+| Module | Role |
+|--------|------|
+| `WineAi.kt` | `WineRecognizer`, `PriceEstimator`, `FoodPairer` |
+| `WineAi.android.kt` | Gemini Flash HTTP client |
+| `Dictation.kt` | Voice → transcript → AI fill |
+| `PhotoCapture.kt` | Camera → label recognition |
+| `Barcode.kt` | ML Kit code scanner |
+
+## Other data modules
+
+- **Auth** — `Auth.kt` + `GoogleSignIn.android.kt`, Firebase Auth
+- **CloudSync** — Firestore `users/{uid}/…`, last-write-wins
+- **CsvFormat** — import/export (Vincent / Vivino / PLOC tolerant mapping)
+- **FileTransfer** — Storage Access Framework (expect/actual)
+
+## Adding a provider
+
+1. Implement `WineDataProvider` in `ProductLookup.android.kt`
+2. Register in `wineDataProviders()` at the correct priority
+3. Add config key to `composeApp/build.gradle.kts` `secret()` if needed
+4. Document in `README.md` provider table
