@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Place
@@ -118,10 +119,11 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                     contentDescription = stringResource(Res.string.edit_bottle),
                 )
                 IconChip(
-                    Icons.Filled.Favorite,
-                onClick = { Cellar.toggleFavorite(live.id) },
-                tint = if (fav) VincentColors.Accent else VincentColors.Muted,
+                    if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    onClick = { Cellar.toggleFavorite(live.id) },
+                    tint = VincentColors.Accent,
                     bg = if (fav) VincentColors.AccentSoft else VincentColors.Surface2,
+                    borderColor = VincentColors.Accent,
                 )
             }
         }
@@ -161,6 +163,19 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                         Text(stringResource(Res.string.detail_stars_count, ratingStr), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
                     }
                 }
+                if (qty > 1 || live.price > 0) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 10.dp),
+                    ) {
+                        if (qty > 1) {
+                            HeroBadge(stringResource(Res.string.detail_qty), "×$qty")
+                        }
+                        if (live.price > 0) {
+                            HeroBadge(stringResource(Res.string.detail_value), "${live.price * qty} €")
+                        }
+                    }
+                }
             }
         }
 
@@ -183,21 +198,6 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 )
             }
 
-            // Stats
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                Stat(stringResource(Res.string.detail_qty), "×$qty", Modifier.weight(1f))
-                Stat(stringResource(Res.string.detail_value), "${live.price * qty} €", Modifier.weight(1f))
-                Stat(stringResource(Res.string.detail_spot), live.cellarSpot, Modifier.weight(1f))
-            }
-
-            // Description (provider overview)
-            if (live.description.isNotBlank()) {
-                Section(stringResource(Res.string.detail_description)) {
-                    Text(live.description, fontSize = 12.5.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 6.dp))
-                }
-            }
-
-            // Grape varieties
             if (live.grapes.isNotEmpty()) {
                 Section(stringResource(Res.string.detail_grapes)) {
                     live.grapes.chunked(3).forEach { rowItems ->
@@ -208,81 +208,12 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 }
             }
 
-            // Flavour profile (0–10 axes from the provider)
-            live.flavorProfile?.let { fp ->
-                Section(stringResource(Res.string.detail_flavor_profile)) {
-                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FlavorBar(stringResource(Res.string.detail_fp_sweetness), fp.sweetness)
-                        FlavorBar(stringResource(Res.string.detail_fp_acidity), fp.acidity)
-                        FlavorBar(stringResource(Res.string.detail_fp_tannins), fp.tannins)
-                        FlavorBar(stringResource(Res.string.detail_fp_alcohol), fp.alcohol)
-                        FlavorBar(stringResource(Res.string.detail_fp_body), fp.body)
-                        FlavorBar(stringResource(Res.string.detail_fp_finish), fp.finish)
-                    }
-                }
-            }
-
-            // Pairings — Gemini can suggest more on demand.
-            Section(stringResource(Res.string.detail_pairings_title)) {
-                if (live.pairingNotes.isNotBlank()) {
-                    Text(live.pairingNotes, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 6.dp))
-                }
-                val all = (live.pairings + suggested).distinct()
-                all.chunked(2).forEach { rowItems ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 7.dp)) {
-                        rowItems.forEach { Pairing(it) }
-                    }
-                }
-                OutlinedButton(
-                    onClick = {
-                        pairingBusy = true
-                        scope.launch {
-                            val res = pairer.pairings(live)
-                            if (res.isNotEmpty()) suggested = res
-                            pairingBusy = false
-                        }
-                    },
-                    enabled = !pairingBusy,
-                    modifier = Modifier.fillMaxWidth().padding(top = 9.dp).height(40.dp),
-                    shape = RoundedCornerShape(11.dp),
-                ) {
-                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text(if (pairingBusy) stringResource(Res.string.detail_analyzing) else stringResource(Res.string.detail_suggest_ai), fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
-                }
-            }
-
-            // Drink window
-            if (live.drinkTo > 0 || live.maturity.isNotBlank()) {
-                Section(stringResource(Res.string.detail_drink_peak)) {
-                    if (live.drinkTo > 0) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                            Text("${live.drinkFrom}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
-                            Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                                Box(
-                                    Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp))
-                                        .background(Brush.horizontalGradient(listOf(VincentColors.Amber, VincentColors.Green, VincentColors.Amber))),
-                                )
-                                Row(Modifier.fillMaxWidth()) {
-                                    Spacer(Modifier.weight(live.drinkNow.coerceIn(0.02f, 0.95f)))
-                                    Box(Modifier.size(13.dp).clip(RoundedCornerShape(50)).background(Color.White).border(3.dp, VincentColors.Green, RoundedCornerShape(50)))
-                                    Spacer(Modifier.weight(1f - live.drinkNow.coerceIn(0.02f, 0.95f)))
-                                }
-                            }
-                            Text("${live.drinkTo}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
-                        }
-                    }
-                    Text(live.tastingNotes.ifBlank { stringResource(Res.string.detail_no_notes) }, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
-                    if (live.maturity.isNotBlank()) {
-                        Text(live.maturity, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
-                    }
-                }
-            }
-
-            // Provenance & purchase
             Section(stringResource(Res.string.detail_source_purchase)) {
                 VCard(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     Column {
+                        if (live.cellarSpot.isNotBlank()) {
+                            InfoRow(Icons.Filled.Place, stringResource(Res.string.detail_spot), live.cellarSpot, divider = true)
+                        }
                         InfoRow(Icons.Filled.Place, stringResource(Res.string.detail_source_label), live.provenance, divider = true)
                         if (live.alcoholLevel > 0.0) {
                             InfoRow(Icons.Filled.LocalBar, stringResource(Res.string.detail_alcohol_label), "${live.alcoholLevel}%", divider = true)
@@ -441,7 +372,80 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 }
             }
 
-            // CTA
+            if (live.description.isNotBlank()) {
+                Section(stringResource(Res.string.detail_description)) {
+                    Text(live.description, fontSize = 12.5.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+
+            live.flavorProfile?.let { fp ->
+                Section(stringResource(Res.string.detail_flavor_profile)) {
+                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlavorBar(stringResource(Res.string.detail_fp_sweetness), fp.sweetness)
+                        FlavorBar(stringResource(Res.string.detail_fp_acidity), fp.acidity)
+                        FlavorBar(stringResource(Res.string.detail_fp_tannins), fp.tannins)
+                        FlavorBar(stringResource(Res.string.detail_fp_alcohol), fp.alcohol)
+                        FlavorBar(stringResource(Res.string.detail_fp_body), fp.body)
+                        FlavorBar(stringResource(Res.string.detail_fp_finish), fp.finish)
+                    }
+                }
+            }
+
+            Section(stringResource(Res.string.detail_pairings_title)) {
+                if (live.pairingNotes.isNotBlank()) {
+                    Text(live.pairingNotes, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+                val all = (live.pairings + suggested).distinct()
+                all.chunked(2).forEach { rowItems ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 7.dp)) {
+                        rowItems.forEach { Pairing(it) }
+                    }
+                }
+                OutlinedButton(
+                    onClick = {
+                        pairingBusy = true
+                        scope.launch {
+                            val res = pairer.pairings(live)
+                            if (res.isNotEmpty()) suggested = res
+                            pairingBusy = false
+                        }
+                    },
+                    enabled = !pairingBusy,
+                    modifier = Modifier.fillMaxWidth().padding(top = 9.dp).height(40.dp),
+                    shape = RoundedCornerShape(11.dp),
+                ) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(if (pairingBusy) stringResource(Res.string.detail_analyzing) else stringResource(Res.string.detail_suggest_ai), fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                }
+            }
+
+            if (live.drinkTo > 0 || live.maturity.isNotBlank()) {
+                Section(stringResource(Res.string.detail_drink_peak)) {
+                    if (live.drinkTo > 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                            Text("${live.drinkFrom}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+                            Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                                Box(
+                                    Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp))
+                                        .background(Brush.horizontalGradient(listOf(VincentColors.Amber, VincentColors.Green, VincentColors.Amber))),
+                                )
+                                Row(Modifier.fillMaxWidth()) {
+                                    Spacer(Modifier.weight(live.drinkNow.coerceIn(0.02f, 0.95f)))
+                                    Box(Modifier.size(13.dp).clip(RoundedCornerShape(50)).background(Color.White).border(3.dp, VincentColors.Green, RoundedCornerShape(50)))
+                                    Spacer(Modifier.weight(1f - live.drinkNow.coerceIn(0.02f, 0.95f)))
+                                }
+                            }
+                            Text("${live.drinkTo}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+                        }
+                    }
+                    Text(live.tastingNotes.ifBlank { stringResource(Res.string.detail_no_notes) }, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
+                    if (live.maturity.isNotBlank()) {
+                        Text(live.maturity, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 OutlinedButton(onClick = { Cellar.adjustQuantity(live.id, -1) }, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.detail_serve_minus)) }
                 Button(
@@ -456,26 +460,36 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
 }
 
 @Composable
-private fun IconChip(icon: ImageVector, onClick: () -> Unit, tint: Color = VincentColors.Fg, bg: Color = VincentColors.Surface2, contentDescription: String? = null) {
+private fun HeroBadge(label: String, value: String) {
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = 0.65f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Text(label.uppercase(), fontSize = 9.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+@Composable
+private fun IconChip(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    tint: Color = VincentColors.Fg,
+    bg: Color = VincentColors.Surface2,
+    borderColor: Color = VincentColors.Border,
+    contentDescription: String? = null,
+) {
     Box(
         Modifier
             .size(38.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(bg)
-            .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(18.dp)) }
-}
-
-@Composable
-private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
-    VCard(modifier) {
-        Column(Modifier.fillMaxWidth().padding(vertical = 9.dp, horizontal = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label.uppercase(), fontSize = 9.5.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600)
-            Text(value, fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 3.dp))
-        }
-    }
 }
 
 @Composable
