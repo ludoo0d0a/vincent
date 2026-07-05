@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,10 +27,15 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Tastings
+import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.WineEnrichment
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.getCurrentYear
@@ -81,6 +88,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottleEditScreen(
     bottle: Bottle,
@@ -126,6 +134,25 @@ fun BottleEditScreen(
         mutableStateOf(if (live.drinkTo > 0) live.drinkTo.toString() else "")
     }
     var enrichment by remember(live.id) { mutableStateOf<WineEnrichment?>(null) }
+
+    // Picking a cellar/catalogue suggestion fills the identity fields (and photos/enrichment when available).
+    fun applySuggestion(s: WineSuggestion) {
+        if (s.domain.isNotBlank()) domain = s.domain
+        if (s.appellation.isNotBlank()) appellation = s.appellation
+        s.color?.let { color = it }
+        s.category?.let { category = it }
+        if (s.vintage.isNotBlank()) vintage = s.vintage
+        s.price?.let { price = it.toString() }
+        s.bottle?.let { b ->
+            photos = BottlePhotoKind.entries.associateWith { b.photo(it) }
+            agingPotential = if (b.agingPotential > 0) b.agingPotential.toString() else ""
+            alcohol = b.alcoholLevel
+            sugar = b.sugarLevel
+        }
+        val extId = s.externalId
+        if (extId != null) scope.launch { enrichment = WineDataSource.enrich(s.externalSource, extId) }
+        else enrichment = null
+    }
 
     val defaultDomain = stringResource(Res.string.add_default_domain)
     val categoryFallback = stringResource(category.label)
@@ -185,8 +212,9 @@ fun BottleEditScreen(
     var sourceExpanded by remember(live.id) { mutableStateOf(true) }
     var priceExpanded by remember(live.id) { mutableStateOf(live.price > 0) }
     var tastingsExpanded by remember(live.id) { mutableStateOf(bottleTastings.isNotEmpty()) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
+    Column(Modifier.fillMaxSize().background(VincentColors.Bg).imePadding()) {
         Row(
             Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -218,54 +246,88 @@ fun BottleEditScreen(
                 if (draft.thumbnailUri() != null) {
                     BottleThumb(draft, Modifier.size(width = 62.dp, height = 150.dp))
                 } else {
-                    WineBottle(color, Modifier.size(width = 62.dp, height = 150.dp))
+                    WineBottle(
+                        color = color,
+                        modifier = Modifier.size(width = 62.dp, height = 150.dp),
+                        name = domain,
+                        appellation = appellation,
+                        vintage = vintage,
+                    )
                 }
                 Spacer(Modifier.width(16.dp))
+                // Aperçu identique à l'écran « voir bouteille », en lecture seule (lié au draft → mis à jour en direct).
                 Column(Modifier.weight(1f).padding(bottom = 4.dp)) {
                     ColorTag(color, label = "${stringResource(color.label)} · ${stringResource(category.label)}")
-                    Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = domain,
-                        onValueChange = { domain = it },
-                        singleLine = true,
-                        label = { Text(stringResource(Res.string.add_field_domain_name), fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
+                    Spacer(Modifier.height(7.dp))
+                    val title = listOfNotNull(
+                        draft.domain.takeIf { it.isNotBlank() },
+                        draft.vintage.takeIf { it != "NM" },
+                    ).joinToString(" ")
+                    Text(
+                        title.ifBlank { stringResource(Res.string.add_default_domain) },
+                        fontSize = 20.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg,
                     )
-                    Spacer(Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = appellation,
-                        onValueChange = { appellation = it },
-                        singleLine = true,
-                        label = { Text(stringResource(Res.string.add_field_appellation_label), fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    QuickChipPicker(
-                        label = stringResource(Res.string.add_field_color),
-                        quickOptions = listOf(WineColor.RED, WineColor.WHITE, WineColor.ROSE),
-                        allOptions = WineColor.entries,
-                        selected = color,
-                        labelOf = { stringResource(it.label) },
-                        onSelect = { color = it },
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    QuickRegionPicker(
-                        label = stringResource(Res.string.add_field_category),
-                        selectedCategory = category,
-                        selectedProvenance = provenance,
-                        categoryLabelOf = { stringResource(it.label) },
-                        onSelectCategory = { category = it; provenance = "" },
-                        onSelectRegion = { region ->
-                            provenance = region
-                            category = categoryFromRegion(region)
-                        },
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    VintageQuickPicker(selected = vintage, showLabel = true, onSelect = { vintage = it })
+                    val sub = listOfNotNull(
+                        draft.appellation.takeIf { it.isNotBlank() && it.trim() != draft.domain.trim() },
+                        draft.provenance.takeIf { it.isNotBlank() },
+                    ).joinToString(" · ")
+                    if (sub.isNotBlank()) {
+                        Text(sub, fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 9.dp)) {
+                        Stars(draft.rating)
+                    }
+                    if (draft.quantity > 1 || draft.price > 0) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 10.dp),
+                        ) {
+                            if (draft.quantity > 1) {
+                                HeroBadge(stringResource(Res.string.detail_qty), "×${draft.quantity}")
+                            }
+                            if (draft.price > 0) {
+                                HeroBadge(stringResource(Res.string.detail_value), "${draft.price * draft.quantity} €")
+                            }
+                        }
+                    }
                 }
             }
 
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                // Identité du vin — pleine largeur, avec autocomplete cave + catalogue.
+                AutocompleteField(
+                    label = stringResource(Res.string.add_field_domain_name),
+                    value = domain,
+                    onChange = { domain = it },
+                    onPick = ::applySuggestion,
+                )
+                AutocompleteField(
+                    label = stringResource(Res.string.add_field_appellation_label),
+                    value = appellation,
+                    onChange = { appellation = it },
+                    onPick = ::applySuggestion,
+                )
+                QuickChipPicker(
+                    label = stringResource(Res.string.add_field_color),
+                    quickOptions = listOf(WineColor.RED, WineColor.WHITE, WineColor.ROSE),
+                    allOptions = WineColor.entries,
+                    selected = color,
+                    labelOf = { stringResource(it.label) },
+                    onSelect = { color = it },
+                )
+                QuickRegionPicker(
+                    label = stringResource(Res.string.add_field_category),
+                    selectedCategory = category,
+                    selectedProvenance = provenance,
+                    categoryLabelOf = { stringResource(it.label) },
+                    onSelectCategory = { category = it; provenance = "" },
+                    onSelectRegion = { region ->
+                        provenance = region
+                        category = categoryFromRegion(region)
+                    },
+                )
+                VintageQuickPicker(selected = vintage, showLabel = true, onSelect = { vintage = it })
+
                 CollapsibleSection(
                     title = stringResource(Res.string.detail_photos),
                     expanded = photosExpanded,
@@ -346,7 +408,7 @@ fun BottleEditScreen(
                             )
                             SugarChipRow(sugar) { sugar = it }
                             EditField(stringResource(Res.string.detail_merchant_label), merchant) { merchant = it }
-                            EditField(stringResource(Res.string.detail_purchase_date_label), purchaseDate) { purchaseDate = it }
+                            DateField(stringResource(Res.string.detail_purchase_date_label), purchaseDate) { showDatePicker = true }
                             EditField(stringResource(Res.string.detail_occasion_label), occasion) { occasion = it }
                         }
                     }
@@ -429,6 +491,24 @@ fun BottleEditScreen(
             Text(stringResource(Res.string.save), fontWeight = FontWeight.W700)
         }
     }
+
+    if (showDatePicker) {
+        val dateState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    dateState.selectedDateMillis?.let { purchaseDate = epochMillisToDateLabel(it) }
+                    showDatePicker = false
+                }) { Text(stringResource(Res.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(Res.string.back)) }
+            },
+        ) {
+            DatePicker(state = dateState)
+        }
+    }
 }
 
 @Composable
@@ -447,6 +527,46 @@ private fun EditField(
         keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
         modifier = modifier.fillMaxWidth(),
     )
+}
+
+@Composable
+private fun DateField(label: String, value: String, onClick: () -> Unit) {
+    Box {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text(label, fontSize = 12.sp) },
+            trailingIcon = {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    tint = VincentColors.Muted,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        // Transparent overlay so the whole read-only field opens the picker.
+        Box(Modifier.matchParentSize().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick))
+    }
+}
+
+/** Convert an epoch-millis instant (UTC) to a dd/MM/yyyy label without extra date deps. */
+private fun epochMillisToDateLabel(millis: Long): String {
+    val z = millis.floorDiv(86_400_000L) + 719468L
+    val era = (if (z >= 0) z else z - 146096) / 146097
+    val doe = z - era * 146097
+    val yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    val y = yoe + era * 400
+    val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    val mp = (5 * doy + 2) / 153
+    val d = doy - (153 * mp + 2) / 5 + 1
+    val m = if (mp < 10) mp + 3 else mp - 9
+    val year = if (m <= 2) y + 1 else y
+    fun pad(n: Long) = n.toString().padStart(2, '0')
+    return "${pad(d)}/${pad(m)}/$year"
 }
 
 @Composable

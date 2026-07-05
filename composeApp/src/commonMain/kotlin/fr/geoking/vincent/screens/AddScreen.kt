@@ -824,7 +824,7 @@ private fun categoryFromRegionName(region: String): WineCategory {
 }
 
 /** A wine candidate surfaced by [AutocompleteField], from the cellar or the wine catalogue. */
-private data class WineSuggestion(
+internal data class WineSuggestion(
     val domain: String,
     val appellation: String,
     val color: WineColor? = null,
@@ -841,7 +841,7 @@ private data class WineSuggestion(
 )
 
 /** Suggestions for the add form: local cellar bottles first, then the wine catalogue. */
-private suspend fun searchWineSuggestions(query: String): List<WineSuggestion> {
+internal suspend fun searchWineSuggestions(query: String): List<WineSuggestion> {
     val q = query.trim()
     if (q.length < 2) return emptyList()
     val local = Cellar.search(q).map { b ->
@@ -876,7 +876,7 @@ private suspend fun searchWineSuggestions(query: String): List<WineSuggestion> {
  * suggestion fills the whole form (domain, appellation, colour, vintage, price, photos).
  */
 @Composable
-private fun AutocompleteField(
+internal fun AutocompleteField(
     label: String,
     value: String,
     modifier: Modifier = Modifier,

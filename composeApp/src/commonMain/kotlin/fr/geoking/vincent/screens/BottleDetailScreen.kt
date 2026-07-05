@@ -69,7 +69,6 @@ import fr.geoking.vincent.model.effectiveDrinkNow
 import fr.geoking.vincent.model.effectiveDrinkTo
 import fr.geoking.vincent.model.hasDrinkWindow
 import fr.geoking.vincent.model.photo
-import fr.geoking.vincent.model.thumbnailUri
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
@@ -81,7 +80,6 @@ import fr.geoking.vincent.ui.ColorTag
 import fr.geoking.vincent.ui.DrinkPeakBar
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
-import fr.geoking.vincent.ui.WineBottle
 
 @Composable
 fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> Unit, onTasting: (Bottle, String?) -> Unit, onMove: (Bottle) -> Unit) {
@@ -141,11 +139,7 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 .padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 20.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            if (live.thumbnailUri() != null) {
-                BottleThumb(live, Modifier.size(width = 62.dp, height = 150.dp))
-            } else {
-                WineBottle(live.color, Modifier.size(width = 62.dp, height = 150.dp))
-            }
+            BottleThumb(live, Modifier.size(width = 62.dp, height = 150.dp))
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f).padding(bottom = 4.dp)) {
                 ColorTag(live.color, label = "${stringResource(live.color.label)} · ${stringResource(live.category.label)}")
@@ -161,11 +155,6 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 9.dp)) {
                     Stars(live.rating, onClick = { onTasting(live, null) })
-                    if (live.rating > 0.0) {
-                        Spacer(Modifier.width(7.dp))
-                        val ratingStr = if (live.rating % 1.0 == 0.0) live.rating.toInt().toString() else live.rating.toString().replace('.', ',')
-                        Text(stringResource(Res.string.detail_stars_count, ratingStr), fontSize = 22.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
-                    }
                 }
                 if (qty > 1 || live.price > 0) {
                     Row(
@@ -458,7 +447,7 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
 }
 
 @Composable
-private fun HeroBadge(label: String, value: String) {
+internal fun HeroBadge(label: String, value: String) {
     Column(
         Modifier
             .clip(RoundedCornerShape(10.dp))
