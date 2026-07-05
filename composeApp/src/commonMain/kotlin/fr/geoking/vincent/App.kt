@@ -48,6 +48,7 @@ import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.RackPlacement
 import fr.geoking.vincent.screens.AccountScreen
 import fr.geoking.vincent.screens.AddScreen
+import fr.geoking.vincent.screens.BottleEditScreen
 import fr.geoking.vincent.screens.ArScreen
 import fr.geoking.vincent.screens.BottleDetailScreen
 import fr.geoking.vincent.screens.BottlesScreen
@@ -169,7 +170,11 @@ fun App() = VincentTheme {
 
                 is Dest.Add -> AddScreen(onClose = { stack.clear() }, initialPlacement = top.placement)
 
-                is Dest.Edit -> AddScreen(onClose = { stack.clear() }, editingBottle = top.bottle)
+                is Dest.Edit -> BottleEditScreen(
+                    bottle = top.bottle,
+                    onClose = { stack.clear() },
+                    onTasting = { bottle, tastingId -> stack.add(Dest.TastingEdit(bottle, tastingId)) },
+                )
 
                 Dest.Account -> AccountScreen(
                     onBack = { stack.clear() },

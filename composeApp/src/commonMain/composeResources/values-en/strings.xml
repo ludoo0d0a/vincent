@@ -355,6 +355,8 @@
     <string name="add_frame_barcode">Align the barcode — automatic detection</string>
     <string name="add_identified_ai">IDENTIFIED BY AI</string>
     <string name="add_to_cellar">Add to cellar</string>
+    <string name="save">Save</string>
+    <string name="edit_region_search">Search a region…</string>
     <string name="add_analyzing">Analyzing…</string>
     <string name="add_barcode_required">Photo or barcode required</string>
     <string name="add_dictate_required">Dictate a bottle</string>

@@ -95,6 +95,10 @@ import fr.geoking.vincent.ui.PlacementCellHighlight
 import fr.geoking.vincent.ui.PlacementRackGrid
 import fr.geoking.vincent.ui.SpeechTextInput
 import fr.geoking.vincent.ui.VCard
+import fr.geoking.vincent.ui.AlcoholQuickPicker
+import fr.geoking.vincent.ui.QuickChipPicker
+import fr.geoking.vincent.ui.QuickRegionPicker
+import fr.geoking.vincent.ui.VintageQuickPicker
 import fr.geoking.vincent.ui.WineBottle
 
 // One "Identifier" screen handles BOTH barcode and label; plus voice and manual.
@@ -406,7 +410,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
             else aiBottle?.let { it.copy(price = aiPrice?.amountEur ?: it.price, photoLabel = capturedLabelUri ?: it.photoLabel) }
         val buttonLabel = when {
             ready != null -> when {
-                editingBottle != null -> stringResource(Res.string.save_changes)
+                editingBottle != null -> stringResource(Res.string.save)
                 mode == AddMode.MANUAL -> stringResource(Res.string.add_to_cellar)
                 else -> stringResource(Res.string.add_confirm)
             }
@@ -650,15 +654,35 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
             onChange = { appellation = it },
             onPick = ::applySuggestion,
         )
-        ChipRow(stringResource(Res.string.add_field_color), WineColor.entries, color, { stringResource(it.label) }) { color = it }
-        ChipRow(stringResource(Res.string.add_field_category), WineCategory.entries, category, { stringResource(it.label) }) { category = it }
-        VintageSelector(vintage) { vintage = it }
+        QuickChipPicker(
+            label = stringResource(Res.string.add_field_color),
+            quickOptions = listOf(WineColor.RED, WineColor.WHITE, WineColor.ROSE),
+            allOptions = WineColor.entries,
+            selected = color,
+            labelOf = { stringResource(it.label) },
+            onSelect = { color = it },
+        )
+        QuickRegionPicker(
+            label = stringResource(Res.string.add_field_category),
+            selectedCategory = category,
+            selectedProvenance = "",
+            categoryLabelOf = { stringResource(it.label) },
+            onSelectCategory = { category = it },
+            onSelectRegion = { region -> category = categoryFromRegionName(region) },
+        )
+        VintageQuickPicker(vintage) { vintage = it }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Field(stringResource(Res.string.add_field_price_label), price, Modifier.weight(1f), numeric = true) { price = it }
             Field(stringResource(Res.string.add_field_quantity), qty, Modifier.weight(1f), numeric = true) { qty = it }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Field(stringResource(Res.string.add_field_alcohol), alcohol, Modifier.weight(1f), numeric = true) { alcohol = it }
+            Box(Modifier.weight(1f)) {
+                AlcoholQuickPicker(
+                    label = stringResource(Res.string.add_field_alcohol),
+                    selected = alcohol.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                    onSelect = { alcohol = it.toString().replace('.', ',') },
+                )
+            }
             Field(stringResource(Res.string.add_field_aging_potential), agingPotential, Modifier.weight(1f), numeric = true) { agingPotential = it }
         }
         ChipRow(stringResource(Res.string.add_field_sugar), fr.geoking.vincent.model.SugarLevel.entries, sugar, { stringResource(it.label) }) { sugar = it }
@@ -787,6 +811,18 @@ private fun resolveGrapemindsDrinkYear(raw: Int, vintageYear: Int?): Int {
     return vintageYear?.plus(raw) ?: 0
 }
 
+private fun categoryFromRegionName(region: String): WineCategory {
+    val v = region.lowercase()
+    return when {
+        "bourgogne" in v || "burgundy" in v -> WineCategory.BOURGOGNE
+        "rhône" in v || "rhone" in v -> WineCategory.RHONE
+        "provence" in v -> WineCategory.PROVENCE
+        "loire" in v -> WineCategory.LOIRE
+        "champagne" in v -> WineCategory.CHAMPAGNE
+        else -> WineCategory.BORDEAUX
+    }
+}
+
 /** A wine candidate surfaced by [AutocompleteField], from the cellar or the wine catalogue. */
 private data class WineSuggestion(
     val domain: String,
@@ -904,11 +940,13 @@ private fun AutocompleteField(
                                 Text(sub, fontSize = 11.sp, color = VincentColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
-                        Text(
-                            s.source ?: stringResource(Res.string.add_reuse),
-                            fontSize = 9.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent,
-                            maxLines = 1,
-                        )
+                        if (!s.source.isNullOrBlank()) {
+                            Text(
+                                s.source,
+                                fontSize = 9.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -1247,7 +1285,7 @@ private fun VoiceSummary(
             editing = editing == VoiceField.VINTAGE,
             onToggle = { toggle(VoiceField.VINTAGE) },
         ) {
-            VintageSelector(parsed.vintage, showLabel = false) {
+            VintageQuickPicker(parsed.vintage, showLabel = false) {
                 onBottleChange(parsed.copy(vintage = it.trim().ifBlank { "NM" }))
             }
         }
@@ -1446,80 +1484,5 @@ private fun ChatBubble(msg: VoiceChatMsg) {
                 .then(if (msg.fromUser) Modifier else Modifier.border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp)))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         )
-    }
-}
-
-/** Quick vintage selector: "NM", last 5 years as chips, and "..." for advanced entry. */
-@Composable
-private fun VintageSelector(
-    selected: String,
-    showLabel: Boolean = true,
-    onSelect: (String) -> Unit,
-) {
-    val quickYears = remember {
-        val y = getCurrentYear()
-        listOf("NM") + (y downTo y - 4).map { it.toString() }
-    }
-    // Advanced mode: explicit via "..." or whenever the value isn't in quick chips.
-    var advancedMode by remember(selected) { mutableStateOf(selected.isNotBlank() && selected !in quickYears) }
-    // Manual text reflects the selected value while in advanced mode.
-    var manualText by remember(selected) { mutableStateOf(if (selected !in quickYears) selected else "") }
-
-    Column {
-        if (showLabel) {
-            Text(
-                stringResource(Res.string.add_field_vintage_label),
-                fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
-                modifier = Modifier.padding(bottom = 6.dp, start = 2.dp),
-            )
-        }
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            quickYears.forEach { year ->
-                val on = year == selected && !advancedMode
-                Box(
-                    Modifier.clip(RoundedCornerShape(10.dp))
-                        .background(if (on) VincentColors.Accent else VincentColors.Surface2)
-                        .border(1.dp, if (on) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(10.dp))
-                        .clickable {
-                            advancedMode = false
-                            onSelect(year)
-                        }.padding(horizontal = 13.dp, vertical = 9.dp),
-                ) {
-                    Text(
-                        year, fontSize = 12.sp, fontWeight = FontWeight.W600,
-                        color = if (on) Color.White else VincentColors.Fg,
-                    )
-                }
-            }
-            Box(
-                Modifier.clip(RoundedCornerShape(10.dp))
-                    .background(if (advancedMode) VincentColors.Accent else VincentColors.Surface2)
-                    .border(1.dp, if (advancedMode) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(10.dp))
-                    .clickable { advancedMode = !advancedMode }
-                    .padding(horizontal = 13.dp, vertical = 9.dp),
-            ) {
-                Text(
-                    "...", fontSize = 12.sp, fontWeight = FontWeight.W600,
-                    color = if (advancedMode) Color.White else VincentColors.Fg,
-                )
-            }
-        }
-        if (advancedMode) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = manualText,
-                onValueChange = {
-                    manualText = it
-                    onSelect(it)
-                },
-                singleLine = true,
-                label = { Text(stringResource(Res.string.add_field_vintage), fontSize = 12.sp) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
     }
 }
