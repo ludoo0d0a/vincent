@@ -17,7 +17,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 
 
 /** Firebase ID + App Check tokens for Worker proxy routes (no grapeminds API key). */
@@ -34,9 +33,6 @@ private suspend fun proxyAuthHeaders(): Pair<String?, String?> {
     }
     return idToken to appCheckToken
 }
-
-/** True when an API key is missing or still the build placeholder. */
-private fun String.isConfigured(): Boolean = isNotBlank() && this != "xxx"
 
 /**
  * Open Food Facts lookup by barcode (free, open, no key). Coverage for wine is
@@ -113,16 +109,9 @@ private object OpenFoodFactsProvider : WineDataProvider {
 }
 
 /**
- * grapeminds Public API v1 — wine-specific catalogue (wines, producers, regions)
- * with free-text search and, on Enterprise plans, AI label photo analysis. Auth via
- * an `Authorization: Bearer` token; `Accept-Language` selects the language for region
- * names/descriptions (de, en, es, fr, it, da). No barcode lookup and no per-wine price.
- *
- * Base: https://api.grapeminds.eu/public/v1
- * - GET  /wines/search?q={q}&limit={n}  (q min 3 chars) -> { data: [wine], meta: {...} }
- * - POST /photo/analyze  { photo: "data:image/jpeg;base64,...", max_results }
- *        -> { detected_labels: [...], candidates: [wine] }   (Enterprise only; 403 otherwise)
- * A wine object: { id, display_name, color, type, sub_type, producer:{id,name}, region:{id,name,country} }.
+ * grapeminds Public API v1 — wine catalogue provider backed by [GrapeMindsClient].
+ * See [GrapeMindsClient] for the full endpoint surface (wines, producers, regions,
+ * region insights, drinking periods, photo analysis).
  */
 private object GrapeMindsProvider : WineDataProvider {
     override val id = "grapeminds"
@@ -136,275 +125,132 @@ private object GrapeMindsProvider : WineDataProvider {
         ProviderCapability.LIST_WINES,
     )
 
-    private const val BASE = "https://api.grapeminds.eu/public/v1"
-    private val PROXY_BASE = "${BuildConfig.AI_PROXY_URL}/v1/grapeminds"
-    // Language for region names/descriptions; matches the supported set (de,en,es,fr,it,da).
-    private const val LANG = "fr"
-
-    override suspend fun search(query: String): List<ProductInfo> = withContext(Dispatchers.IO) {
-        val key = BuildConfig.GRAPEMINDS_API_KEY
-        if (!key.isConfigured()) return@withContext emptyList()
-        val q = query.trim()
-        if (q.length < 3) return@withContext emptyList() // API requires min 3 characters
-        val urlStr = "$BASE/wines/search?q=${URLEncoder.encode(q, "UTF-8")}&limit=20"
-        val resp = get(urlStr, key) ?: return@withContext emptyList()
-        try {
-            val rows = JSONObject(resp).optJSONArray("data") ?: return@withContext emptyList()
-            (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.toProductInfo() }
-        } catch (e: Exception) {
-            HttpDebug.log(label = displayName, method = "GET", url = urlStr, error = "${e.javaClass.simpleName}: ${e.message}")
-            emptyList()
-        }
+    private val client by lazy {
+        GrapeMindsClient.fromBuildConfig(authHeaders = ::proxyAuthHeaders)
     }
 
-    override suspend fun byLabel(imageBytes: ByteArray): ProductInfo? = withContext(Dispatchers.IO) {
-        val key = BuildConfig.GRAPEMINDS_API_KEY
-        if (!key.isConfigured()) return@withContext null
-        val urlStr = "$BASE/photo/analyze"
-        val started = System.currentTimeMillis()
-        try {
-            val b64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
-            val payload = JSONObject()
-                .put("photo", "data:image/jpeg;base64,$b64")
-                .put("max_results", 5)
-                .toString()
-            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                connectTimeout = 15000
-                readTimeout = 30000
-                setRequestProperty("Authorization", "Bearer $key")
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("Accept-Language", LANG)
-            }
-            conn.outputStream.use { it.write(payload.toByteArray()) }
-            val status = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            if (status !in 200..299) {
-                // 403 = plan without Enterprise photo analysis; treat as "no result", not a crash.
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                HttpDebug.log(label = displayName, method = "POST", url = urlStr, statusCode = status, responseBody = err, durationMs = elapsed)
-                return@withContext null
-            }
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            HttpDebug.log(label = displayName, method = "POST", url = urlStr, requestBody = "<image ${imageBytes.size} bytes>", statusCode = status, responseBody = resp, durationMs = elapsed)
-            val root = JSONObject(resp)
-            // Prefer the structured detected label (carries vintage); fall back to the first candidate.
-            val label = root.optJSONArray("detected_labels")?.optJSONObject(0)
-            // The matched DB wine (when any) carries the id used for enrichment.
-            val topCandidate = root.optJSONArray("candidates")?.optJSONObject(0)
-            val candidateId = topCandidate?.optInt("id", 0)?.takeIf { it > 0 }?.toString()
-            if (label != null) {
-                val name = label.str("wine_name")
-                val producer = label.str("producer_name")
-                if (name.isNotEmpty() || producer.isNotEmpty()) {
-                    return@withContext ProductInfo(
-                        name = name,
-                        brand = producer,
-                        country = label.str("country"),
-                        category = label.str("color"),
-                        vintage = label.optInt("vintage", 0).takeIf { it > 0 }?.toString(),
-                        region = label.str("region_name").takeIf { it.isNotEmpty() },
-                        source = displayName,
-                        externalId = candidateId,
-                        externalSource = if (candidateId != null) id else null,
-                    )
-                }
-            }
-            topCandidate?.toProductInfo()
-        } catch (e: Exception) {
-            HttpDebug.log(label = displayName, method = "POST", url = urlStr, error = "${e.javaClass.simpleName}: ${e.message}")
-            null
-        }
+    override suspend fun search(query: String): List<ProductInfo> {
+        if (!GrapeMindsClient.isConfigured()) return emptyList()
+        return client.searchWines(query, limit = 20).mapNotNull { it.toProductInfo() }
     }
 
-    override suspend fun listProducers(): List<Producer> = withContext(Dispatchers.IO) {
-        fetchPaginated("$PROXY_BASE/producers", perPage = 100, maxPages = 10, key = "")
-            .mapNotNull { o ->
-                val name = o.str("name")
-                if (name.isEmpty()) return@mapNotNull null
-                val title = o.str("title")
-                Producer(
-                    id = "gm-${o.optInt("id")}",
-                    name = if (title.isNotEmpty()) "$title $name" else name,
-                    country = "",
-                )
-            }
-    }
-
-    override suspend fun listRegions(): List<Region> = withContext(Dispatchers.IO) {
-        fetchPaginated("$PROXY_BASE/regions", perPage = 100, maxPages = 25, key = "")
-            .mapNotNull { o ->
-                val name = o.str("name")
-                if (name.isEmpty()) return@mapNotNull null
-                Region(
-                    id = "gm-${o.optInt("id")}",
-                    name = name,
-                    country = o.str("country"),
-                )
-            }
-    }
-
-    override suspend fun listWines(): List<Bottle> = withContext(Dispatchers.IO) {
-        fetchPaginated("$PROXY_BASE/wines", perPage = 100, maxPages = 5, key = "")
-            .mapNotNull { o -> o.toImportBottle() }
-    }
-
-    override suspend fun enrich(externalId: String): WineEnrichment? = withContext(Dispatchers.IO) {
-        val key = BuildConfig.GRAPEMINDS_API_KEY
-        if (!key.isConfigured()) return@withContext null
-        val wineId = externalId.filter { it.isDigit() }
-        if (wineId.isEmpty()) return@withContext null
-        // /wines/{id}: descriptions, pairing, tasting notes, grapes.
-        val wine = get("$BASE/wines/$wineId", key)?.let { runCatching { JSONObject(it) }.getOrNull() }
-        // /drinking-periods/{id}: optimal drink window + maturity descriptions.
-        val drink = get("$BASE/drinking-periods/$wineId?lang=$LANG", key)?.let { runCatching { JSONObject(it) }.getOrNull() }
-        if (wine == null && drink == null) return@withContext null
-        val grapes = wine?.optJSONArray("grapes")?.let { arr ->
-            (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.str("name")?.takeIf { it.isNotEmpty() } }
-        } ?: emptyList()
-        val flavor = wine?.optJSONObject("flavor_profile")?.let { o ->
-            FlavorProfile(
-                sweetness = o.optInt("sweetness"),
-                acidity = o.optInt("acidity"),
-                tannins = o.optInt("tannins"),
-                alcohol = o.optInt("alcohol"),
-                body = o.optInt("body"),
-                finish = o.optInt("finish"),
+    override suspend fun byLabel(imageBytes: ByteArray): ProductInfo? {
+        if (!GrapeMindsClient.isConfigured()) return null
+        val analysis = client.analyzePhoto(imageBytes, maxResults = 5) ?: return null
+        val label = analysis.detectedLabels.firstOrNull()
+        val topCandidate = analysis.candidates.firstOrNull()
+        val candidateId = topCandidate?.id?.takeIf { it > 0 }?.toString()
+        if (label != null && (label.wineName.isNotEmpty() || label.producerName.isNotEmpty())) {
+            return ProductInfo(
+                name = label.wineName,
+                brand = label.producerName,
+                country = label.country,
+                category = label.color,
+                vintage = label.vintage?.toString(),
+                region = label.regionName.takeIf { it.isNotEmpty() },
+                source = displayName,
+                externalId = candidateId,
+                externalSource = if (candidateId != null) id else null,
             )
         }
-        WineEnrichment(
-            // Raw from/to from API — offsets from vintage or absolute calendar years (see AddScreen).
-            drinkFromYears = drink?.optInt("from", -1)?.takeIf { it >= 0 },
-            drinkToYears = drink?.optInt("to", -1)?.takeIf { it >= 0 },
-            maturity = drink?.str("statement") ?: "",
-            young = drink?.str("young") ?: "",
-            ripe = drink?.str("ripe") ?: "",
-            storage = drink?.str("storage") ?: "",
-            tastingNotes = wine?.optJSONObject("tasting_notes")?.str("text") ?: "",
-            description = wine?.optJSONObject("description")?.str("text") ?: "",
-            pairingText = wine?.optJSONObject("pairing")?.str("text") ?: "",
-            grapes = grapes,
+        return topCandidate?.toProductInfo()
+    }
+
+    override suspend fun listProducers(): List<Producer> =
+        client.listAllProducers(perPage = 100, maxPages = 10).map { p ->
+            Producer(
+                id = "gm-${p.id}",
+                name = p.displayName.ifEmpty {
+                    if (p.title.isNotEmpty()) "${p.title} ${p.name}" else p.name
+                },
+                country = "",
+            )
+        }
+
+    override suspend fun listRegions(): List<Region> =
+        client.listAllRegions(perPage = 100, maxPages = 25).map { r ->
+            Region(id = "gm-${r.id}", name = r.name, country = r.country)
+        }
+
+    override suspend fun listWines(): List<Bottle> =
+        client.listAllWines(perPage = 100, maxPages = 5).mapNotNull { it.toImportBottle() }
+
+    override suspend fun enrich(externalId: String): WineEnrichment? {
+        if (!GrapeMindsClient.isConfigured()) return null
+        val wineId = externalId.filter { it.isDigit() }.toIntOrNull() ?: return null
+        val wine = client.getWine(wineId)
+        val drink = client.getDrinkingPeriod(wineId)
+        if (wine == null && (drink == null || drink.generating)) return null
+        val flavor = wine?.flavorProfile?.let { f ->
+            FlavorProfile(
+                sweetness = f.sweetness,
+                acidity = f.acidity,
+                tannins = f.tannins,
+                alcohol = f.alcohol,
+                body = f.body,
+                finish = f.finish,
+            )
+        }
+        return WineEnrichment(
+            drinkFromYears = drink?.from?.takeIf { it >= 0 },
+            drinkToYears = drink?.to?.takeIf { it >= 0 },
+            maturity = drink?.statement ?: "",
+            young = drink?.young ?: "",
+            ripe = drink?.ripe ?: "",
+            storage = drink?.storage ?: "",
+            tastingNotes = wine?.tastingNotes?.text ?: "",
+            description = wine?.description?.text ?: "",
+            pairingText = wine?.pairing?.text ?: "",
+            grapes = wine?.grapes?.map { it.name } ?: emptyList(),
             flavorProfile = flavor,
             source = displayName,
         )
     }
 
-    private suspend fun get(urlStr: String, key: String): String? {
-        val started = System.currentTimeMillis()
-        return try {
-            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10000
-                readTimeout = 15000
-
-                // Use the provided API key if available (direct call).
-                // Otherwise, use the app's session token for proxy calls.
-                if (key.isNotEmpty()) {
-                    setRequestProperty("Authorization", "Bearer $key")
-                } else {
-                    val (idToken, appCheckToken) = proxyAuthHeaders()
-                    idToken?.let { setRequestProperty("Authorization", "Bearer $it") }
-                    appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
-                }
-
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("Accept-Language", LANG)
-            }
-            val status = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            if (status !in 200..299) {
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                HttpDebug.log(label = displayName, method = "GET", url = urlStr, statusCode = status, responseBody = err, durationMs = elapsed)
-                return null
-            }
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            HttpDebug.log(label = displayName, method = "GET", url = urlStr, statusCode = status, responseBody = resp, durationMs = elapsed)
-            resp
-        } catch (e: Exception) {
-            HttpDebug.log(label = displayName, method = "GET", url = urlStr, error = "${e.javaClass.simpleName}: ${e.message}")
-            null
-        }
-    }
-
-    /** Follows grapeminds pagination (`meta.last_page`) up to [maxPages]. */
-    private suspend fun fetchPaginated(basePath: String, perPage: Int, maxPages: Int, key: String): List<JSONObject> {
-        val items = mutableListOf<JSONObject>()
-        var page = 1
-        while (page <= maxPages) {
-            val sep = if (basePath.contains("?")) "&" else "?"
-            val resp = get("$basePath${sep}per_page=$perPage&page=$page", key) ?: break
-            val root = runCatching { JSONObject(resp) }.getOrNull() ?: break
-            val data = root.optJSONArray("data") ?: break
-            if (data.length() == 0) break
-            for (i in 0 until data.length()) {
-                data.optJSONObject(i)?.let { items.add(it) }
-            }
-            val lastPage = root.optJSONObject("meta")?.optInt("last_page", page) ?: page
-            if (page >= lastPage) break
-            page++
-        }
-        return items
-    }
-
-    /** Maps a grapeminds wine object (search row / photo candidate) to [ProductInfo]. */
-    private fun JSONObject.toProductInfo(): ProductInfo? {
-        val producer = optJSONObject("producer")
-        val region = optJSONObject("region")
-        // display_name is "Producer, Wine Region IGT"; producer.name is the cleaner brand.
-        // /wines/search returns flat producer_name fields instead of a nested producer object.
-        val name = str("display_name")
-        val brand = producer?.str("name")
-            ?: str("producer_name").ifBlank { str("producer_display_name") }
-        if (name.isEmpty() && brand.isEmpty()) return null
-        val wineId = optInt("id", 0).takeIf { it > 0 }?.toString()
+    private fun GmWineSummary.toProductInfo(): ProductInfo? {
+        val brand = producer?.name?.takeIf { it.isNotEmpty() }
+            ?: producerName.ifBlank { producerDisplayName }
+        if (displayName.isEmpty() && brand.isEmpty()) return null
+        val wineId = id.takeIf { it > 0 }?.toString()
         return ProductInfo(
-            name = name,
+            name = displayName,
             brand = brand,
-            country = region?.str("country")?.uppercase() ?: str("country").uppercase(),
-            category = str("color"), // red / white / rose
-            region = region?.str("name")?.takeIf { it.isNotEmpty() } ?: str("region_name").takeIf { it.isNotEmpty() },
-            source = displayName,
+            country = region?.country?.uppercase() ?: "",
+            category = color,
+            region = region?.name?.takeIf { it.isNotEmpty() },
+            vintage = vintage?.toString(),
+            source = this@GrapeMindsProvider.displayName,
             externalId = wineId,
-            externalSource = if (wineId != null) id else null,
+            externalSource = if (wineId != null) "grapeminds" else null,
         )
     }
 
-    private fun JSONObject.toImportBottle(): Bottle? {
-        val p = optJSONObject("producer")
-        val r = optJSONObject("region")
-        val domain = p?.str("name") ?: p?.str("display_name") ?: ""
-        val appellation = str("display_name")
-        if (domain.isEmpty() && appellation.isEmpty()) return null
-        val subType = str("sub_type")
-        val colorStr = str("color")
+    private fun GmWineSummary.toImportBottle(): Bottle? {
+        val domain = producer?.name?.takeIf { it.isNotEmpty() }
+            ?: producer?.displayName?.takeIf { it.isNotEmpty() }
+            ?: producerName.ifBlank { producerDisplayName }
+        if (domain.isEmpty() && displayName.isEmpty()) return null
         return Bottle(
-            id = "gm-${optInt("id")}",
+            id = "gm-$id",
             domain = domain,
-            appellation = appellation,
+            appellation = displayName,
             color = when {
                 subType == "sparkling" -> WineColor.SPARKLING
-                colorStr == "white" -> WineColor.WHITE
-                colorStr == "rose" -> WineColor.ROSE
+                color == "white" -> WineColor.WHITE
+                color == "rose" -> WineColor.ROSE
                 else -> WineColor.RED
             },
             category = WineCategory.BORDEAUX,
-            vintage = optInt("vintage", 0).takeIf { it > 0 }?.toString() ?: "NM",
+            vintage = vintage?.toString() ?: "NM",
             price = 0,
             quantity = 1,
             rating = 0.0,
             cellarSpot = "—",
-            provenance = r?.str("name") ?: "",
+            provenance = region?.name ?: "",
             merchant = "—",
             purchaseDate = "",
             occasion = "",
         )
-    }
-
-    private fun JSONObject.str(key: String): String {
-        val v = optString(key, "").trim()
-        return if (v == "null") "" else v
     }
 }
 

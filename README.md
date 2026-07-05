@@ -85,15 +85,16 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `ENRICH`.
 | 3 | **AI Label (Gemini)** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ active |
 
 > grapeminds Public API v1 — base `https://api.grapeminds.eu/public/v1`, `Accept-Language` ∈ {de,en,es,fr,it,da}.
-> Endpoints used: `GET /wines/search?q=&limit=` (q min 3 chars), `POST /photo/analyze` (Enterprise only),
-> and for `ENRICH` `GET /wines/{id}` + `GET /drinking-periods/{id}`.
+> Full typed client: `androidMain/.../data/GrapeMindsClient.kt` (wines, producers, regions, region insights,
+> drinking periods, photo analysis). Catalogue lists (`/wines`, `/producers`, `/regions`) go through the
+> Worker proxy; search, detail, enrichment and photo use the direct API with `GRAPEMINDS_API_KEY`.
 > **Enrichment**: when a grapeminds catalogue suggestion is picked in Add, `WineDataSource.enrich(source, id)`
 > fetches `/wines/{id}` + `/drinking-periods/{id}` and fills the bottle's new rich fields — `description`,
 > `pairingNotes`, `grapes`, `flavorProfile` (sweetness/acidity/tannins/alcohol/body/finish 0–10), `maturity`
 > (statement + young/ripe/storage), plus the drink window (`drinkFrom`/`drinkTo` = vintage + ageing offsets)
 > and `tastingNotes`. These are persisted (Room **v8**, `MIGRATION_7_8` adds the columns) and rendered on the
 > bottle detail screen (Description, Grape varieties, Flavour-profile bars, pairing prose, maturity notes).
-> No barcode and no price field; `producers`/`regions`/`region-insights` endpoints exist but aren't wired.
+> No barcode and no price field; region insights are available on the client but not yet wired in the UI.
 
 > Real priority: `OpenFoodFacts → grapeminds → AiLabel`.
 

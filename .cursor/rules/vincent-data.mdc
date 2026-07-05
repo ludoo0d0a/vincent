@@ -18,7 +18,7 @@ alwaysApply: false
 Providers implement `WineDataProvider`. Order set in `ProductLookup.android.kt` → `wineDataProviders()`:
 
 1. Open Food Facts (`BARCODE_SCAN`) — no key
-2. grapeminds (`TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH`) — `GRAPEMINDS_API_KEY`
+2. grapeminds (`TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH`, `LIST_*`) — `GRAPEMINDS_API_KEY`; typed client `GrapeMindsClient.kt`
 3. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
 
 Routing: barcode → first non-null; text search → merge results. `WineDataSource.enrich()` fills rich fields from grapeminds.
