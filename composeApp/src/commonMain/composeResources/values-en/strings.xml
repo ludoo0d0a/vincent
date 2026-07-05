@@ -437,6 +437,24 @@
 
     <string name="data_management_title">Data management</string>
     <string name="data_management_subtitle">Manage imports, exports and reference data</string>
+    <string name="data_management_section_transfer">Transfer</string>
+    <string name="vincent_backup_import_title">Import full backup</string>
+    <string name="vincent_backup_import_desc">Restore all your data from a JSON file or a .vincent archive (with photos).</string>
+    <string name="vincent_backup_export_title">Export full backup</string>
+    <string name="vincent_backup_export_desc">Creates a single file with wines, racks, tastings, reference data and optionally photos.</string>
+    <string name="vincent_backup_include_photos">Include photos</string>
+    <string name="vincent_backup_import_button">Choose file</string>
+    <string name="vincent_backup_export_button">Export backup</string>
+    <string name="vincent_backup_export_summary">%1$d bottles · %2$d racks · %3$d tastings · %4$d producers · %5$d suppliers · %6$d regions</string>
+    <string name="vincent_backup_import_mode_title">Import mode</string>
+    <string name="vincent_backup_import_mode_merge">Merge with existing data</string>
+    <string name="vincent_backup_import_mode_replace">Replace all data</string>
+    <string name="vincent_backup_import_mode_replace_warning">All local data will be deleted before import.</string>
+    <string name="vincent_backup_import_confirm">Import</string>
+    <string name="vincent_backup_import_success">Imported: %1$d bottles, %2$d racks, %3$d tastings, %4$d photos restored.</string>
+    <string name="vincent_backup_import_error">Unrecognized file or invalid backup.</string>
+    <string name="vincent_backup_export_success">Backup exported.</string>
+    <string name="vincent_backup_export_canceled">Export canceled.</string>
     <string name="data_management_section_data">Data</string>
     <string name="data_management_wines">Wines</string>
     <string name="data_management_wines_subtitle">%1$d bottles in cellar</string>

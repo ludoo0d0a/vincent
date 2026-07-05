@@ -73,6 +73,24 @@ object Racks {
         persist(rack)
     }
 
+    fun import(incoming: List<Rack>): Int {
+        incoming.forEach { rack ->
+            val i = all.indexOfFirst { it.id == rack.id }
+            if (i >= 0) all[i] = rack else all.add(rack)
+            persist(rack)
+        }
+        return incoming.size
+    }
+
+    suspend fun clearAll() {
+        val r = repo ?: return
+        all.toList().forEach {
+            r.delete(it.id)
+            cloudSyncDeleteRack(it.id)
+        }
+        all.clear()
+    }
+
     /** Insert a copy of the rack at [index] right after it (name suffixed "copie"). */
     fun duplicate(index: Int): Int {
         val src = all.getOrNull(index) ?: return index

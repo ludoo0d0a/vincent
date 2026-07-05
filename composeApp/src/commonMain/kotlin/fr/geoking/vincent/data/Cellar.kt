@@ -159,6 +159,13 @@ object Cellar {
         return incoming.size
     }
 
+    suspend fun clearAll() {
+        val r = repo ?: return
+        bottles.toList().forEach { r.delete(it.id) }
+        bottles.clear()
+        recent.clear()
+    }
+
     private fun persist(b: Bottle) {
         val r = repo ?: return
         scope.launch {

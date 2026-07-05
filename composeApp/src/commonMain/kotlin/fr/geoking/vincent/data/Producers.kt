@@ -33,6 +33,12 @@ object Producers {
         return incoming.size
     }
 
+    suspend fun clearAll() {
+        val r = repo ?: return
+        all.toList().forEach { r.delete(it.id) }
+        all.clear()
+    }
+
     private fun persist(p: Producer) {
         val repo = repo ?: return
         scope.launch {

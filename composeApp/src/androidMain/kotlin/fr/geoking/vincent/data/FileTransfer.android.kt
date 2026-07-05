@@ -65,3 +65,56 @@ actual fun rememberCsvExport(
     }
     return { launcher.launch(filename) }
 }
+
+@Composable
+actual fun rememberVincentImport(onLoading: (Boolean) -> Unit, onBytes: (ByteArray) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                onLoading(true)
+                try {
+                    val bytes = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    }
+                    if (bytes != null) onBytes(bytes)
+                } finally {
+                    onLoading(false)
+                }
+            }
+        }
+    }
+    return { launcher.launch("*/*") }
+}
+
+@Composable
+actual fun rememberVincentExport(
+    includePhotos: Boolean,
+    content: suspend () -> ByteArray,
+    onResult: (Boolean) -> Unit,
+): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val date = java.time.LocalDate.now().toString()
+    val filename = if (includePhotos) "vincent-backup-$date.vincent" else "vincent-backup-$date.json"
+    val mime = if (includePhotos) "application/zip" else "application/json"
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(mime),
+    ) { uri ->
+        if (uri == null) {
+            onResult(false)
+        } else {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val bytes = content()
+                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    }.getOrNull() != null
+                }
+                onResult(ok)
+            }
+        }
+    }
+    return { launcher.launch(filename) }
+}

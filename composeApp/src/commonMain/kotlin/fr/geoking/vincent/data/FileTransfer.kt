@@ -13,3 +13,15 @@ expect fun rememberCsvExport(
     content: () -> String,
     onResult: (Boolean) -> Unit,
 ): () -> Unit
+
+/** Opens a system file picker and returns the chosen backup bytes (.json or .vincent zip). */
+@Composable
+expect fun rememberVincentImport(onLoading: (Boolean) -> Unit, onBytes: (ByteArray) -> Unit): () -> Unit
+
+/** Opens a system "create document" dialog and writes a Vincent backup archive. */
+@Composable
+expect fun rememberVincentExport(
+    includePhotos: Boolean,
+    content: suspend () -> ByteArray,
+    onResult: (Boolean) -> Unit,
+): () -> Unit

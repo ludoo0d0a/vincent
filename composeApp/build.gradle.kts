@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 // Secrets read from local.properties, gradle properties, or environment variables.
@@ -56,9 +57,11 @@ kotlin {
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(libs.kotlinx.serialization.json)
         }
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling)
@@ -117,7 +120,6 @@ android {
         // via local.properties / gradle properties / CI env.
         buildConfigField("String", "GWDB_API_KEY", "\"${secret("GWDB_API_KEY").ifBlank { "xxx" }}\"")
         buildConfigField("String", "GWDB_API_SECRET", "\"${secret("GWDB_API_SECRET").ifBlank { "xxx" }}\"")
-        buildConfigField("String", "CELLARTRACKER_API_KEY", "\"${secret("CELLARTRACKER_API_KEY").ifBlank { "xxx" }}\"")
         buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY").ifBlank { "xxx" }}\"")
     }
 
