@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geoking.vincent.getCurrentYear
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.ai.PriceSearchResult
@@ -63,6 +64,10 @@ import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
+import fr.geoking.vincent.model.effectiveDrinkFrom
+import fr.geoking.vincent.model.effectiveDrinkNow
+import fr.geoking.vincent.model.effectiveDrinkTo
+import fr.geoking.vincent.model.hasDrinkWindow
 import fr.geoking.vincent.model.photo
 import fr.geoking.vincent.model.thumbnailUri
 import kotlinx.coroutines.flow.onCompletion
@@ -73,6 +78,7 @@ import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.ColorTag
+import fr.geoking.vincent.ui.DrinkPeakBar
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
@@ -418,24 +424,18 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                 }
             }
 
-            if (live.drinkTo > 0 || live.maturity.isNotBlank()) {
+            if (live.hasDrinkWindow() || live.maturity.isNotBlank()) {
+                val drinkFrom = live.effectiveDrinkFrom()
+                val drinkTo = live.effectiveDrinkTo()
+                val drinkNow = live.effectiveDrinkNow(getCurrentYear())
                 Section(stringResource(Res.string.detail_drink_peak)) {
-                    if (live.drinkTo > 0) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                            Text("${live.drinkFrom}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
-                            Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                                Box(
-                                    Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp))
-                                        .background(Brush.horizontalGradient(listOf(VincentColors.Amber, VincentColors.Green, VincentColors.Amber))),
-                                )
-                                Row(Modifier.fillMaxWidth()) {
-                                    Spacer(Modifier.weight(live.drinkNow.coerceIn(0.02f, 0.95f)))
-                                    Box(Modifier.size(13.dp).clip(RoundedCornerShape(50)).background(Color.White).border(3.dp, VincentColors.Green, RoundedCornerShape(50)))
-                                    Spacer(Modifier.weight(1f - live.drinkNow.coerceIn(0.02f, 0.95f)))
-                                }
-                            }
-                            Text("${live.drinkTo}", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
-                        }
+                    if (live.hasDrinkWindow()) {
+                        DrinkPeakBar(
+                            from = drinkFrom,
+                            to = drinkTo,
+                            now = drinkNow,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                     }
                     Text(live.tastingNotes.ifBlank { stringResource(Res.string.detail_no_notes) }, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
                     if (live.maturity.isNotBlank()) {

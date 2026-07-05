@@ -121,14 +121,32 @@ fun Bottle.withPhoto(kind: BottlePhotoKind, uri: String?): Bottle = when (kind) 
 /** Best photo to show as a list thumbnail: étiquette → bouteille → dos. */
 fun Bottle.thumbnailUri(): String? = photoLabel ?: photoBottle ?: photoBack
 
+/** Start of the drink window — explicit years or vintage + half the aging potential. */
+fun Bottle.effectiveDrinkFrom(): Int {
+    val v = vintage.toIntOrNull()
+    return if (drinkFrom > 0) drinkFrom else v?.plus(agingPotential / 2) ?: 0
+}
+
+/** End of the drink window — explicit years or vintage + full aging potential. */
+fun Bottle.effectiveDrinkTo(): Int {
+    val v = vintage.toIntOrNull()
+    return if (drinkTo > 0) drinkTo else v?.plus(agingPotential) ?: 0
+}
+
+/** 0..1 position of [currentYear] within the effective drink window. */
+fun Bottle.effectiveDrinkNow(currentYear: Int): Float {
+    val from = effectiveDrinkFrom()
+    val to = effectiveDrinkTo()
+    if (to <= from) return drinkNow
+    return ((currentYear - from).toFloat() / (to - from)).coerceIn(0f, 1f)
+}
+
+fun Bottle.hasDrinkWindow(): Boolean = effectiveDrinkTo() > 0
+
 /** Deduces the aging status from the drink window or vintage + potential. */
 fun Bottle.agingStatus(currentYear: Int): AgingStatus? {
-    val v = vintage.toIntOrNull()
-
-    // 1. If we have aging potential, it defines the drink window if not set.
-    val effectiveDrinkFrom = if (drinkFrom > 0) drinkFrom else v?.plus(agingPotential / 2) ?: 0
-    val effectiveDrinkTo = if (drinkTo > 0) drinkTo else v?.plus(agingPotential) ?: 0
-
+    val effectiveDrinkFrom = effectiveDrinkFrom()
+    val effectiveDrinkTo = effectiveDrinkTo()
     if (effectiveDrinkTo > 0) {
         return when {
             currentYear > effectiveDrinkTo -> AgingStatus.OVERDUE
@@ -137,7 +155,6 @@ fun Bottle.agingStatus(currentYear: Int): AgingStatus? {
             else -> AgingStatus.MUST_KEEP
         }
     }
-
     return null
 }
 

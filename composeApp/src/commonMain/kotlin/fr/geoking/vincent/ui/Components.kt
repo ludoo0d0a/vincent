@@ -2,10 +2,14 @@ package fr.geoking.vincent.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -19,8 +23,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import fr.geoking.vincent.theme.MonoNumber
+import fr.geoking.vincent.theme.VincentColors
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -165,6 +172,37 @@ fun Stars(
         fontSize = 11.sp,
         modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     )
+}
+
+/** Coloured drink-window bar with a marker for the current position. */
+@Composable
+fun DrinkPeakBar(
+    from: Int,
+    to: Int,
+    now: Float,
+    modifier: Modifier = Modifier,
+) {
+    if (to <= 0) return
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+        Text("$from", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+        Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+            Box(
+                Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp))
+                    .background(Brush.horizontalGradient(listOf(VincentColors.Amber, VincentColors.Green, VincentColors.Amber))),
+            )
+            Row(Modifier.fillMaxWidth()) {
+                val w = now.coerceIn(0.02f, 0.95f)
+                Spacer(Modifier.weight(w))
+                Box(
+                    Modifier.size(13.dp).clip(RoundedCornerShape(50))
+                        .background(Color.White)
+                        .border(3.dp, VincentColors.Green, RoundedCornerShape(50)),
+                )
+                Spacer(Modifier.weight(1f - w))
+            }
+        }
+        Text("$to", style = MonoNumber, fontSize = 10.sp, color = VincentColors.Muted)
+    }
 }
 
 private val ScreenPad = PaddingValues(horizontal = 16.dp)

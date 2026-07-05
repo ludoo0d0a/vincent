@@ -50,11 +50,16 @@ import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Tastings
 import fr.geoking.vincent.data.WineEnrichment
 import fr.geoking.vincent.data.rememberLabelImageSaver
+import fr.geoking.vincent.getCurrentYear
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
 import fr.geoking.vincent.model.SugarLevel
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.effectiveDrinkFrom
+import fr.geoking.vincent.model.effectiveDrinkNow
+import fr.geoking.vincent.model.effectiveDrinkTo
+import fr.geoking.vincent.model.hasDrinkWindow
 import fr.geoking.vincent.model.photo
 import fr.geoking.vincent.model.thumbnailUri
 import fr.geoking.vincent.ai.rememberPhotoCapture
@@ -64,6 +69,7 @@ import fr.geoking.vincent.ui.BottlePhotosRow
 import fr.geoking.vincent.ui.BottleThumb
 import fr.geoking.vincent.ui.CollapsibleSection
 import fr.geoking.vincent.ui.ColorTag
+import fr.geoking.vincent.ui.DrinkPeakBar
 import fr.geoking.vincent.ui.GrapeChipEditor
 import fr.geoking.vincent.ui.QuickChipPicker
 import fr.geoking.vincent.ui.QuickRegionPicker
@@ -113,6 +119,12 @@ fun BottleEditScreen(
     var agingPotential by remember(live.id) {
         mutableStateOf(if (live.agingPotential > 0) live.agingPotential.toString() else "")
     }
+    var drinkFrom by remember(live.id) {
+        mutableStateOf(if (live.drinkFrom > 0) live.drinkFrom.toString() else "")
+    }
+    var drinkTo by remember(live.id) {
+        mutableStateOf(if (live.drinkTo > 0) live.drinkTo.toString() else "")
+    }
     var enrichment by remember(live.id) { mutableStateOf<WineEnrichment?>(null) }
 
     val defaultDomain = stringResource(Res.string.add_default_domain)
@@ -124,12 +136,18 @@ fun BottleEditScreen(
 
     val draft = remember(
         domain, appellation, color, category, provenance, vintage, price, alcohol, sugar, grapes,
-        merchant, purchaseDate, occasion, agingPotential, photos, enrichment, defaultDomain, categoryFallback,
+        merchant, purchaseDate, occasion, agingPotential, drinkFrom, drinkTo, photos, enrichment, defaultDomain, categoryFallback,
     ) {
         val vintageYear = vintage.trim().toIntOrNull()
         val enr = enrichment
-        val dFrom = enr?.drinkFromYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: live.drinkFrom
-        val dTo = enr?.drinkToYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: live.drinkTo
+        val parsedFrom = drinkFrom.filter { it.isDigit() }.toIntOrNull()
+        val parsedTo = drinkTo.filter { it.isDigit() }.toIntOrNull()
+        val dFrom = parsedFrom
+            ?: enr?.drinkFromYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) }
+            ?: 0
+        val dTo = parsedTo
+            ?: enr?.drinkToYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) }
+            ?: 0
         live.copy(
             domain = domain.trim().ifBlank { defaultDomain },
             appellation = appellation.trim().ifBlank { categoryFallback },
@@ -161,6 +179,9 @@ fun BottleEditScreen(
     val hasPhotos = photos.values.any { !it.isNullOrBlank() }
     var photosExpanded by remember(live.id) { mutableStateOf(hasPhotos) }
     var grapesExpanded by remember(live.id) { mutableStateOf(grapes.isNotEmpty()) }
+    var peakExpanded by remember(live.id) {
+        mutableStateOf(live.drinkTo > 0 || live.drinkFrom > 0 || live.agingPotential > 0 || live.maturity.isNotBlank())
+    }
     var sourceExpanded by remember(live.id) { mutableStateOf(true) }
     var priceExpanded by remember(live.id) { mutableStateOf(live.price > 0) }
     var tastingsExpanded by remember(live.id) { mutableStateOf(bottleTastings.isNotEmpty()) }
@@ -268,6 +289,46 @@ fun BottleEditScreen(
                 }
 
                 CollapsibleSection(
+                    title = stringResource(Res.string.detail_drink_peak),
+                    expanded = peakExpanded,
+                    onToggle = { peakExpanded = !peakExpanded },
+                ) {
+                    VCard(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                EditField(
+                                    stringResource(Res.string.detail_drink_from),
+                                    drinkFrom,
+                                    numeric = true,
+                                    modifier = Modifier.weight(1f),
+                                ) { drinkFrom = it.filter { c -> c.isDigit() } }
+                                EditField(
+                                    stringResource(Res.string.detail_drink_to),
+                                    drinkTo,
+                                    numeric = true,
+                                    modifier = Modifier.weight(1f),
+                                ) { drinkTo = it.filter { c -> c.isDigit() } }
+                            }
+                            EditField(
+                                stringResource(Res.string.add_field_aging_potential),
+                                agingPotential,
+                                numeric = true,
+                            ) { agingPotential = it }
+                            if (draft.hasDrinkWindow()) {
+                                DrinkPeakBar(
+                                    from = draft.effectiveDrinkFrom(),
+                                    to = draft.effectiveDrinkTo(),
+                                    now = draft.effectiveDrinkNow(getCurrentYear()),
+                                )
+                            }
+                            if (draft.maturity.isNotBlank()) {
+                                Text(draft.maturity, fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 18.sp)
+                            }
+                        }
+                    }
+                }
+
+                CollapsibleSection(
                     title = stringResource(Res.string.detail_source_purchase),
                     expanded = sourceExpanded,
                     onToggle = { sourceExpanded = !sourceExpanded },
@@ -287,11 +348,6 @@ fun BottleEditScreen(
                             EditField(stringResource(Res.string.detail_merchant_label), merchant) { merchant = it }
                             EditField(stringResource(Res.string.detail_purchase_date_label), purchaseDate) { purchaseDate = it }
                             EditField(stringResource(Res.string.detail_occasion_label), occasion) { occasion = it }
-                            EditField(
-                                stringResource(Res.string.add_field_aging_potential),
-                                agingPotential,
-                                numeric = true,
-                            ) { agingPotential = it }
                         }
                     }
                 }
@@ -376,14 +432,20 @@ fun BottleEditScreen(
 }
 
 @Composable
-private fun EditField(label: String, value: String, numeric: Boolean = false, onChange: (String) -> Unit) {
+private fun EditField(
+    label: String,
+    value: String,
+    numeric: Boolean = false,
+    modifier: Modifier = Modifier,
+    onChange: (String) -> Unit,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         singleLine = true,
         label = { Text(label, fontSize = 12.sp) },
         keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     )
 }
 
