@@ -55,7 +55,6 @@ import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.ai.PriceSearchResult
 import fr.geoking.vincent.ai.foodPairer
-import fr.geoking.vincent.ai.priceEstimator
 import fr.geoking.vincent.ai.priceSearcher
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.data.Cellar
@@ -84,7 +83,6 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
     val qty = live.quantity
     val fav = live.favorite
     val pairer = foodPairer()
-    val estimator = priceEstimator()
     val searcher = priceSearcher()
     val scope = rememberCoroutineScope()
     val labelSaver = rememberLabelImageSaver()

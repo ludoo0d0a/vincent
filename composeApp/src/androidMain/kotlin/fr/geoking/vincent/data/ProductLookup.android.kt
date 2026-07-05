@@ -113,30 +113,6 @@ private object OpenFoodFactsProvider : WineDataProvider {
 }
 
 /**
- * db.wine (Wine Folly Database, aka GWDB) — wine-specific lookup. Auth uses an
- * API key + secret. NOTE: db.wine's documented API is slug/producer-based
- * (e.g. /v1/vintages/{slug}.json), not a barcode endpoint; the exact barcode
- * route/auth is still to be confirmed against their docs. Until then this returns
- * null when credentials are missing and is wired to consume both key and secret.
- */
-@Suppress("unused") // disabled: kept for later re-enable, see wineDataProviders()
-private object GwdbProvider : WineDataProvider {
-    override val id = "gwdb"
-    override val displayName = "db.wine"
-    override val capabilities = setOf(ProviderCapability.BARCODE_SCAN)
-
-    override suspend fun byBarcode(code: String): ProductInfo? {
-        val key = BuildConfig.GWDB_API_KEY
-        val secret = BuildConfig.GWDB_API_SECRET
-        if (!key.isConfigured() || !secret.isConfigured()) return null
-        // TODO: call the db.wine barcode endpoint with [key]/[secret] and map the
-        // response to ProductInfo (set source = displayName). Pending confirmation
-        // of the barcode route/auth scheme from db.wine API docs.
-        return null
-    }
-}
-
-/**
  * grapeminds Public API v1 — wine-specific catalogue (wines, producers, regions)
  * with free-text search and, on Enterprise plans, AI label photo analysis. Auth via
  * an `Authorization: Bearer` token; `Accept-Language` selects the language for region
@@ -433,28 +409,6 @@ private object GrapeMindsProvider : WineDataProvider {
 }
 
 /**
- * CellarTracker — community catalogue with text search and price valuations.
- * Requires CELLARTRACKER_API_KEY; returns empty/null until a real key is set.
- */
-private object CellarTrackerProvider : WineDataProvider {
-    override val id = "cellartracker"
-    override val displayName = "CellarTracker"
-    override val capabilities = setOf(ProviderCapability.TEXT_SEARCH, ProviderCapability.PRICE)
-
-    override suspend fun search(query: String): List<ProductInfo> {
-        if (!BuildConfig.CELLARTRACKER_API_KEY.isConfigured()) return emptyList()
-        // TODO: query CellarTracker, map rows to ProductInfo (source = displayName).
-        return emptyList()
-    }
-
-    override suspend fun price(query: String): PriceInfo? {
-        if (!BuildConfig.CELLARTRACKER_API_KEY.isConfigured()) return null
-        // TODO: read CellarTracker community valuation -> PriceInfo(source = displayName).
-        return null
-    }
-}
-
-/**
  * Wikipedia provider — fetches wine regions from the proxy.
  */
 private object WikipediaProvider : WineDataProvider {
@@ -535,9 +489,7 @@ private fun JSONObject.frontImageUrl(): String? {
 
 actual fun wineDataProviders(): List<WineDataProvider> = listOf(
     OpenFoodFactsProvider, // free barcode, no key — first
-    // GwdbProvider — db.wine disabled for now (kept above for later re-enable)
     GrapeMindsProvider,    // text search + AI label analysis (Enterprise) — grapeminds.eu
-    CellarTrackerProvider, // text search + price
     AiLabelProvider,       // label photo recognition (AI)
     WikipediaProvider,     // region scraping
 )

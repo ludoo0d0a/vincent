@@ -104,7 +104,7 @@
     <string name="detail_value">Value</string>
     <string name="detail_spot">Rack</string>
     <string name="detail_compare_prices">Compare prices</string>
-    <string name="detail_compare_desc">Check web offers — Vincent does not collect or store these prices.</string>
+    <string name="detail_compare_desc">AI estimate (Gemini), Nicolas, Vivino, Wine-Searcher… — Vincent does not collect or store these prices.</string>
     <string name="detail_pairings_title">Food-wine pairings</string>
     <string name="detail_description">Description</string>
     <string name="detail_grapes">Grape varieties</string>
@@ -144,6 +144,7 @@
     <string name="detail_price_site">Site</string>
     <string name="detail_price_value">Price</string>
     <string name="detail_price_not_found">Not found</string>
+    <string name="price_source_gemini">Gemini</string>
 
     <string name="bottles_title">My bottles</string>
     <plurals name="bottles_subtitle_format">

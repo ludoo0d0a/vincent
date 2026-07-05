@@ -109,7 +109,7 @@
     <string name="detail_value">Valeur</string>
     <string name="detail_spot">Casier</string>
     <string name="detail_compare_prices">Comparer les prix</string>
-    <string name="detail_compare_desc">Consultez les offres sur le web — Vincent ne collecte ni ne stocke ces prix.</string>
+    <string name="detail_compare_desc">Estimation IA (Gemini), Nicolas, Vivino, Wine-Searcher… — Vincent ne collecte ni ne stocke ces prix.</string>
     <string name="detail_pairings_title">Accords mets-vin</string>
     <string name="detail_description">Description</string>
     <string name="detail_grapes">Cépages</string>
@@ -151,6 +151,7 @@
     <string name="detail_price_site">Site</string>
     <string name="detail_price_value">Prix</string>
     <string name="detail_price_not_found">Non trouvé</string>
+    <string name="price_source_gemini">Gemini</string>
 
     <string name="bottles_title">Mes bouteilles</string>
     <plurals name="bottles_subtitle_format">

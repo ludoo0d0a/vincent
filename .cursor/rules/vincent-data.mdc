@@ -19,8 +19,7 @@ Providers implement `WineDataProvider`. Order set in `ProductLookup.android.kt` 
 
 1. Open Food Facts (`BARCODE_SCAN`) — no key
 2. grapeminds (`TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH`) — `GRAPEMINDS_API_KEY`
-3. CellarTracker (`TEXT_SEARCH`, `PRICE`) — stub, returns empty
-4. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
+3. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
 
 Routing: barcode → first non-null; text search → merge results. `WineDataSource.enrich()` fills rich fields from grapeminds.
 
@@ -28,7 +27,7 @@ Routing: barcode → first non-null; text search → merge results. `WineDataSou
 
 | Module | Role |
 |--------|------|
-| `WineAi.kt` | `WineRecognizer`, `PriceEstimator`, `FoodPairer` |
+| `WineAi.kt` | `WineRecognizer`, `PriceEstimator`, `PriceSearcher`, `FoodPairer` |
 | `WineAi.android.kt` | Gemini Flash HTTP client |
 | `Dictation.kt` | Voice → transcript → AI fill |
 | `PhotoCapture.kt` | Camera → label recognition |

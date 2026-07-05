@@ -76,15 +76,13 @@ All providers implement `WineDataProvider` (`commonMain/.../data/ProductLookup.k
 capability, **in the order of `wineDataProviders()`** (`androidMain/.../data/ProductLookup.android.kt`):
 barcode → first non-null wins; text search → results merged.
 
-Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `PRICE`.
+Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `ENRICH`.
 
 | # | Provider | Capabilities | Auth / key | Status |
 |---|----------|--------------|------------|--------|
 | 1 | **Open Food Facts** | `BARCODE_SCAN` | none (open API) | ✅ active |
 | 2 | **grapeminds** | `TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH` | `GRAPEMINDS_API_KEY` (`Authorization: Bearer`) | ✅ active when key set (label scan needs Enterprise plan) |
-| 3 | **CellarTracker** | `TEXT_SEARCH`, `PRICE` | `CELLARTRACKER_API_KEY` | 🚧 wired but not implemented (returns empty) |
-| 4 | **AI Label (Gemini)** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ active |
-| — | **db.wine (GWDB)** | `BARCODE_SCAN` (planned) | `GWDB_API_KEY` + `GWDB_API_SECRET` | ❌ disabled (commented out in `wineDataProviders()`) |
+| 3 | **AI Label (Gemini)** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ active |
 
 > grapeminds Public API v1 — base `https://api.grapeminds.eu/public/v1`, `Accept-Language` ∈ {de,en,es,fr,it,da}.
 > Endpoints used: `GET /wines/search?q=&limit=` (q min 3 chars), `POST /photo/analyze` (Enterprise only),
@@ -97,8 +95,7 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `PRICE`.
 > bottle detail screen (Description, Grape varieties, Flavour-profile bars, pairing prose, maturity notes).
 > No barcode and no price field; `producers`/`regions`/`region-insights` endpoints exist but aren't wired.
 
-> Real priority: `OpenFoodFacts → grapeminds → CellarTracker → AiLabel`.
-> `GwdbProvider` stays in the file but is excluded from the list (kept for later re-enable).
+> Real priority: `OpenFoodFacts → grapeminds → AiLabel`.
 
 ### Config keys
 
@@ -109,8 +106,6 @@ Resolved by the `secret()` function in `composeApp/build.gradle.kts`, in order:
 | Key | Role | Default if absent |
 |-----|------|-------------------|
 | `GRAPEMINDS_API_KEY` | grapeminds provider (Bearer token) | `xxx` |
-| `CELLARTRACKER_API_KEY` | CellarTracker provider | `xxx` |
-| `GWDB_API_KEY` / `GWDB_API_SECRET` | db.wine provider (disabled) | `xxx` |
 | `GEMINI_API_KEY` | direct Gemini call (debug) | blank in release |
 | `AI_PROXY_URL` | Cloudflare Worker AI proxy (prod) | blank |
 | `WEB_CLIENT_ID` | Google Sign-in / Firebase | — |
@@ -152,13 +147,11 @@ Keys present in `local.properties` but **not read by the app code** (used by CI/
   Access Framework (`data/FileTransfer*.kt`, `expect/actual`). An **Import / Export**
   screen is reachable from Account.
 - **Recognition & price (AI, wired).** `ai/WineAi.kt` exposes `WineRecognizer`
-  (title/photo → `Bottle`) and `PriceEstimator` (→ estimated price). The Android
-  `actual` `ai/WineAi.android.kt` calls **Gemini Flash** (HTTP + `org.json`,
-  structured JSON output). Wired into the Add screen (scan/photo): an
-  "identify with AI" button fills the fields + an estimated price, then the add
-  reuses those values. ⚠️ Set `GEMINI_API_KEY` in `local.properties` (gitignored,
-  via `BuildConfig`; free key at aistudio.google.com) — otherwise it no-ops cleanly.
-  Price is always shown as an **estimate** (source displayed).
+  (title/photo → `Bottle`), `PriceEstimator` and `PriceSearcher` (→ estimated price).
+  Both use **Gemini Flash** via `GeminiClient` (`ai/WineAi.android.kt`): estimation
+  at add time (photo/voice) and on the bottle detail “Auto” search (Gemini first, then
+  retailer pages — Nicolas, Vivino, Wine-Searcher…). Price is always shown as an
+  **estimate** with its source (Gemini).
 - **Food pairings (AI, wired).** `FoodPairer` (same `GeminiClient`): the bottle
   detail has a "Suggest more pairings (AI)" button → Gemini returns dishes, merged
   with the existing pairings.

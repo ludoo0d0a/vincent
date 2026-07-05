@@ -118,8 +118,6 @@ android {
         // Wine data provider credentials/source. "xxx" placeholders mean "not
         // configured": the matching providers stay inert until a real value is set
         // via local.properties / gradle properties / CI env.
-        buildConfigField("String", "GWDB_API_KEY", "\"${secret("GWDB_API_KEY").ifBlank { "xxx" }}\"")
-        buildConfigField("String", "GWDB_API_SECRET", "\"${secret("GWDB_API_SECRET").ifBlank { "xxx" }}\"")
         buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY").ifBlank { "xxx" }}\"")
     }
 

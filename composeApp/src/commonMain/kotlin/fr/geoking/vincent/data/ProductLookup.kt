@@ -16,9 +16,6 @@ enum class ProviderCapability {
     /** Free-text search (name, domain, grape, region…) returning candidates. */
     TEXT_SEARCH,
 
-    /** Estimate/lookup a market price for a wine query. */
-    PRICE,
-
     /** Fetch rich detail (drink window, tasting notes, pairings…) for a known [ProductInfo.externalId]. */
     ENRICH,
 
@@ -32,13 +29,6 @@ enum class ProviderCapability {
     LIST_WINES,
 }
 
-/** An estimated/looked-up price attached to a product. */
-data class PriceInfo(
-    val amount: Double,
-    val currency: String,
-    val source: String? = null,
-)
-
 /** Product facts resolved from a barcode, a label photo, or a text query. */
 data class ProductInfo(
     val name: String,
@@ -48,11 +38,10 @@ data class ProductInfo(
     /** Front label photo (e.g. from Open Food Facts), when one is available. */
     val imageUrl: String? = null,
     // Wine-specific fields, often missing from Open Food Facts but provided by
-    // CellarTracker / the AI label reader.
+    // catalogue providers / the AI label reader.
     val vintage: String? = null,
     val grape: String? = null,
     val region: String? = null,
-    val price: PriceInfo? = null,
     /** Display name of the provider that produced this result (UI/debug). */
     val source: String? = null,
     /** Stable id of this wine in the provider's catalogue, for a follow-up [WineDataSource.enrich] call. */
@@ -95,7 +84,6 @@ interface WineDataProvider {
     suspend fun byBarcode(code: String): ProductInfo? = null
     suspend fun byLabel(imageBytes: ByteArray): ProductInfo? = null
     suspend fun search(query: String): List<ProductInfo> = emptyList()
-    suspend fun price(query: String): PriceInfo? = null
     suspend fun enrich(externalId: String): WineEnrichment? = null
     suspend fun listProducers(): List<Producer> = emptyList()
     suspend fun listRegions(): List<Region> = emptyList()
@@ -129,10 +117,6 @@ object WineDataSource {
     suspend fun search(query: String): List<ProductInfo> =
         supporting(ProviderCapability.TEXT_SEARCH)
             .flatMap { it.search(query) }
-
-    suspend fun price(query: String): PriceInfo? =
-        supporting(ProviderCapability.PRICE)
-            .firstNotNullOfOrNull { it.price(query) }
 
     /**
      * Fetch rich detail for a wine previously surfaced by a provider. Routes to the provider

@@ -171,7 +171,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
     }
     var scanMsg by remember { mutableStateOf<ScanMessage?>(null) }
     var aiError by remember { mutableStateOf<String?>(null) }
-    // Barcode → wine data providers (Open Food Facts, GWDB…) → prefill the manual
+    // Barcode → wine data providers (Open Food Facts…) → prefill the manual
     // form (vintage/price stay for the user to complete, since EANs rarely encode them).
     val labelSaver = rememberLabelImageSaver()
     var capturedLabelUri by remember { mutableStateOf<String?>(null) }

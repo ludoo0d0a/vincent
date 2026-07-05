@@ -37,6 +37,10 @@ private const val TAG = "VincentAI"
 object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer {
 
     override fun search(bottle: Bottle): Flow<PriceSearchResult> = flow {
+        val geminiLabel = getString(Res.string.price_source_gemini)
+        estimate(bottle)?.let { est ->
+            emit(PriceSearchResult(geminiLabel, est.amountEur, "", true))
+        }
         val links = bottlePriceCompareLinks(bottle)
         for (link in links) {
             val content = fetchText(link.url)
@@ -190,15 +194,16 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
 
     override suspend fun estimate(bottle: Bottle): PriceEstimate? = withContext(Dispatchers.IO) {
         val q = "${bottle.domain} ${bottle.vintage} ${bottle.appellation}".trim()
+        val source = getString(Res.string.price_source_gemini)
         val json = generate(
             langDirective() +
-                "Donne le prix marché estimé en euros (entier) pour ce vin, avec une source courte. " +
-                "JSON {price:int, source:string}. Vin: \"$q\"",
+                "Donne le prix marché estimé en euros (entier) pour ce vin. " +
+                "JSON {price:int}. Vin: \"$q\"",
             imageB64 = null,
         ) ?: return@withContext null
         val price = json.optInt("price", 0)
         if (price <= 0) null
-        else PriceEstimate(price, json.optString("source", "estimation"), "estimation IA")
+        else PriceEstimate(price, source, source)
     }
 
     // Instructs Gemini to reply in the device's current language so user-facing
