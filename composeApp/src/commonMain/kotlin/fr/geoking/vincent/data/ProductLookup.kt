@@ -4,6 +4,7 @@ import fr.geoking.vincent.model.FlavorProfile
 import fr.geoking.vincent.model.Producer
 import fr.geoking.vincent.model.Region
 import fr.geoking.vincent.model.Bottle
+import fr.geoking.vincent.model.SugarLevel
 
 /** A capability a [WineDataProvider] may expose. */
 enum class ProviderCapability {
@@ -68,8 +69,50 @@ data class WineEnrichment(
     val pairingText: String = "",    // prose food-pairing note
     val grapes: List<String> = emptyList(),
     val flavorProfile: FlavorProfile? = null,
+    // Catalogue identity facts that also enrich the bottle (region/place + sugar).
+    val regionName: String = "",     // provider region name, e.g. "Saint-Julien"
+    val country: String = "",        // provider country code/name, e.g. "FR"
+    val residualSugar: String? = null, // provider's raw sugar descriptor (free text)
     val source: String? = null,
 )
+
+/**
+ * Drink-window statement + young/ripe/storage notes folded into one text block.
+ * Shared by the add and edit screens so the maturity copy never drifts between them.
+ */
+fun WineEnrichment.maturityText(): String = buildString {
+    if (maturity.isNotBlank()) append(maturity)
+    if (young.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Jeune : $young") }
+    if (ripe.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("À maturité : $ripe") }
+    if (storage.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Conservation : $storage") }
+}
+
+/** "Region, COUNTRY" from the enrichment, or "" when the provider gave no place. */
+fun WineEnrichment.provenanceText(): String {
+    val region = regionName.trim()
+    val c = country.trim().uppercase()
+    return when {
+        region.isNotEmpty() && c.isNotEmpty() -> "$region, $c"
+        region.isNotEmpty() -> region
+        else -> ""
+    }
+}
+
+/**
+ * Best-effort map of the provider's free-text sugar descriptor to a [SugarLevel].
+ * Returns null when the descriptor is missing or unrecognised (e.g. raw g/L values),
+ * so callers keep the user's current value rather than guessing wrong.
+ */
+fun WineEnrichment.sugarLevel(): SugarLevel? {
+    val s = residualSugar?.lowercase()?.trim().orEmpty()
+    if (s.isEmpty()) return null
+    return when {
+        listOf("moelleux", "sweet", "doux", "liquoreux", "dessert").any { it in s } -> SugarLevel.MOELLEUX
+        listOf("demi", "off-dry", "off dry", "medium", "semi", "tendre").any { it in s } -> SugarLevel.DEMI_SEC
+        listOf("sec", "dry", "brut", "extra").any { it in s } -> SugarLevel.SEC
+        else -> null
+    }
+}
 
 /**
  * A pluggable wine data source. Each provider declares its [capabilities];

@@ -75,6 +75,9 @@ import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.WineEnrichment
+import fr.geoking.vincent.data.maturityText
+import fr.geoking.vincent.data.provenanceText
+import fr.geoking.vincent.data.sugarLevel
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
@@ -584,14 +587,7 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         val enr = enrichment
         val dFrom = enr?.drinkFromYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: 0
         val dTo = enr?.drinkToYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: 0
-        val maturityText = enr?.let {
-            buildString {
-                if (it.maturity.isNotBlank()) append(it.maturity)
-                if (it.young.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Jeune : ${it.young}") }
-                if (it.ripe.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("À maturité : ${it.ripe}") }
-                if (it.storage.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Conservation : ${it.storage}") }
-            }
-        }.orEmpty()
+        val maturityText = enr?.maturityText().orEmpty()
         onBottle(
             Bottle(
                 id = draftId,
@@ -605,9 +601,9 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
                 rating = 0.0,
                 agingPotential = agingPotential.filter { it.isDigit() }.toIntOrNull() ?: 0,
                 alcoholLevel = alcohol.replace(',', '.').toDoubleOrNull() ?: 0.0,
-                sugarLevel = sugar,
+                sugarLevel = enr?.sugarLevel() ?: sugar,
                 cellarSpot = spot.trim().uppercase().ifBlank { "—" },
-                provenance = "",
+                provenance = enr?.provenanceText().orEmpty(),
                 merchant = "—",
                 purchaseDate = todayLabel,
                 occasion = "",

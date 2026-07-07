@@ -203,6 +203,9 @@ private object GrapeMindsProvider : WineDataProvider {
             pairingText = wine?.pairing?.text ?: "",
             grapes = wine?.grapes?.map { it.name } ?: emptyList(),
             flavorProfile = flavor,
+            regionName = wine?.region?.name.orEmpty(),
+            country = wine?.region?.country.orEmpty(),
+            residualSugar = wine?.residualSugar,
             source = displayName,
         )
     }

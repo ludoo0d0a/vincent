@@ -56,6 +56,9 @@ import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Tastings
 import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.WineEnrichment
+import fr.geoking.vincent.data.maturityText
+import fr.geoking.vincent.data.provenanceText
+import fr.geoking.vincent.data.sugarLevel
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.getCurrentYear
 import fr.geoking.vincent.model.Bottle
@@ -181,12 +184,12 @@ fun BottleEditScreen(
             appellation = appellation.trim().ifBlank { categoryFallback },
             color = color,
             category = category,
-            provenance = provenance.trim(),
+            provenance = provenance.trim().ifBlank { enr?.provenanceText().orEmpty() },
             vintage = vintage.trim().ifBlank { "NM" },
             price = price.filter { it.isDigit() }.toIntOrNull() ?: 0,
             alcoholLevel = alcohol,
-            sugarLevel = sugar,
-            grapes = grapes,
+            sugarLevel = enr?.sugarLevel() ?: sugar,
+            grapes = grapes.ifEmpty { enr?.grapes.orEmpty() },
             merchant = merchant.trim().ifBlank { "—" },
             purchaseDate = purchaseDate.trim().ifBlank { live.purchaseDate },
             occasion = occasion.trim(),
@@ -197,7 +200,7 @@ fun BottleEditScreen(
             description = enr?.description ?: live.description,
             pairingNotes = enr?.pairingText ?: live.pairingNotes,
             flavorProfile = enr?.flavorProfile ?: live.flavorProfile,
-            maturity = enr?.let { buildMaturityText(it) } ?: live.maturity,
+            maturity = enr?.maturityText() ?: live.maturity,
             photoBottle = photos[BottlePhotoKind.BOTTLE],
             photoLabel = photos[BottlePhotoKind.LABEL],
             photoBack = photos[BottlePhotoKind.BACK],
@@ -598,13 +601,6 @@ private fun categoryFromRegion(region: String): WineCategory {
         "champagne" in v -> WineCategory.CHAMPAGNE
         else -> WineCategory.BORDEAUX
     }
-}
-
-private fun buildMaturityText(enr: WineEnrichment): String = buildString {
-    if (enr.maturity.isNotBlank()) append(enr.maturity)
-    if (enr.young.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Jeune : ${enr.young}") }
-    if (enr.ripe.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("À maturité : ${enr.ripe}") }
-    if (enr.storage.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append("Conservation : ${enr.storage}") }
 }
 
 private fun resolveGrapemindsDrinkYear(raw: Int, vintageYear: Int?): Int {
