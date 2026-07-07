@@ -470,6 +470,13 @@
     <string name="vincent_backup_import_error">Fichier non reconnu ou sauvegarde invalide.</string>
     <string name="vincent_backup_export_success">Sauvegarde exportée.</string>
     <string name="vincent_backup_export_canceled">Export annulé.</string>
+    <string name="data_management_section_maintenance">Maintenance</string>
+    <string name="data_management_reset_button">Réinitialiser la base</string>
+    <string name="data_management_reset_desc">Supprime toutes les données locales (vins, casiers, dégustations, référentiels). Utile pour tester les imports.</string>
+    <string name="data_management_reset_dialog_title">Réinitialiser la base ?</string>
+    <string name="data_management_reset_dialog_message">Toutes les données locales seront définitivement supprimées. Cette action est irréversible.</string>
+    <string name="data_management_reset_confirm">Réinitialiser</string>
+    <string name="data_management_reset_success">Base réinitialisée.</string>
     <string name="data_management_section_referentials">Référentiels</string>
     <string name="data_management_section_data">Données</string>
     <string name="data_management_wines">Vins</string>

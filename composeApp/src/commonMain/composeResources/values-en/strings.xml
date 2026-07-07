@@ -456,6 +456,13 @@
     <string name="vincent_backup_import_error">Unrecognized file or invalid backup.</string>
     <string name="vincent_backup_export_success">Backup exported.</string>
     <string name="vincent_backup_export_canceled">Export canceled.</string>
+    <string name="data_management_section_maintenance">Maintenance</string>
+    <string name="data_management_reset_button">Reset database</string>
+    <string name="data_management_reset_desc">Deletes all local data (wines, racks, tastings, referentials). Useful for testing imports.</string>
+    <string name="data_management_reset_dialog_title">Reset database?</string>
+    <string name="data_management_reset_dialog_message">All local data will be permanently deleted. This action cannot be undone.</string>
+    <string name="data_management_reset_confirm">Reset</string>
+    <string name="data_management_reset_success">Database reset.</string>
     <string name="data_management_section_data">Data</string>
     <string name="data_management_wines">Wines</string>
     <string name="data_management_wines_subtitle">%1$d bottles in cellar</string>

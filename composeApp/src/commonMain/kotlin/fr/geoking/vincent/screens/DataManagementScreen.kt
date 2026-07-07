@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.AlertDialog
@@ -74,6 +75,7 @@ private sealed interface BackupUiStatus {
     data object ImportError : BackupUiStatus
     data object ExportSuccess : BackupUiStatus
     data object ExportCanceled : BackupUiStatus
+    data object ResetSuccess : BackupUiStatus
 }
 
 @Composable
@@ -94,6 +96,7 @@ fun DataManagementScreen(
     var status by remember { mutableStateOf<BackupUiStatus?>(null) }
     var pendingImport by remember { mutableStateOf<VincentParsedBackup?>(null) }
     var importMode by remember { mutableStateOf(VincentImportMode.MERGE) }
+    var showResetDialog by remember { mutableStateOf(false) }
 
     val exportSummary = stringResource(
         Res.string.vincent_backup_export_summary,
@@ -175,6 +178,42 @@ fun DataManagementScreen(
         )
     }
 
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringResource(Res.string.data_management_reset_dialog_title)) },
+            text = {
+                Text(
+                    stringResource(Res.string.data_management_reset_dialog_message),
+                    fontSize = 13.sp,
+                    color = VincentColors.Fg,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetDialog = false
+                        busy = true
+                        status = null
+                        scope.launch {
+                            runCatching { VincentBackup.clearAll() }
+                                .onSuccess { status = BackupUiStatus.ResetSuccess }
+                                .onFailure { status = BackupUiStatus.ImportError }
+                            busy = false
+                        }
+                    },
+                ) {
+                    Text(stringResource(Res.string.data_management_reset_confirm), color = VincentColors.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text(stringResource(Res.string.cellar_action_cancel))
+                }
+            },
+        )
+    }
+
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         DataScreenHeader(
             title = stringResource(Res.string.data_management_title),
@@ -248,6 +287,7 @@ fun DataManagementScreen(
                         BackupUiStatus.ImportError -> stringResource(Res.string.vincent_backup_import_error)
                         BackupUiStatus.ExportSuccess -> stringResource(Res.string.vincent_backup_export_success)
                         BackupUiStatus.ExportCanceled -> stringResource(Res.string.vincent_backup_export_canceled)
+                        BackupUiStatus.ResetSuccess -> stringResource(Res.string.data_management_reset_success)
                     },
                 )
             }
@@ -285,6 +325,34 @@ fun DataManagementScreen(
                     sublabel = pluralStringResource(Res.plurals.regions_management_subtitle, Regions.all.size, Regions.all.size),
                     onClick = onOpenRegions,
                 )
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SectionHeader(stringResource(Res.string.data_management_section_maintenance))
+            VCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        stringResource(Res.string.data_management_reset_desc),
+                        fontSize = 11.5.sp,
+                        color = VincentColors.Muted,
+                        lineHeight = 16.sp,
+                    )
+                    Button(
+                        onClick = { showResetDialog = true },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Red, contentColor = Color.White),
+                    ) {
+                        Icon(Icons.Filled.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            stringResource(Res.string.data_management_reset_button),
+                            fontWeight = FontWeight.W700,
+                            fontSize = 12.5.sp,
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(24.dp))
