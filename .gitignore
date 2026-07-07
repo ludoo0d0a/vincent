@@ -32,3 +32,7 @@ playstore/version.properties
 
 # Local API reference (grapeminds dashboard export, Postman collection) — not for the repo
 docs/
+
+# IntelliJ HTTP Client private env — holds the grapeminds API key + Firebase tokens
+http/http-client.private.env.json
+**/http-client.private.env.json

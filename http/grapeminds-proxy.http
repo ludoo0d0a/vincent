@@ -1,0 +1,72 @@
+### grapeminds via the Cloudflare Worker proxy (/v1/grapeminds/*)
+#
+# The app routes catalogue lists (/wines, /producers, /regions) through the
+# Worker so GRAPEMINDS_API_KEY never ships in the APK (worker/src/index.ts →
+# handleGrapemindsGet). The Worker authenticates the *caller* with Firebase
+# App Check + a Firebase ID token instead of the grapeminds key.
+#
+# Requires:
+#   - proxyBaseUrl in http-client.env.json (e.g. https://vin-cent-ai.<acct>.workers.dev)
+#   - firebaseIdToken + appCheckToken in http-client.private.env.json
+#     (short-lived; grab fresh tokens from a debug build / HttpDebug logs).
+# When ENFORCE_APP_CHECK / ENFORCE_AUTH are true, missing tokens return 401.
+
+### Worker health check (no auth)
+GET {{proxyBaseUrl}}/health
+Accept: application/json
+
+> {%
+    client.test("200 OK", function () {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+    });
+    client.test("reports ok", function () {
+        client.assert(response.body.ok === true, "health not ok");
+    });
+%}
+
+### Proxied wines list — Firebase-authenticated, no grapeminds key sent
+GET {{proxyBaseUrl}}/v1/grapeminds/wines?page=1&per_page=5
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("authenticated (200) — 401 means stale/absent tokens", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("data is an array", function () {
+            client.assert(Array.isArray(response.body.data), "response.data is not an array");
+        });
+    }
+%}
+
+### Proxied producers list
+GET {{proxyBaseUrl}}/v1/grapeminds/producers?page=1&per_page=5
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("authenticated (200) or 401 on stale tokens", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+%}
+
+### Proxied regions list
+GET {{proxyBaseUrl}}/v1/grapeminds/regions?page=1&per_page=5
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("authenticated (200) or 401 on stale tokens", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+%}
