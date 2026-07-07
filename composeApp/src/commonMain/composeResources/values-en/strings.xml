@@ -138,6 +138,8 @@
     <string name="detail_tasting_notes">Notes</string>
     <string name="detail_tasting_save">Save</string>
     <string name="detail_tasting_title">Tasting</string>
+    <string name="detail_tasting_delete">Delete tasting</string>
+    <string name="detail_tasting_open">View tastings</string>
     <string name="detail_price_auto">Auto</string>
     <string name="detail_price_searching">Searching prices…</string>
     <string name="detail_price_update">Update</string>

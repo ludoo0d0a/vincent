@@ -51,6 +51,7 @@ import fr.geoking.vincent.screens.AddScreen
 import fr.geoking.vincent.screens.BottleEditScreen
 import fr.geoking.vincent.screens.ArScreen
 import fr.geoking.vincent.screens.BottleDetailScreen
+import fr.geoking.vincent.screens.BottleTastingsScreen
 import fr.geoking.vincent.screens.BottlesScreen
 import fr.geoking.vincent.screens.CellarScreen
 import fr.geoking.vincent.screens.DashboardScreen
@@ -100,6 +101,8 @@ private sealed interface Dest {
     /** Edit the rack at [rackIndex]. */
     data class RackEdit(val rackIndex: Int) : Dest
     data class TastingEdit(val bottle: Bottle, val tastingId: String? = null) : Dest
+    /** Screen listing the tastings recorded for [bottle]. */
+    data class BottleTastings(val bottle: Bottle) : Dest
     data class Placement(val bottle: Bottle) : Dest
 }
 
@@ -164,7 +167,7 @@ fun App() = VincentTheme {
                     bottle = top.bottle,
                     onBack = { stack.clear() },
                     onEdit = { stack.add(Dest.Edit(it)) },
-                    onTasting = { bottle, tastingId -> stack.add(Dest.TastingEdit(bottle, tastingId)) },
+                    onOpenTastings = { stack.add(Dest.BottleTastings(it)) },
                     onMove = { stack.add(Dest.Placement(it)) },
                 )
 
@@ -173,7 +176,7 @@ fun App() = VincentTheme {
                 is Dest.Edit -> BottleEditScreen(
                     bottle = top.bottle,
                     onClose = { stack.clear() },
-                    onTasting = { bottle, tastingId -> stack.add(Dest.TastingEdit(bottle, tastingId)) },
+                    onOpenTastings = { stack.add(Dest.BottleTastings(it)) },
                 )
 
                 Dest.Account -> AccountScreen(
@@ -230,6 +233,12 @@ fun App() = VincentTheme {
                     bottle = top.bottle,
                     tastingId = top.tastingId,
                     onClose = { stack.removeAt(stack.lastIndex) }
+                )
+
+                is Dest.BottleTastings -> BottleTastingsScreen(
+                    bottle = top.bottle,
+                    onBack = ::pop,
+                    onTasting = { bottle, tastingId -> stack.add(Dest.TastingEdit(bottle, tastingId)) },
                 )
 
                 is Dest.Placement -> AddScreen(

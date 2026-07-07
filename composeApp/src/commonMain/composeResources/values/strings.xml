@@ -145,6 +145,8 @@
     <string name="detail_tasting_notes">Commentaire</string>
     <string name="detail_tasting_save">Enregistrer</string>
     <string name="detail_tasting_title">Dégustation</string>
+    <string name="detail_tasting_delete">Supprimer la dégustation</string>
+    <string name="detail_tasting_open">Voir les dégustations</string>
     <string name="detail_price_auto">Auto</string>
     <string name="detail_price_searching">Recherche de prix…</string>
     <string name="detail_price_update">Mettre à jour</string>

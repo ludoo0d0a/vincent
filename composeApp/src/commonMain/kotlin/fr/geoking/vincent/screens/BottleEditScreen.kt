@@ -85,6 +85,7 @@ import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.VintageQuickPicker
 import fr.geoking.vincent.ui.WineBottle
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 
@@ -93,7 +94,7 @@ import vincent.composeapp.generated.resources.*
 fun BottleEditScreen(
     bottle: Bottle,
     onClose: () -> Unit,
-    onTasting: (Bottle, String?) -> Unit = { _, _ -> },
+    onOpenTastings: (Bottle) -> Unit = {},
 ) {
     val live = Cellar.bottle(bottle.id) ?: bottle
     val scope = rememberCoroutineScope()
@@ -158,7 +159,7 @@ fun BottleEditScreen(
     val categoryFallback = stringResource(category.label)
 
     val bottleTastings = remember(live.id, Tastings.all.toList()) {
-        Tastings.all.filter { it.bottleId == live.id }.sortedByDescending { it.date }
+        Tastings.all.filter { it.bottleId == live.id }
     }
 
     val draft = remember(
@@ -211,7 +212,6 @@ fun BottleEditScreen(
     }
     var sourceExpanded by remember(live.id) { mutableStateOf(true) }
     var priceExpanded by remember(live.id) { mutableStateOf(live.price > 0) }
-    var tastingsExpanded by remember(live.id) { mutableStateOf(bottleTastings.isNotEmpty()) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).imePadding()) {
@@ -429,50 +429,27 @@ fun BottleEditScreen(
                     )
                 }
 
-                CollapsibleSection(
-                    title = stringResource(Res.string.detail_tasting),
-                    expanded = tastingsExpanded,
-                    onToggle = { tastingsExpanded = !tastingsExpanded },
+                Text(stringResource(Res.string.detail_tasting), fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                VCard(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenTastings(draft) },
                 ) {
-                    if (bottleTastings.isEmpty()) {
-                        Text(
-                            stringResource(Res.string.detail_tasting_empty),
-                            fontSize = 12.sp,
-                            color = VincentColors.Muted,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                    } else {
-                        Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            bottleTastings.forEach { tasting ->
-                                VCard(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onTasting(draft, tasting.id) },
-                                ) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                            Column(Modifier.weight(1f)) {
-                                                Text(tasting.date, fontSize = 11.sp, color = VincentColors.Muted)
-                                                if (tasting.place.isNotBlank()) {
-                                                    Text(tasting.place, fontSize = 11.sp, color = VincentColors.Muted)
-                                                }
-                                            }
-                                            Stars(tasting.rating)
-                                        }
-                                        if (tasting.notes.isNotEmpty()) {
-                                            Text(tasting.notes, fontSize = 12.sp, color = VincentColors.Fg, modifier = Modifier.padding(top = 4.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = { onTasting(draft, null) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(40.dp),
-                        shape = RoundedCornerShape(11.dp),
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(stringResource(Res.string.detail_tasting_add), fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                        Icon(Icons.Filled.LocalBar, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(Res.string.detail_tasting_open), fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
+                            Text(
+                                if (bottleTastings.isEmpty()) stringResource(Res.string.detail_tasting_empty)
+                                else pluralStringResource(Res.plurals.tastings_subtitle, bottleTastings.size, bottleTastings.size),
+                                fontSize = 11.sp, color = VincentColors.Muted,
+                            )
+                        }
+                        Text("›", fontSize = 18.sp, color = VincentColors.Muted)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
