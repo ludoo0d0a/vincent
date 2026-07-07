@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -36,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,8 +59,8 @@ import fr.geoking.vincent.data.rememberRackImageSaver
 import fr.geoking.vincent.data.rememberVincentExport
 import fr.geoking.vincent.data.rememberVincentImport
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.DataImportCard
 import fr.geoking.vincent.ui.DataScreenHeader
+import fr.geoking.vincent.ui.ImportBusyIndicator
 import fr.geoking.vincent.ui.ImportStatusBanner
 import fr.geoking.vincent.ui.SectionHeader
 import fr.geoking.vincent.ui.VCard
@@ -181,52 +185,16 @@ fun DataManagementScreen(
         Column(Modifier.padding(horizontal = 16.dp)) {
             SectionHeader(stringResource(Res.string.data_management_section_transfer))
 
-            DataImportCard(
-                title = stringResource(Res.string.vincent_backup_import_title),
-                description = stringResource(Res.string.vincent_backup_import_desc),
-                busy = busy,
-            ) {
-                OutlinedButton(
-                    onClick = importBackup,
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape = RoundedCornerShape(13.dp),
-                ) {
-                    Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(Res.string.vincent_backup_import_button),
-                        fontWeight = FontWeight.W700,
-                        color = VincentColors.Accent,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
             VCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(
-                        stringResource(Res.string.vincent_backup_export_title),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.W700,
-                        color = VincentColors.Fg,
-                    )
-                    Text(
-                        stringResource(Res.string.vincent_backup_export_desc),
-                        fontSize = 12.sp,
-                        color = VincentColors.Muted,
-                        lineHeight = 18.sp,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                Column(Modifier.padding(14.dp)) {
                     Text(
                         exportSummary,
                         fontSize = 11.5.sp,
                         color = VincentColors.Muted,
-                        modifier = Modifier.padding(top = 8.dp),
+                        lineHeight = 16.sp,
                     )
                     Row(
-                        Modifier.fillMaxWidth().padding(top = 12.dp),
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Switch(
@@ -240,18 +208,28 @@ fun DataManagementScreen(
                             color = VincentColors.Fg,
                         )
                     }
-                    OutlinedButton(
-                        onClick = exportBackup,
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(46.dp),
-                        shape = RoundedCornerShape(13.dp),
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(Icons.Filled.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            stringResource(Res.string.vincent_backup_export_button),
-                            fontWeight = FontWeight.W700,
-                            color = VincentColors.Accent,
+                        TransferButton(
+                            label = stringResource(Res.string.vincent_backup_import_button),
+                            icon = Icons.Filled.FileUpload,
+                            enabled = !busy,
+                            modifier = Modifier.weight(1f),
+                            onClick = importBackup,
                         )
+                        TransferButton(
+                            label = stringResource(Res.string.vincent_backup_export_button),
+                            icon = Icons.Filled.FileDownload,
+                            enabled = !busy,
+                            modifier = Modifier.weight(1f),
+                            onClick = exportBackup,
+                        )
+                    }
+                    if (busy) {
+                        Spacer(Modifier.height(10.dp))
+                        ImportBusyIndicator()
                     }
                 }
             }
@@ -322,6 +300,28 @@ private fun ImportModeRow(selected: Boolean, label: String, onClick: () -> Unit)
     ) {
         RadioButton(selected = selected, onClick = onClick)
         Text(label, fontSize = 13.sp, color = VincentColors.Fg)
+    }
+}
+
+@Composable
+private fun TransferButton(
+    label: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(44.dp),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
     }
 }
 

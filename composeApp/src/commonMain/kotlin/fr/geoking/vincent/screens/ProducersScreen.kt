@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -16,24 +15,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.Producers
 import fr.geoking.vincent.data.ProviderCapability
 import fr.geoking.vincent.data.WineDataSource
-import fr.geoking.vincent.data.rememberCsvExport
 import fr.geoking.vincent.data.rememberCsvImport
-import fr.geoking.vincent.model.Producer
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.CsvFileImportButton
-import fr.geoking.vincent.ui.DataExportCard
 import fr.geoking.vincent.ui.DataImportCard
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.ExternalProviderButtons
 import fr.geoking.vincent.ui.ImportStatusBanner
-import fr.geoking.vincent.ui.VCard
+import fr.geoking.vincent.ui.RedImportButton
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -49,7 +42,6 @@ private sealed interface ProducerImportStatus {
 fun ProducersScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var importStatus by remember { mutableStateOf<ProducerImportStatus?>(null) }
-    var exportOk by remember { mutableStateOf<Boolean?>(null) }
     var busy by remember { mutableStateOf(false) }
     val externalProviders = remember { WineDataSource.supporting(ProviderCapability.LIST_PRODUCERS) }
     val emptyMsg = stringResource(Res.string.data_import_empty)
@@ -61,10 +53,6 @@ fun ProducersScreen(onBack: () -> Unit) {
         } else {
             ProducerImportStatus.WrongType
         }
-    }
-
-    val exportCsv = rememberCsvExport("vincent-producteurs.csv", { CsvFormat.producersToCsv(Producers.all.toList()) }) { ok ->
-        exportOk = ok
     }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
@@ -80,9 +68,9 @@ fun ProducersScreen(onBack: () -> Unit) {
                 description = stringResource(Res.string.format_ploc_desc),
                 busy = busy,
             ) {
-                CsvFileImportButton(onClick = importCsv, enabled = !busy)
+                RedImportButton(stringResource(Res.string.import_ploc), enabled = !busy, onClick = importCsv)
                 if (externalProviders.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     ExternalProviderButtons(externalProviders, enabled = !busy) { provider ->
                         busy = true
                         importStatus = null
@@ -115,61 +103,7 @@ fun ProducersScreen(onBack: () -> Unit) {
                 null -> Unit
             }
 
-            Spacer(Modifier.height(14.dp))
-
-            DataExportCard(
-                title = stringResource(Res.string.transfer_export_title),
-                description = stringResource(Res.string.data_management_producers_subtitle, Producers.all.size),
-                buttonLabel = stringResource(Res.string.export_producers_button),
-                onExport = exportCsv,
-            )
-
-            exportOk?.let { ok ->
-                Spacer(Modifier.height(14.dp))
-                ImportStatusBanner(
-                    stringResource(if (ok) Res.string.transfer_export_success else Res.string.transfer_export_canceled),
-                )
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            Producers.all.forEach { producer ->
-                ProducerCard(producer)
-                Spacer(Modifier.height(11.dp))
-            }
-
-            if (Producers.all.isEmpty()) {
-                androidx.compose.material3.Text(
-                    stringResource(Res.string.producers_empty),
-                    fontSize = 13.sp,
-                    color = VincentColors.Muted,
-                    modifier = Modifier.padding(vertical = 24.dp),
-                )
-            }
-
             Spacer(Modifier.height(24.dp))
-        }
-    }
-}
-
-@Composable
-private fun ProducerCard(p: Producer) {
-    VCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp)) {
-            androidx.compose.material3.Text(p.name, fontSize = 14.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg)
-            if (p.region.isNotEmpty() || p.country.isNotEmpty()) {
-                androidx.compose.material3.Text(
-                    "${p.region}${if (p.region.isNotEmpty() && p.country.isNotEmpty()) ", " else ""}${p.country}",
-                    fontSize = 11.sp,
-                    color = VincentColors.Muted,
-                )
-            }
-            if (p.email.isNotEmpty() || p.phone.isNotEmpty() || p.website.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                if (p.email.isNotEmpty()) androidx.compose.material3.Text(p.email, fontSize = 11.sp, color = VincentColors.Accent)
-                if (p.phone.isNotEmpty()) androidx.compose.material3.Text(p.phone, fontSize = 11.sp, color = VincentColors.Fg)
-                if (p.website.isNotEmpty()) androidx.compose.material3.Text(p.website, fontSize = 11.sp, color = VincentColors.Muted)
-            }
         }
     }
 }

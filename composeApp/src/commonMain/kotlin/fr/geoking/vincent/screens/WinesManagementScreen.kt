@@ -23,7 +23,7 @@ import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.rememberCsvExport
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.CsvProviderGrid
+import fr.geoking.vincent.ui.ImportSourceButtons
 import fr.geoking.vincent.ui.DataExportCard
 import fr.geoking.vincent.ui.DataImportCard
 import fr.geoking.vincent.ui.DataScreenHeader
@@ -74,12 +74,11 @@ fun WinesManagementScreen(onBack: () -> Unit) {
                 description = stringResource(Res.string.wines_management_import_desc),
                 busy = busy,
             ) {
-                CsvProviderGrid(
-                    providers = listOf(
+                ImportSourceButtons(
+                    sources = listOf(
+                        stringResource(Res.string.import_ploc) to importCsv,
                         stringResource(Res.string.import_vivino) to importCsv,
                         stringResource(Res.string.import_cellartracker) to importCsv,
-                        stringResource(Res.string.import_ploc) to importCsv,
-                        stringResource(Res.string.import_vincent) to importCsv,
                     ),
                     enabled = !busy,
                 )

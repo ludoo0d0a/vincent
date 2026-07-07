@@ -134,30 +134,31 @@ fun DataExportCard(
 }
 
 @Composable
-fun CsvProviderGrid(providers: List<Pair<String, () -> Unit>>, enabled: Boolean) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        providers.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (label, onClick) ->
-                    ImportSourceButton(label, Modifier.weight(1f), enabled = enabled, onClick = onClick)
-                }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
+fun RedImportButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.fillMaxWidth().height(44.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+    ) {
+        Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontWeight = FontWeight.W700, fontSize = 13.sp)
     }
 }
 
 @Composable
-fun CsvFileImportButton(onClick: () -> Unit, enabled: Boolean) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(46.dp),
-        shape = RoundedCornerShape(13.dp),
-    ) {
-        Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(Res.string.transfer_import_button), fontWeight = FontWeight.W700, color = VincentColors.Accent)
+fun ImportSourceButtons(sources: List<Pair<String, () -> Unit>>, enabled: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        sources.forEach { (label, onClick) ->
+            RedImportButton(label, enabled = enabled, onClick = onClick)
+        }
     }
 }
 
@@ -181,26 +182,6 @@ fun ExternalProviderButtons(
                 Text(provider.displayName, fontWeight = FontWeight.W700, fontSize = 13.sp)
             }
         }
-    }
-}
-
-@Composable
-fun ImportSourceButton(
-    label: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier
-            .height(42.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (enabled) VincentColors.Surface2 else VincentColors.Surface2.copy(alpha = 0.5f))
-            .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.W700, color = if (enabled) VincentColors.Fg else VincentColors.Muted)
     }
 }
 

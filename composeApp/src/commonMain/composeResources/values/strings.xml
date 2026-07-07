@@ -486,7 +486,7 @@
         <item quantity="one">%1$d région enregistrée</item>
         <item quantity="other">%1$d régions enregistrées</item>
     </plurals>
-    <string name="regions_management_title">Régions viticoles</string>
+    <string name="regions_management_title">Importer des régions</string>
     <string name="regions_management_import_desc">Importez des régions depuis Wikipedia ou Grapeminds.</string>
     <string name="data_import_loading">Chargement et analyse en cours…</string>
     <string name="data_import_empty">Aucune donnée trouvée.</string>

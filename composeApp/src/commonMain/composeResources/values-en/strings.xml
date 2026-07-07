@@ -471,7 +471,7 @@
         <item quantity="one">%1$d region registered</item>
         <item quantity="other">%1$d regions registered</item>
     </plurals>
-    <string name="regions_management_title">Wine regions</string>
+    <string name="regions_management_title">Import regions</string>
     <string name="regions_management_import_desc">Import regions from Wikipedia or Grapeminds.</string>
     <string name="data_import_loading">Loading and parsing…</string>
     <string name="data_import_empty">No data found.</string>

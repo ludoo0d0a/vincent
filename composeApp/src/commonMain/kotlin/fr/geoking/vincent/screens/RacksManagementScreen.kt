@@ -17,12 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fr.geoking.vincent.data.CsvFormat
 import fr.geoking.vincent.data.Racks
-import fr.geoking.vincent.data.rememberCsvExport
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
-import fr.geoking.vincent.ui.CsvFileImportButton
-import fr.geoking.vincent.ui.DataExportCard
 import fr.geoking.vincent.ui.DataImportCard
+import fr.geoking.vincent.ui.RedImportButton
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.ImportStatusBanner
 import org.jetbrains.compose.resources.pluralStringResource
@@ -37,7 +35,6 @@ private sealed interface RackImportStatus {
 @Composable
 fun RacksManagementScreen(onBack: () -> Unit) {
     var importStatus by remember { mutableStateOf<RackImportStatus?>(null) }
-    var exportOk by remember { mutableStateOf<Boolean?>(null) }
     var busy by remember { mutableStateOf(false) }
 
     val importCsv = rememberCsvImport(onLoading = { busy = it }) { text ->
@@ -48,10 +45,6 @@ fun RacksManagementScreen(onBack: () -> Unit) {
         } else {
             RackImportStatus.WrongType
         }
-    }
-
-    val exportCsv = rememberCsvExport("vincent-casiers.csv", { CsvFormat.racksToCsv(Racks.all.toList()) }) { ok ->
-        exportOk = ok
     }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
@@ -67,7 +60,7 @@ fun RacksManagementScreen(onBack: () -> Unit) {
                 description = stringResource(Res.string.format_vincent_desc),
                 busy = busy,
             ) {
-                CsvFileImportButton(onClick = importCsv, enabled = !busy)
+                RedImportButton(stringResource(Res.string.import_ploc), enabled = !busy, onClick = importCsv)
             }
 
             when (val status = importStatus) {
@@ -80,22 +73,6 @@ fun RacksManagementScreen(onBack: () -> Unit) {
                     ImportStatusBanner(stringResource(Res.string.cellar_import_wrong_type))
                 }
                 null -> Unit
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            DataExportCard(
-                title = stringResource(Res.string.transfer_export_title),
-                description = stringResource(Res.string.data_management_racks_subtitle, Racks.all.size),
-                buttonLabel = stringResource(Res.string.export_racks_button),
-                onExport = exportCsv,
-            )
-
-            exportOk?.let { ok ->
-                Spacer(Modifier.height(14.dp))
-                ImportStatusBanner(
-                    stringResource(if (ok) Res.string.transfer_export_success else Res.string.transfer_export_canceled),
-                )
             }
 
             Spacer(Modifier.height(24.dp))
