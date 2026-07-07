@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,7 +52,7 @@ import vincent.composeapp.generated.resources.log_no_result
 fun LogcatScreen(onBack: () -> Unit) {
     var query by remember { mutableStateOf("") }
 
-    Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
+    Column(Modifier.fillMaxSize().background(VincentColors.Bg).imePadding()) {
         // Toolbar
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),

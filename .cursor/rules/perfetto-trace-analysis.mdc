@@ -1,0 +1,285 @@
+---
+description: |-
+  Analyzes Perfetto traces to find the root cause of latency, memory, or jank issues in Android apps. Use when the user provides a Perfetto trace file and asks any question, ongoing investigation, or open-ended request to analyze its contents.
+alwaysApply: false
+---
+
+
+## Resources
+
+- **Domain Hints:** Reference files for specific performance areas: [`CPU`](references/hints_cpu.md), [`Graphics`](references/hints_graphics.md), [`I/O`](references/hints_io.md), [`IPC`](references/hints_ipc.md), [`Memory`](references/hints_memory.md), [`Power`](references/hints_power.md). These files each contain multiple expert-vetted, powerful trace analysis techniques to steer and aid in the analysis.
+- **Perfetto SQL Reference:** Reference guidelines for translating intents into valid queries are located in [the SQL reference](references/sql.md). You must read this reference and follow its Execution Protocol for all SQL generation.
+
+## Setup Phase (Mandatory)
+
+1. **Initialize Scratchpad (Chain of Evidence):**
+   - Maintain your working memory in a local scratchpad file located in the exact same directory as the target trace file.
+   - Name the file using the trace's filename appended with `_analysis.md` (e.g., `[trace_filename]_analysis.md`). Before creating it, check if a file with that name already exists by listing the directory's contents---to avoid biasing your investigation, DO NOT read the file's contents to check for its existence. If it does, append an incrementing version number (e.g., `_v2.md`, `_v3.md`) until you find an available filename. You MUST hardcode this exact filename in all subsequent tool calls.
+   - Use this scratchpad STRICTLY to log verified facts: timestamps, slice names, thread IDs (utid/tid), and thread states.
+   - DO NOT write preliminary hypotheses or premature conclusions in the scratchpad. It is a strict Chain of Evidence.
+2. **Review Domain Hints:** Read the Domain Hints in each file to get a high-level overview of what techniques are possible. Make sure to use this baseline knowledge when researching and retrieving hints during the ongoing investigation.
+3. **Review SQL Reference:** Read the SQL reference in [`references/sql.md`](references/sql.md) and follow its Execution Protocol for all SQL generation. Do not guess schemas.
+4. **Target Resolution:** If the user's request is broad (e.g., "why is the app slow?") and doesn't specify a package name:
+   - Execute a query to identify the active application: `sql INCLUDE
+     PERFETTO MODULE android.startup.startups; SELECT package FROM
+     android_startups;`
+   - If multiple packages are returned, ask the user to choose one. Save the chosen `package_name` to your scratchpad.
+
+## Investigation Protocol
+
+Follow this iterative loop until you have isolated the definitive root cause(s):
+
+### 1. Formulate Hypothesis
+
+- **Prioritization:** Form hypotheses using information from: user prompt \> "Domain Hints" ([`CPU`](references/hints_cpu.md), [`Graphics`](references/hints_graphics.md), [`I/O`](references/hints_io.md), [`IPC`](references/hints_ipc.md), [`Memory`](references/hints_memory.md), [`Power`](references/hints_power.md)) \> general knowledge. Be sure to leverage these "Domain Hints" as they are expert-vetted analysis techniques.
+- **Source Attribution:** Explicitly mention the source of your hypothesis (e.g., "Based on hints_io.md...").
+- **Focus Constraint:** Focus on the primary bottleneck. Avoid investigating deep into binder transactions unless the user explicitly asks for it or there is no other obvious bottleneck.
+- **State Reasoning:** Briefly state your reasoning based on previous findings *before* generating a new query.
+
+### 2. Plan and Collect Data
+
+- **Metrics First:** Start with a high-level view using trace metrics before diving into custom SQL (e.g., `./trace_processor --run-metrics
+  android_startup`).
+- **Broad to Narrow:** Begin with broad queries using minimal filters. Favor fuzzy matching (e.g., `GLOB '*abc*'`) over exact matching.
+- **Overlapping Time:** When filtering by time, you MUST check for events that overlap with the target time range (e.g., `start1 < end2 AND start2 < end1`) to ensure you don't miss slices that span across the boundaries.
+
+### 3. Analyze and Drill Down (Depth-First)
+
+- **Evidentiary Rigor:** Do not draw conclusions without explicit data.
+- **Wall Time vs. CPU Time:** Do not assume a long-running slice is actively computing. You MUST query the `thread_state` table for the exact timestamp window of suspicious slices to verify if the thread was `Running`, `Runnable` (waiting for CPU), or `Sleeping`/`Uninterruptible Sleep` (blocked).
+- **Follow Dependencies:** If a thread is blocked/waiting, you MUST find what it is waiting *for* (Binder, Lock, I/O, etc.). Cross process boundaries if necessary. You cannot conclude an investigation on a waiting thread without identifying the blocker.
+
+### 4. Exhaustive Investigation (Do Not Give Up Early)
+
+- **Multiple Bottlenecks:** Complex performance issues rarely have a single cause. Do NOT stop your investigation after finding the first anomaly. Even if you find a major bottleneck (e.g., emulator graphics lag), you MUST continue searching for other independent system-wide issues (e.g., lock contention, I/O stalls). To find other bottlenecks, search through the content of the "Domain Hints" files ([`CPU`](references/hints_cpu.md), [`Graphics`](references/hints_graphics.md), [`I/O`](references/hints_io.md), [`IPC`](references/hints_ipc.md), [`Memory`](references/hints_memory.md), [`Power`](references/hints_power.md)) to retrieve and leverage expert-vetted, powerful trace analysis techniques. Investigate each relevant hint with depth.
+- **Global Verification:** Periodically perform a system-wide query for the longest running slices (`ORDER BY slice.dur DESC`) and most frequent D-states to ensure your local investigation hasn't missed a massive, unrelated system stall.
+- **Persist Through Dead Ends:** If a hypothesis is disproven or a query returns empty, do not conclude. Pivot your focus, broaden your search constraints (fuzzy matching, wider time windows), and continue the mission.
+
+## Final Report
+
+Only when you have followed the entire chain of dependencies to the root
+cause(s) AND confirmed through exhaustive search that no other major bottlenecks
+exist: 1. Summarize your findings detailing the verified chain of evidence. 2.
+Conclude with: "This concludes the trace analysis. You can review the full chain
+of evidence in \[scratchpad_filename\]. Let me know if you would like me to drill
+down into any of these specific threads, or if you'd like help drafting a bug
+report."
+
+---
+
+# Inlined references
+
+## references/hints_cpu.md
+
+- When debugging a long slice: Examine its thread states to understand what the thread was doing (running, sleeping, blocked on I/O).
+- When debugging a long slice for latency issues: Check if its duration is caused by one or more long-running child slices. Apply recursively.
+- When a thread is woken up but there's a delay before it runs, check the "IRQ" track for the corresponding CPU to see if an interrupt is the cause.
+- Check if kernel threads associated with hardware are running with real-time priority; if not, they can be preempted.
+- When analysis of the primary application package does not reveal the root cause, expand to all threads and processes. Search for other runnable threads on the same CPU or high-priority kernel threads.
+- When investigating app startup, use an SQL query to aggregate the reasons for uninterruptible sleep on the main thread.
+- Check the "cpu_frequency" counter for the CPU cores that ran the main process. Missing frequency data or stuck frequencies indicate a kernel-level bug in the governor.
+- Query raw "ftrace" events for logs related to the governor thread (e.g., "su_gov").
+- To find concurrency issues, search for critical threads (e.g., 'RenderThread') in a blocked state (thread_state.state = 'D') and join with scheduling data to find the waker.
+- Compare time spent in userspace functions vs kernel (slices with \[k\] prefix).
+- To detect a 'catch-up storm', look for threads with long gaps in thread_state/cpu_slice activity immediately followed by a high-density burst.
+- Quantify scheduler contention by calculating scheduling latency (measure duration of preceding 'Runnable' state using preceding_sched_slice_for_thread). Search for maximums and high percentiles (p95/p99).
+- If a task exhibits high scheduling latency, check if other CPUs were idle (running swapper or idle thread).
+- Check the cpu_id for key threads; if consistently scheduled on slower cores, it signals a potential performance gain by allowing them on big cores.
+- For a struggling thread, analyze 'Runnable' vs 'Running' state time. A large 'Runnable' time indicates CPU contention.
+- If a slice's wall duration increases but the percentage of 'Running' time is unchanged, it strongly suggests a lower CPU frequency. Check sched_switch to focus on the correct cores.
+
+## references/hints_graphics.md
+
+- When investigating UI jank, check for long-running slices on the main thread; if a slice like "ConstraintLayout.onMeasure" is taking a long time (e.g., \>8ms), it is a likely cause of the jank.
+- When a bitmap_write_to_parcel slice takes milliseconds instead of microseconds, investigate its children slices to see how time is spent. Long durations often point to suboptimal kernel operations like memory mapping (mmap) or unnecessary data zeroing.
+- For a high-level overview of graphics memory usage, track the 'gpu_mem_total' counter for a specific process (upid).
+- To find the largest graphics allocations, query the android_graphics_allocs table and sort by size_bytes in descending order. Compare its 'width' and 'height' against the device's display resolution.
+- To detect the "double memory cost" of an image existing on both CPU and GPU, look for a large buffer in android_graphics_allocs and a simultaneous CPU memory allocation of a similar size (rss_anon_bytes or heap_graph).
+- To find potentially costly intermediate render targets, look for large buffers in android_graphics_allocs where 'usage_bits' lack a 'COMPOSER_OVERLAY' flag.
+- To check if an allocation is actually presented on screen, correlate 'buffer_id' with SurfaceFlinger events.
+- To see if high graphics memory is causing performance issues, check the frame duration in 'actual_frame_timeline_frame'. Durations over vsync (e.g., 16.6ms) correlating with 'gpu_mem_total' spikes suggest memory pressure jank.
+- Within the main thread of a janky graphics application, look for frequent or long-running 'texture_upload' slices.
+- Analyze the duration of 'eglSwapBuffersWithDamageKHR' or similar buffer-swapping slices in the graphics rendering thread. Consistently long durations suggest a large "damage area" being redrawn every frame.
+- To identify UI jank, compare the 'actual_frame_timeline' against the 'expected_frame_timeline' on the main process; a significant deviation indicates missed frames.
+
+## references/hints_io.md
+
+- When debugging a long, uninterruptible sleep state related to I/O: Check for overlapping slices with "verity" in their name (dm-verity).
+- When a thread is stuck in an uninterruptible sleep with no blocked_function, look for other threads that might be holding the memory lock (e.g., "jit-thread-pool", memory mapping ops).
+- When analyzing a long uninterruptible sleep, check the "blocked_function" in the thread state details (from sched_blocked_reason ftrace event).
+- A lot of time spent in "do_page_fault" during app startup is a strong indicator of I/O contention.
+- For file integrity mechanisms like DM-Verity, search for events like dm_verity_fec_prefetch.
+- To find the specific kernel dependency of a stalled app thread, locate the thread in state 'D', then look for kworker or kernel threads that become runnable immediately after.
+- For app stalls caused by I/O, analyze the scheduling latency of the relevant kworker threads handling the request.
+- To find inefficient file I/O, query the syscall table for a high frequency of small, sequential read() or pread() syscalls on a single fd.
+- If a thread spends significant time in 'Uninterruptible Sleep', check if 'blocked_function' is 'page_cache_readahead'. Correlate waking timestamps with 'filemap_add_to_page_cache' ftrace events.
+- Aggregate counts of 'filemap_add_to_page_cache' grouping by 'inode' to find the specific file causing I/O pressure.
+- Inspect 'nr_sector' in 'block_rq_issue' ftrace events to understand file read-ahead size.
+- If an I/O issue disappears on subsequent launches, it's a 'cold start' problem (populating page cache).
+
+## references/hints_ipc.md
+
+- Look for multiple outbound binder transactions from the same process (system_server) that carry similar data to different destinations in a short time frame. This "binder storm" indicates a lack of multiplexing.
+- To trace data across processes, correlate slices using flow events by linking a slice's ID to flow.source_slice_id or flow.dest_slice_id.
+- To detect binder spam, query the binder_transaction table and group by thread ID (tid), service_name, and method_name to find high numbers of identical calls.
+- When high binder concurrency is found, identify the bottleneck server process by grouping transactions by server_upid.
+- To analyze the latency of a slow binder transaction, calculate the time spent outside the server by subtracting server_dur from the total dur in the binder_transaction table.
+- When a thread is suspected of binder spam, correlate its tid with the cpu_slice table to check for high CPU consumption.
+- To find the code responsible for binder spam, get the utid of the problematic thread and use it to query stack_profile_callsite.
+- To find the callers of a problematic function, filter stack_profile_callsite for frames mapping to it, then trace upwards using parent_id.
+- A long-running slice on one thread causally linked to a slice on another thread (e.g., binder from system_server to SystemUI) indicates a scheduling dependency bottleneck.
+- To find asynchronous operations that might cause UI jank, look for a binder transaction from a controlling process that returns quickly, followed by a long-running slice in the receiving process.
+
+## references/hints_memory.md
+
+- To investigate low memory kills, look for the "lmk_kill_occurred" ftrace event; a high count indicates severe memory pressure.
+- When you see a burst of "lmk_kill_occurred" events, query for processes with high CPU wall_duration in the "sched_slice" table during the same time window. Runaway processes consuming CPU exacerbate memory pressure.
+- To understand a process's memory impact, inspect its "anon_rss" (Anonymous Resident Set Size) from memory counters like "mem.info".
+- Check system-wide memory stats for a high or rapidly increasing "swap_used" value.
+- To confirm memory thrashing, look for high CPU usage by the "kswapd" kernel thread.
+- To find the direct trigger for LMKD, look for "memory_pressure" trace events from Pressure Stall Information (PSI).
+- To detect 'lost' memory for processes using hardware accelerators (like a TPU), query the counter table for RssFile values. If it drops significantly while hardware is active, check for kswapd0 scheduling slices.
+- When analyzing memory shared with hardware, query the dma_heap_stat and dmabuf_total_size counters (or ion_total_size for older devices) for a more accurate picture than RSS.
+- Be aware that RssFile can over-report memory if the same physical page is mapped multiple times.
+- When investigating OOMs, establish a baseline by querying process memory counters (e.g., mem.rss) and compare the median and 95th percentile against its history.
+- If bitmaps are a major memory consumer, check for outliers in bitmap count by querying android.graphics.Bitmap instances across traces.
+- To find what is holding onto an object (like a bitmap), trace its retainer path back to a GC root by querying heap_graph_reference. Pay close attention to custom application classes.
+- Query the android_bitmaps table to check the width and height properties of bitmaps.
+- Check for the presence of software bitmaps, which consume memory on both the app heap and in graphics memory.
+- When analyzing bitmaps, look for duplicates by checking for multiple android.graphics.Bitmap objects with identical properties.
+
+## references/hints_power.md
+
+- When investigating overall battery drain, start by querying the power_rails track and summing the energy consumed (power_ma \* duration) for each rail name.
+- To check if a device is sleeping correctly during screen-off periods, query the suspend_state track; a lack of time in "suspended" state indicates a wakefulness problem.
+- To find the root cause of the device failing to suspend, query the kernel_wakelock track and aggregate the total duration for each wake lock name.
+- If a top kernel wake lock name contains "bt_" or "bcm" (e.g., bt_host_wake), cross-reference its timing with events in the bluetooth_scan_results track.
+- If the modem rail in power_rails shows high consumption, query the network_packets table and aggregate traffic volume by uid to identify the app.
+- When analyzing network traffic from a shared uid, use the socket_tag associated with network packets for granular attribution.
+- Convert impact into a common energy unit like milliwatt-hours (mWh) to compare the severity of different issues.
+
+## references/sql.md
+
+## Guidelines and Hints
+
+- **Idempotency:** Ensure queries are idempotent to prevent "already exists" errors during multiple executions.
+  - For Perfetto objects, always use `CREATE OR REPLACE`: `CREATE OR REPLACE
+    PERFETTO TABLE`, `CREATE OR REPLACE PERFETTO VIEW`, `CREATE OR REPLACE
+    PERFETTO FUNCTION`, `CREATE OR REPLACE PERFETTO MACRO`.
+  - For SQLite Virtual Tables (such as `SPAN_JOIN`), `CREATE OR REPLACE` is not supported. Explicitly drop them first: `DROP TABLE IF EXISTS
+    my_table; CREATE VIRTUAL TABLE my_table USING SPAN_JOIN(...);`
+  - For standard SQLite indexes, prepend `DROP INDEX IF EXISTS index_name;`.
+- `SPAN_JOIN` will crash if intervals **within the same input table** overlap. Always use the `PARTITIONED {column}` (for example, `PARTITIONED upid`) clause to isolate intervals.
+- Intermediate tables fed into a `SPAN_JOIN` must be materialized using `CREATE PERFETTO TABLE`, not `CREATE VIEW`.
+- **Trace Boundaries (`dur = -1`):** Slices or thread states that don't finish before the trace ends are recorded with `dur = -1`. When calculating a bounding box (for example, `ts + dur`) or summing durations (`SUM(dur)`), handle incomplete durations using: `IIF(dur = -1, trace_end() - ts, dur)`.
+- **Robust State Transitions:** Avoid manual timestamp arithmetic (for example, `ts + dur = next.ts`) to join adjacent events. Rely on standard library modules (for example, `sched.runnable`, `linux.perf.counters`, `intervals.overlap`) which safely handle trace gaps and preemptions.
+- **Unique Identifiers:** When writing SQL queries in Perfetto, you must join tables using `utid` (unique thread ID) or `upid` (unique process ID) instead of the regular `tid` or `pid`. **Why it's useful** : The operating system recycles `TIDs` and `PIDs`, while `UTIDs` and `UPIDs` remain unique for the lifetime of the trace, which prevents incorrect joins.
+- **Safe Argument Extraction:** Use `EXTRACT_ARG(arg_set_id, 'key')` to extract dictionary or JSON-like properties from slices or tracks. Don't attempt string parsing.
+- **String Matching (Always use GLOB):** Use `GLOB` instead of `LIKE`. `LIKE` causes performance bottlenecks and treats underscores (`_`) as wildcards, leading to bugs.
+  - **Exact matches:** Use `=`.
+  - **Substring matches:** Use `GLOB` with `*` (for example, `name GLOB
+    '*RenderThread*'`).
+  - **Case-insensitive matches:** Use `LOWER(name) GLOB` and make sure the search string is fully lowercase (for example, `LOWER(name) GLOB
+    '*renderthread*'`). Use this when dealing with inconsistent trace capitalization (for example, `WakeLock` versus `wakelock`).
+- **Calculating Time Overlaps:** To calculate the overlap duration between two
+  time intervals `[start1, end1]` and `[start2, end2]`:
+
+  > **Precedence Rule:** Always prefer using `SPAN_JOIN` or standard library
+  > functions (for example, `intervals.overlap`) to calculate overlaps
+  > **between two different sets of intervals** . Avoid manual arithmetic if a
+  > standard library feature or `SPAN_JOIN` can achieve the same result. Use
+  > the following logic if no built-in alternative exists.
+  1. **Condition:** The intervals overlap if `start1 < end2` and `start2 <
+     end1`.
+  2. **Duration:** The overlap duration is calculated as `MIN(end1, end2) -
+     MAX(start1, start2)`
+
+     > **Important:** Incomplete Perfetto slices have a duration of -1
+     > (`dur = -1`). Always calculate the effective end time using `ts +
+     > IIF(dur = -1, trace_end() - ts, dur)` before applying this logic.
+- Query `android_thread_slices_for_all_startups` for app startup requests.
+
+- Join `counter_track` with `counter` to get values of counter with a specific
+  name.
+
+- When querying for a CPU frequency counter, include the `linux.cpu.frequency`
+  module and use the `cpu_frequency_counters` table.
+
+- When looking for events around a specific timestamp, start with 100ms as the
+  window size.
+
+- Always prefix column names with table or view alias, that is:
+  `{alias}.{column_name}`.
+
+- To calculate the total time spent in slices matching a specific name pattern
+  (for example, `*{name_pattern}*`), you must sum their durations. **Why it's
+  useful** : This helps quantify the total impact of a specific function or
+  feature on performance across multiple calls. Here is an example query (note
+  the safe handling of incomplete slices): `sql SELECT count(*) as
+  total_count, sum(IIF(slice.dur = -1, trace_end() - slice.ts, slice.dur)) /
+  1000000.0 as total_dur_ms FROM slice WHERE slice.name GLOB
+  '*{name_pattern}*';`
+
+## Resources
+
+- **Documentation:** The Perfetto Standard Library documentation is in [`perfetto-stdlib.md`](perfetto-stdlib.md). Use this file as a reference to discover available modules, find schemas (columns and types) for specific tables or views, or determine the `INCLUDE PERFETTO MODULE` statements required before drafting SQL query.
+- **Execution Tool:** Queries are executed using the official `trace_processor` wrapper script downloaded directly from Perfetto. Output is returned in pure CSV format.
+
+## Execution Protocol
+
+You must follow these steps sequentially, mirroring a multi-agent pipeline:
+
+### Step 0: Tool Setup
+
+**Fetch the Wrapper:** You must use the top level of the current project workspace (`./trace_processor`).
+
+> **CRITICAL GUARDRAIL:** NEVER use filesystem search tools (`find`, `find_by_name`, `grep`, `dir /s`, `Get-ChildItem`) across the home directory or workspace to locate `trace_processor` — unconstrained searches across entire workspaces will stop responding or time out.
+
+Perform a direct file check at the top level of your workspace (e.g., `ls trace_processor`). If missing, download `https://get.perfetto.dev/trace_processor` directly into the root workspace (`curl -LO`), make it executable on macOS/Linux (`chmod +x`), and ensure `trace_processor` is added to `.gitignore`. Execute queries directly via `./trace_processor` (on Windows, explicitly invoke `python trace_processor`).
+
+> **Important:** The file served at this URL is a `~10KB` Python wrapper script. Don't assume the download failed because it is human-readable text. This is the intended behavior. This script handles lazy-loading the precompiled binary automatically on its first run. Use it directly.
+
+### Step 1: Dissection and Schema Research
+
+1. Identify the core question, required data points, and filtering conditions.
+2. **Precedence Rule:** If the user's request contains a SQL query, use it **without modification** and skip to Step 2 for validation.
+3. **Mandatory Schema and Module Search:** For every table or view you plan to use, you MUST find its schema in [`perfetto-stdlib.md`](perfetto-stdlib.md). **Don't read the entire documentation file** --- it consumes the context window. Follow this precise workflow:
+   - **Discovery and Search:** Use available search tools (`grep`, `read_file` or file search) with line limits to discover relevant views, tables or modules based on your problem domain and high-level intents (for example, 'CPU time', 'running time', 'overlap', 'jank').
+     - **Why:** Searching solely for exact table names misses comprehensive, pre-computed views built for these analyses.
+     - **Note:** You must verify if a Standard Library module already provides the needed abstraction before drafting manual arithmetic or custom functions.
+   - **Targeted Bounded Reads:** Once you identify the relevant modules, efficiently read the tables and views within that module section.
+   - **Extract:** Extract only the schema, columns, and the exact `INCLUDE
+     PERFETTO MODULE` statements for the required object from the documentation.
+   - **Verify:** Review the columns, types, and descriptions to ensure the table matches your needs.
+4. Print the research results before drafting the query:
+5. *Tables/Views:* `Schema for {name}:` listing columns and types.
+
+### Step 2: Draft and Validate Loop (Max 3 Iterations)
+
+Draft the SQL query in SQLite syntax using **only** the schemas retrieved in
+Step 1. After drafting, you must validate against this checklist:
+
+- \[ \] **SQLite Syntax:** Does the query parse successfully without syntax errors?
+- \[ \] **Idempotency:** Are all object creations safe to re-run? (Did you use `CREATE OR REPLACE PERFETTO` and `DROP TABLE IF EXISTS` for virtual tables?)
+- \[ \] **Existence:** Were all tables found in the documentation?
+- \[ \] **Intent Check:** Is there a pre-existing standard library table or view that will fulfill this intent before instead of writing manual arithmetic?
+- \[ \] **Column Accuracy:** Do columns match the retrieved schemas?
+- \[ \] **Alias Check:** Are ALL column names prefixed with their table or view alias (for example, `alias.column_name`)?
+- \[ \] **Module Check:** Are `INCLUDE PERFETTO MODULE` statements included for all non-prelude modules? **You must use the exact module names provided in
+  the documentation.**
+- \[ \] **Span Join Check:** If using `SPAN_JOIN`, are tables safely `PARTITIONED` to prevent overlapping interval crashes? Are intermediate tables materialized with `CREATE PERFETTO TABLE`?
+- \[ \] **No LIKE Constraint:** Did you map string matches using `GLOB` or `=` instead of prohibited `LIKE`?
+- \[ \] **Execution Check:** You MUST run queries using the standalone
+  `./trace_processor` wrapper with the `--query-string` flag:
+  `./trace_processor --query-string "QUERY" {trace_file}`.
+
+  **Execution Rules:**
+  - **File Usage** : If you must create a SQL file to execute queries (for example, due to query length or escaping issues), you must create them in the `/tmp/` directory.
+  - **State:** The execution is purely ephemeral. Database state does not persist across turns. You **cannot** share state (like views or tables) across queries in different turns. Every query must be standalone and fully self-contained.
+  - **Failure Resilience:** Debug and fix SQL syntax and logic errors when query fails.Don't simplify the analytical intent to pass validation. For example, if requested to calculate an overlap or intersection, you must fix the intersection math. Don't substitute with disjoint queries (for example, returning independent total durations) as a workaround.
+
+### Step 3: Final Output
+
+1. Explicitly return and state the final validated SQL and explain the results to the user.
+2. Before finishing your response, delete all temporary SQL files you created in `/tmp/` directory.
+

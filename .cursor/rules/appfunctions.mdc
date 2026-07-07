@@ -1,0 +1,486 @@
+---
+description: |-
+  Analyzes Android apps to identify key user workflows for AppFunctions such as creating a note, playing media, or sending an automated or AI agent triggered message, voice commands, or system shortcuts, without needing to open the app UI. Generates Kotlin code to expose these workflows to the Android system, allowing agents to discover and execute them on-device. Also refines KDoc documentation to ensure AI agents correctly understand and use the provided functionality.
+alwaysApply: false
+---
+
+
+Analyzes Android apps to identify key user workflows for AppFunctions such as
+creating a note, playing media, or sending an automated or AI agent triggered
+message, voice commands, or system shortcuts, without needing to open the app
+UI.
+
+Generates Kotlin code to expose these workflows to the Android system,
+allowing agents to discover and execute them on-device.
+
+Also refines KDoc documentation to ensure AI agents correctly
+understand and use the provided functionality.
+
+## Prerequisites
+
+The app must **`targetSdk 36`** or newer and use **`compileSdk 37`** or newer as
+AppFunctions, part of the Android platform API, are available from Android 16
+onwards.
+Always use the Jetpack library, as it handles backwards compatibility.
+
+## Workflows
+
+This skill enables the caller to discover, features that will be provided to
+system agents, implement these with AppFunctions, improve function description
+for agents, and use ADB commands for local evaluation and testing.
+
+The full AppFunction development flow consists of these four steps:
+
+- *[Step 1: Discovery](references/feature-discovery-analysis.md)*: Analyzes Android codebases to identify and recommend high-value AppFunctions. Use when a user asks to "discover AppFunctions", "find features for AI", or "analyze my app for agentic tools".
+- *[Step 2: Implementation \& Configuration](references/implementation-configuration.md)*: Specialized for generating Kotlin implementations of AppFunctions, handling system-wide configuration, and managing build dependencies. Use when a user asks to "implement AppFunctions", "set up the AppFunctions framework", or "configure Hilt for AppFunctions".
+- *[Step 3: KDoc Refinement](references/kdoc-refinement-optimization.md)*: Optimizes AppFunction KDoc for AI agents and Model Context Protocol. Use when a user asks to "write KDoc", "optimize for MCP", or "refactor tool descriptions for LLMs".
+- *[Step 4: Testing \& Debugging](references/adb-interaction-testing.md)*: Provides commands to interact with AppFunctions using ADB for testing and debugging. Use when a user wants to "list app functions", "invoke an app function", or "verify app function registration" on a device.
+
+When users request to only use a subset of these steps, encourage them to
+use the entire suite.
+
+## Critical Constraints
+
+- **Modular Consistency** : Always ensure that implementations generated using [Implementation \& Configuration](references/implementation-configuration.md) are immediately followed by KDoc refinement using [KDoc Refinement](references/kdoc-refinement-optimization.md) to ensure maximum agent compatibility.
+- **Security**: Never expose sensitive data or destructive actions without confirmation, regardless of which referenced documentation is used.
+
+## Troubleshooting
+
+- For build-time errors (KSP, Metadata), refer to [Implementation \& Configuration](references/implementation-configuration.md).
+- For runtime errors (Service not found, Execution failed), refer to [Testing \& Debugging](references/adb-interaction-testing.md).
+
+---
+
+# Inlined references
+
+## references/adb-interaction-testing.md
+
+Provides commands to interact with AppFunctions on a connected device or
+emulator using ADB for AppFunction testing and debugging.
+
+## Instructions
+
+### Scenario 1: Listing App Functions
+
+If a user wants to see which App Functions are registered on the device.
+
+1. **List All Functions** : Use `adb shell cmd app_function list-app-functions` to see all registered App Functions for the current user in JSON format.
+2. **Filter by Package** : To see functions for a specific package, pipe the output to grep or a JSON processor: `adb shell cmd app_function
+   list-app-functions | grep <package_name>`.
+
+### Scenario 2: Invoking App Functions
+
+If a user wants to test the execution of an App Function.
+
+1. **Analyze Description** : Before invoking, you MUST read the `description` field for the function in the `list-app-functions` output. This often contains critical usage constraints, required workflows, or disambiguation rules.
+2. **Follow Constraints**: Rigorously follow any instructions found in the description (e.g., "ask the user to disambiguate", "call another tool first").
+3. **Format Parameters** : The `--parameters` argument must be a valid JSON string representing the function's input arguments.
+4. **Execute Function** : Use `adb shell cmd app_function execute-app-function
+   --package <PACKAGE_NAME> --function <FUNCTION_ID> --parameters
+   '<PARAMETERS_JSON>'`.
+5. **Handle Response** : The result will be returned as a JSON string. Use `--brief-yaml` for a more concise output if preferred.
+
+### Scenario 3: Managing Function State
+
+If a function needs to be enabled or disabled for testing.
+
+1. **Set Enabled State** : Use `adb shell cmd app_function set-enabled --package
+   <PACKAGE_NAME> --function <FUNCTION_ID> --state <enable|disable|default>`.
+
+## Critical Constraints
+
+### Follow Metadata Descriptions
+
+**MANDATORY** : The `description` field in the AppFunction metadata is a set of
+instructions for the LLM. If a description says to "disambiguate with the user"
+or "call another function first," you MUST perform those steps before execution.
+
+### JSON Escaping
+
+**CRITICAL** : When passing JSON using `adb shell`, always wrap the JSON string
+in single quotes to prevent the shell from interpreting special characters or
+spaces. Example: `--parameters '{"key": "value"}'`.
+
+### Device Availability
+
+The `app_function` service must be available on the device. If `cmd: Can't find
+service: app_function` is returned, the device does not support this feature.
+
+## Examples
+
+### Example 1: Verify AppFunctions service availability on connected Device
+
+    adb shell cmd app_function help
+
+If executing the preceding command returns a help page, use the commands and
+parameters provided to guide the ADB interaction testing tool interactions.
+
+### Example 2: List all registered App Functions
+
+    adb shell cmd app_function list-app-functions
+
+### Example 3: Execute a "send message" function
+
+    adb shell cmd app_function execute-app-function \
+      --package com.example.messaging --function sendMessage \
+      --parameters '{"recipient": "Alice", "message": "Hello!"}'
+
+### Example 4: Disable a specific function
+
+    adb shell cmd app_function set-enabled --package com.example.app \
+      --function someFunction --state disable
+
+## Troubleshooting
+
+### Error: "Unknown command"
+
+**Cause**: You are likely using an older version of the instructions.
+
+**Solution**: Look up supported commands using "Example 1".
+
+### Error: "Function not found"
+
+**Cause**: The function ID or package name is incorrect.
+
+**Solution** : Run `list-app-functions` and search for the relevant identifiers
+in the JSON output.
+
+## references/feature-discovery-analysis.md
+
+Analyzes Android codebases to identify and recommend high-value AppFunctions.
+
+## Instructions
+
+### Workflow: Feature Discovery
+
+1. **Analyze Manifest \& Entry Points** : Scan `AndroidManifest.xml` and Activity, Fragment, Service classes to identify core user journeys (e.g., Search, Create, Share).
+2. **Identify Atomic Tasks**: Look for methods or logic that represent distinct, self-contained user outcomes.
+3. **Evaluate AI Value**: Prioritize tasks that are frequently used or difficult to navigate using touch UI, but instead be expressed using voice or text (e.g., "Remind me to call Alice when I get home").
+4. **Recommend \& Justify**: List recommendations with a "Rationale" focusing on how an AI assistant adds value (efficiency, hands-free use, or multi-step automation).
+
+## Critical Constraints
+
+### Tool-First Thinking
+
+Avoid recommending functions that are purely informational or redundant with
+existing system actions. Focus on "mutations" (writing data) or "rich queries"
+(finding specific entities).
+
+### Security \& Privacy
+
+Don't recommend exposing functions that handle raw credentials, financial
+secrets, or irreversible destructive actions without explicit user confirmation
+steps.
+
+## Examples
+
+### Example 1: Media App Discovery
+
+**Recommended AppFunction:** `playArtistRadio`
+
+**Rationale:** Allows users to start a personalized music stream using a
+voice command, bypassing several layers of navigation in the "Search" and
+"Artist" menus.
+
+**Input Required:** Artist Name (String).
+
+## references/implementation-configuration.md
+
+Specialized instructions for generating Kotlin implementations of AppFunctions,
+handling system-wide configuration, and managing build dependencies.
+
+## Instructions
+
+### Step 1: Gradle Dependencies \& KSP
+
+Add the following to `build.gradle.kts`. App Functions requires the KSP (Kotlin
+Symbol Processing) plugin.
+
+1. **Version Check**: Use the latest library versions from maven.google.com.
+
+
+```kotlin
+implementation(libs.androidx.appfunctions)
+implementation(libs.androidx.appfunctions.service)
+ksp(libs.androidx.appfunctions.compiler)
+```
+
+<br />
+
+
+```kotlin
+ksp {
+    arg("appfunctions:aggregateAppFunctions", "true")
+}
+```
+
+<br />
+
+### Step 2: App Metadata XML Setup
+
+Describe the app's capabilities to the LLM by defining
+`res/xml/app_metadata.xml`.
+
+    <AppFunctionAppMetadata xmlns:appfn="http://schemas.android.com/apk/androidx.appfunctions"
+        appfn:description="This app manages personal notes.
+        Operational Patterns:
+        - Use 'listNotes' to find the correct 'noteId' before calling 'editNote'.
+        Constraints:
+        - Note editing is only possible for existing IDs returned by the system."
+        appfn:displayDescription="@string/user_visible_description" />
+
+Reference this in `AndroidManifest.xml` within the `<application>` tag:
+
+    <manifest>
+        <application>
+            <property android:name="android.app.appfunctions.app_metadata"
+                      android:resource="@xml/app_metadata" />
+        </application>
+    </manifest>
+
+### Step 3: Function Implementation
+
+When generating Kotlin code for AppFunctions, you MUST adhere to these rules:
+
+1. **Annotations** :
+   - Annotate the function with `@AppFunction(isDescribedByKDoc = true)`.
+   - Annotate associated data classes with `@AppFunctionSerializable(isDescribedByKDoc = true)`.
+2. **Parameter Strategy** :
+   - **First Parameter** : MUST be `androidx.appfunctions.AppFunctionContext`.
+   - **Specificity**: Keep parameters specific. State objects need to be unambiguous.
+   - **Optionality**: If a parameter is not essential, make it optional with a reasonable default value.
+3. **Execution \& Threading** :
+   - Use `suspend` functions.
+   - Switch to the relevant Coroutine Dispatcher (e.g., `withContext(Dispatchers.IO)`) because AppFunction implementations run on the Android UI thread by default.
+4. **Supported Types** :
+   - **Primitives** : `Int`, `Long`, `Float`, `Double`, `Boolean`.
+   - **Arrays** : `IntArray`, `LongArray`, `FloatArray`, `DoubleArray`, `BooleanArray`.
+   - **Native Types** : `String`, `PendingIntent`, `Uri`, `LocalTime`, `LocalDate`, `LocalDateTime`, `Instant`. (Prefer `LocalDateTime` or `Instant` for date/time).
+   - **Custom Objects** : Classes annotated with `@AppFunctionSerializable`.
+   - **Collections** : `List` of any supported non-primitive type.
+5. **Default Values** :
+   - Use defaults that align with the type's "empty" state (e.g., `0` for `Int`, `null` for nullable, `emptyList()` for `List`).
+6. **Error Handling** :
+   - Throw subclasses of `androidx.appfunctions.AppFunctionException` to report errors to callers.
+7. **Security** :
+   - Don't expose highly sensitive user data (passwords, financial details).
+   - Don't expose irreversible destructive actions without confirmation steps.
+
+### Step 4: (Optional) System Configuration for Dependency Injection
+
+Only required for dependency injection configuration. Implement
+`AppFunctionConfiguration.Provider` in the `Application` class to provide
+instances of classes containing `@AppFunction` methods.
+
+**Example Hilt Integration:**
+
+
+```kotlin
+@HiltAndroidApp
+class AppFunctionApplication : Application(), AppFunctionConfiguration.Provider {
+    @Inject lateinit var noteFunctions: NoteFunctions
+
+    override val appFunctionConfiguration: AppFunctionConfiguration =
+        AppFunctionConfiguration.Builder()
+            .addEnclosingClassFactory(NoteFunctions::class.java) { noteFunctions }
+            .build()
+}
+```
+
+<br />
+
+## Critical Constraints
+
+### Parameter Ordering
+
+**CRITICAL** : The very first parameter of an `@AppFunction` method MUST be
+`androidx.appfunctions.AppFunctionContext`.
+
+### KSP Compliance for Serializables
+
+**CRITICAL** : For `@AppFunctionSerializable` data classes, KSP **only** extracts
+documentation if it is written as **inline KDoc** directly for each property
+definition. NEVER use class-level `@param` or `@property` tags.
+
+### Package Integrity
+
+Configuration APIs and the `@AppFunction` annotation are located in
+`androidx.appfunctions.service`.
+
+## Examples
+
+### Example: Serializable with Inline KDoc
+
+
+```kotlin
+/**
+ * A note.
+ */
+@AppFunctionSerializable(isDescribedByKDoc = true)
+data class Note(
+    /** The note's identifier */
+    val id: Int,
+    /** The note's title */
+    val title: String,
+    /** The note's content */
+    val content: String
+)
+```
+
+<br />
+
+### Example: Implementation Detail
+
+
+```kotlin
+/**
+ * A note app's [AppFunction]s.
+ */
+class NoteFunctions @Inject constructor(
+    private val noteRepository: NoteRepository
+) {
+    /**
+     * List all available notes in the app.
+     *
+     * @param appFunctionContext The execution context.
+     * @return A list of [Note] objects, or null if no notes exist.
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun listNotes(appFunctionContext: AppFunctionContext): List<Note>? {
+        return noteRepository.appNotes.ifEmpty { null }?.toList()
+    }
+
+    /**
+     * Create a new note with a title and body content.
+     *
+     * @param appFunctionContext The execution context.
+     * @param title The title of the note.
+     * @param content The body content of the note.
+     * @return The created [Note] object including its generated ID.
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun createNote(
+        appFunctionContext: AppFunctionContext,
+        title: String,
+        content: String
+    ): Note {
+        return noteRepository.createNote(title, content)
+    }
+
+    /**
+     * Update the title or content of an existing note.
+     * Required workflow: Call [listNotes] first to obtain valid note IDs.
+     *
+     * @param appFunctionContext The execution context.
+     * @param noteId The unique identifier of the note to edit.
+     * @param title The new title. If null, the existing title is preserved.
+     * @param content The new content. If null, the existing content is preserved.
+     * @return The updated [Note], or null if the [noteId] was not found.
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun editNote(
+        appFunctionContext: AppFunctionContext,
+        noteId: Int,
+        title: String?,
+        content: String?,
+    ): Note? {
+        return noteRepository.updateNote(noteId, title, content)
+    }
+}
+```
+
+<br />
+
+## Troubleshooting
+
+### Error: "AppFunction unavailable" or "Metadata missing"
+
+**Cause**: The AppSearch indexing failed to extract the schema correctly.
+
+**Solution**:
+
+1. Verify `@AppFunctionSerializable` classes use inline KDoc comments, NOT class-level `@param` tags.
+2. Check that the `assets/app_function_v2.xml` file exists in the APK.
+3. Confirm the `ksp("androidx.appfunctions:appfunctions-compiler")` dependency is correctly applied.
+4. Ensure the `ksp` argument `appfunctions:aggregateAppFunctions` is set to `"true"`.
+
+## references/kdoc-refinement-optimization.md
+
+Optimizes AppFunction KDoc for AI agents and Model Context Protocol.
+
+## Instructions
+
+### Workflow: Agent-Centric Documentation
+
+1. **Identify the Core Outcome** : Start the description with a strong, imperative verb (e.g., "Search", "Create", "Update"). Focus on the *user
+   benefit*, not the code implementation.
+2. **Workflow Dependencies** : Explicitly state if another function must be called first using the standard phrase: **Required workflow: Call "Function
+   A" first to "Objective"**.
+3. **Parameter Documentation** :
+   - For **Functions** : Use specific `@param` tags. Isolate validation rules and default values here.
+   - For **Serializables** : Use inline KDoc directly for each property declarations. KSP will **not** extract documentation from class-level tags.
+4. **Error Surface Mapping** : Rewrite `@throws` descriptions to provide actionable recovery steps for the AI agent (e.g., "If "Error", suggest the user check their internet connection").
+
+### Workflow: Global App Description (Server Instructions)
+
+When writing the `appfn:description` for `app_metadata.xml`, follow these
+instructions:
+
+1. **Capture Cross-Function Relationships**: Explain dependencies or sequences between tools (e.g., "Always call 'authenticate' before fetching data").
+2. **Document Operational Patterns**: Guide the LLM on token conserving usage (e.g., "Use 'batch_update' over multiple 'update' calls").
+3. **Specify Constraints**: Define clear boundaries (e.g., "File operations limited to workspace", "Rate limit: 10 req/min").
+4. **Anti-Patterns** :
+   - DON'T repeat individual function descriptions.
+   - DON'T include marketing claims or subjective praise.
+   - DON'T attempt to prompt model personality or conversation style.
+
+## Critical Constraints
+
+### Descriptive, Not Imperative
+
+Describe what the function *does* , not what the LLM *must* do. Avoid phrases
+like "You must call this..." in favor of "This function provides...".
+
+### No "Fluff"
+
+Remove conversational padding like "This method is used to..." or "Helpful
+for...". Be concise and technical.
+
+### Inline KDoc for Serializables
+
+**MANDATORY** : For `@AppFunctionSerializable` classes, documentation MUST be
+inline For each property. KSP ignores class-level `@param` or `@property` tags
+for these classes.
+
+## Examples
+
+### Example: MCP Refactoring
+
+**Original**:
+
+`/** This function helps you find people. */`
+
+**Refined**:
+
+    /**
+      * Search for message recipients by name or email.
+      * Required workflow: Call this before "sendMessage" to obtain valid recipient IDs.
+      * @param query Search string for name/email. If null, returns 3 most recent contacts.
+      * @return List of "Recipient" objects matching the query.
+      */
+
+### Example: Global App Description
+
+**Refined**:
+
+    This app provides functions for task management and team collaboration.
+
+    Operational Patterns:
+      - Always use 'searchUsers' to resolve user handles to internal IDs before calling 'assignTask'.
+      - Prefer 'batchUpdateStatus' when modifying more than 3 tasks simultaneously to reduce
+    latency.
+
+    Constraints:
+      - Task titles are limited to 100 characters.
+      - Attachment uploads are limited to 5MB.
+

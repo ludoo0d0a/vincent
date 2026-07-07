@@ -37,6 +37,11 @@ Package: `fr.geoking.vincent`. Full docs: `README.md`.
 
 Kotlin 2.3 · Compose MP 1.11 · Material 3 · Room (KSP) · JDK 21 · min SDK 24.
 
+## Android skills
+
+Google android-skills rules: `.cursor/rules/*.mdc`. Project-specific applicability,
+compliance gaps, and KMP constraints: skill **`vincent-android`** (`.cursor/skills/vincent-android/SKILL.md`).
+
 ## Conventions
 
 - Mutate cellar via `Cellar` API (`addBottle`, `adjustQuantity`, `toggleFavorite`) — screens stay reactive.

@@ -1,0 +1,1869 @@
+---
+description: |-
+  Instructions to make or update an app's UI so that it adapts to different Android devices including phones, tablets, foldables, laptops, desktop, TV, Auto and XR. It includes how to handle different window sizes, pointing devices (such as mouse) and text entry devices (such as keyboard) using the Compose MediaQuery API. It also covers multi-pane layouts using Navigation3 Scenes, adaptive UI components (such as buttons) with varying target sizes, and adaptive layouts (including navigation areas - nav rails and nav bars) using the Compose Grid and FlexBox APIs.
+alwaysApply: false
+---
+
+
+## Prerequisites
+
+The app must:
+
+- Use Compose for all screens. If it's still using Fragments or Views, suggest using the XML to Compose skill to migrate those screens.
+- Use Jetpack Navigation 3. If it doesn't, suggest the Navigation 3 skill to migrate the app.
+
+## Workflow to make an app adaptive
+
+To make an app adaptive, follow these steps or a subset of them adapting to the
+task.
+
+- Step 1: Verify current UI
+- Step 2: Make the navigation bar adaptive
+- Step 3: Add multi-pane layouts
+- Step 4: Make vertical lists adaptive by changing the number of columns
+- Step 5: Hide app bars when scrolling
+
+## Step 1. Verify current UI
+
+Ensure that screenshot tests exist to verify the current UI on different form
+factors. If they don't exist, add the [Compose Preview Screenshot Testing
+tool](references/android/develop/ui/compose/tooling/debug.md). Use the following annotation to create previews for all the major form
+factors. For example:
+
+
+```kotlin
+@Preview(name = "Phone", device = Devices.PHONE, showBackground = true)
+@Preview(name = "Foldable", device = Devices.FOLDABLE, showBackground = true)
+@Preview(name = "Tablet", device = Devices.TABLET, showBackground = true)
+@Preview(name = "Desktop", device = Devices.DESKTOP, showBackground = true)
+annotation class FormFactorPreviews
+
+@PreviewTest
+@FormFactorPreviews
+@Composable
+fun FeedScreenPreview() {
+    SnippetsTheme {
+        Box {
+            Text("My Screen")
+        }
+    }
+}
+```
+
+<br />
+
+## Step 2. Make the navigation bar adaptive
+
+Bottom navigation bars are optimized for touch input when the user is holding a
+phone in portrait mode. On larger screen hand-held devices, like tablets and
+unfolded foldables, the navigation area must be accessible from the edge of the
+screen (navigation rail).
+
+If you need to provide more screen real state for the content, hide the
+navigation area. Examples of this include:
+
+- Hiding the navigation bar when the user scrolls down and showing it again when the user scrolls up. The assumption is that when the user is scrolling down, they are consuming content but when scrolling up they are trying to navigate away from that content.
+- Hiding the navigation area when its content is distracting. For example, in camera previews or when the content is best displayed in full screen (such as a single photo screen).
+
+When the detail screen is displayed full-screen on mobile, full-screen mode must
+be deactivated on larger screens.
+
+Steps to migrate:
+
+- Locate the existing navigation bar.
+- Convert each item to a `NavigationSuiteItem`.
+- Identify whether the navigation bar's visibility changes. For example, if it is wrapped with an `AnimatedContent` or `AnimatedVisibility` composable. If so, follow the guidance in the "Control navigation area visibility".
+- Replace the container that held the navigation bar (often a `Scaffold`) with `NavigationSuiteScaffold` from the Material 3 adaptive layouts library.
+- Supply the navigation items using the `navigationItems` parameter of `NavigationSuiteScaffold`.
+
+### Step 2.1. Control navigation area visibility
+
+If the navigation bar's visibility changes - it is hidden under certain
+scenarios or on certain screens - this behavior must be maintained with the
+adaptive navigation area. This is done using `NavigationSuiteScaffold`'s `state`
+parameter.
+
+Steps to migrate:
+
+- Identify the scenarios under which the navigation bar is hidden. This is usually done with a boolean variable for the visibility. It could be named something like `isNavBarVisible` or `shouldShowNavBar`.
+- Create an instance of `NavigationSuiteScaffoldState` using `rememberNavigationSuiteScaffoldState()` and pass it to `NavigationSuiteScaffold`.
+- When the navigation area visibility changes, use a `LaunchedEffect` to call `show` or `hide` on the `NavigationSuiteScaffoldState`.
+
+For example:
+
+
+```kotlin
+// Pass this variable to any composable that needs to control the navigation area visibility
+var isNavBarVisible by remember { mutableStateOf(true) }
+val scaffoldVisibilityState = rememberNavigationSuiteScaffoldState()
+
+NavigationSuiteScaffold(
+    navigationSuiteItems = navItems,
+    state = scaffoldVisibilityState
+) {
+    // Main content
+}
+
+LaunchedEffect(isNavBarVisible){
+    if (isNavBarVisible) {
+        scaffoldVisibilityState.show()
+    } else {
+        scaffoldVisibilityState.hide()
+    }
+}
+```
+
+<br />
+
+## Step 3. Add multi-pane layouts using Navigation 3 Scenes
+
+Analyze the codebase looking for related screens - tapping on something in one
+screen opens another screen that shows information related to the first. There
+are two canonical screen relationships: list-detail and supporting pane.
+
+IMPORTANT: You must use the Navigation 3 `SceneStrategy` approach to implement
+multi-pane layouts. Do not use `ListDetailPaneScaffold` or
+`SupportingPaneScaffold`.
+
+### Step 3.1. List-detail
+
+#### Identify the list and detail screens
+
+List-detail layouts display a list of items (this is the list screen) and
+clicking on an item opens a new screen that shows more details about that item
+(the detail screen).
+
+Typical usage includes productivity apps like email, notes, and messaging.
+
+Unless requested explicitly, avoid this pattern when the detail content requires
+substantial screen space (e.g., images or media that benefits from a full-screen
+presentation).
+
+#### Add a Material list-detail SceneStrategy
+
+- Add the `androidx.compose.material3.adaptive:adaptive-navigation3` library
+- Create an `androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy` using `rememberListDetailSceneStrategy`
+- Pass the `ListDetailSceneStrategy` to `NavDisplay` using its `sceneStrategies` parameter
+
+#### Use metadata to identify the list and detail screens
+
+- Add metadata using `entry(metadata = ...)` or `NavEntry(metadata = ...)` to the list entry using `ListDetailSceneStrategy.listPane(detailPlaceholder = {
+  <placeholder composable> })`.
+- Use the `detailPlaceholder` parameter to add a placeholder on the detail screen when no list items are selected.
+- Add metadata to the detail entry using `ListDetailSceneStrategy.detailPane()`.
+
+#### Important considerations
+
+- When a detail screen displays its content full-screen on mobile (content fills the entire screen, bars or rails are hidden), full-screen mode must be deactivated if it's part of a list-detail layout.
+- Detail screens must not show a back arrow when on a list-detail layout.
+
+For a reference implementation, check the [Nav3 **Material** List Detail
+recipe](references/android/guide/navigation/navigation-3/recipes/material-listdetail.md).
+
+### Step 3.2. Supporting pane
+
+Identify supporting pane screens where a main screen displays a single item, and
+selecting it opens a "supporting screen" with more details. The supporting
+screen complements the main screen and is shown in a supporting pane.
+
+#### Add a Material supporting pane `SceneStrategy`
+
+- If you haven't already, add the `androidx.compose.material3.adaptive:adaptive-navigation3` library
+- Create an `androidx.compose.material3.adaptive.navigation3.SupportingPaneSceneStrategy` using `rememberSupportingPaneSceneStrategy`
+- Pass the `SupportingPaneSceneStrategy` to `NavDisplay` using its `sceneStrategies` parameter
+
+#### Use metadata to identify the main and supporting screens
+
+- Add metadata using `entry(metadata = ...)` or `NavEntry(metadata = ...)` to the main entry using `SupportingPaneSceneStrategy.mainPane()`
+- Add metadata to the supporting entry using `SupportingPaneSceneStrategy.supportingPane()`
+
+### Step 3.3. Run screenshot tests
+
+If you have made changes, record new reference files. Ask the user to visually
+verify that the new layouts are correct.
+
+## Step 4. Make vertical lists adaptive by changing the number of columns
+
+### Step 4.1. Make lazy lists adaptive
+
+Look for the following vertical list composables: `LazyColumn`,
+`LazyVerticalGrid`, `LazyVerticalStaggeredGrid`.
+
+Steps to migrate:
+
+- Choose a suitable minimum width in dp for the column. It should be large enough so that item is clearly visible to the user.
+- For `LazyColumn`: change to a `LazyVerticalGrid` and follow the instruction below
+- For `LazyVerticalGrid`: change the `columns` parameter to use `GridCells.Adaptive(<width>.dp)`
+- For `LazyVerticalStaggeredGrid`: change the `columns` parameter to use `StaggeredGridCells.Adaptive(<width>.dp)`
+
+### Step 4.2. Migrate non-lazy lists to Grid
+
+WARNING: Grid is an experimental API available from Compose 1.11.0-beta01.
+Confirm with the user that they are happy to use an experimental API in their
+codebase.
+
+Look for any `Column` that contains multiple items of the same type and replace
+it with `Grid`. Do not replace it with `LazyVerticalGrid` or any other lazy
+layout. Do not place `Grid` inside the existing `Column`. Completely replace it.
+
+`Grid` is configured by supplying a lambda (an extension function on
+`GridConfigurationScope`) to its `config` parameter. Inside the lambda,
+`constraints` provides the minimum and maximum dimensions of the grid container
+and can be used to change the number of rows and columns based on the available
+size. For example, the following code configures `Grid` such that when the
+available width is:
+
+- less than 800dp, a 2x4 grid is used
+- 800dp or more, a 4x2 grid is used
+
+
+```kotlin
+Grid(
+    config = {
+        val maxWidthDp = constraints.maxWidth.toDp()
+        val (cols, rows) = if (maxWidthDp < 800.dp){
+            2 to 4
+        } else{
+            4 to 2
+        }
+
+        val gapSizeDp = 8.dp
+        val cellSize = ((maxWidthDp - (gapSizeDp * (cols - 1))) / cols).coerceAtLeast(0.dp)
+        repeat(cols) { column(cellSize) }
+        repeat(rows) { row(cellSize) }
+        gap(gapSizeDp)
+    }
+) { /** items **/ }
+```
+
+<br />
+
+`Grid` is an experimental API so add the `@OptIn(ExperimentalGridApi::class)`
+annotation to any function that uses it.
+
+## Step 5: Hide App Bars when scrolling
+
+In an app with multiple top-level destinations, each screen must manage its own
+app bar state independently. There are two main scroll behaviors:
+
+- `exitUntilCollapsedScrollBehavior`: Hides on scroll down, stays hidden while you scroll up until you reach the very top (0 offset).
+- `enterAlwaysScrollBehavior`: Hides on scroll down, shows immediately on scroll up.
+
+## Final step: Build and test
+
+Build the app and run the local tests. If the project has screenshot tests, run
+them but DO NOT update the reference images. Prompt the user to do this after
+they have viewed the screenshot diffs.
+
+## Additional documentation for experimental adaptive APIs
+
+The following APIs are available from Compose 1.11.0-beta01.
+
+### FlexBox
+
+Check the FlexBox documentation:
+
+- [Overview](references/android/develop/ui/compose/layouts/adaptive/flexbox/index.md)
+- [Get started - setup](references/android/develop/ui/compose/layouts/adaptive/flexbox/get-started.md)
+- [Set container behavior](references/android/develop/ui/compose/layouts/adaptive/flexbox/container-behavior.md)
+- [Set item behavior](references/android/develop/ui/compose/layouts/adaptive/flexbox/item-behavior.md)
+
+## MediaQuery
+
+Check the [MediaQuery documentation](references/android/develop/ui/compose/layouts/adaptive/mediaquery/index.md) when you need to query the device's
+screen size, pointer precision, keyboard type, whether it has cameras or
+microphones, and other device capabilities.
+
+## Grid
+
+Check the Grid documentation when you need to display a fixed number of items in
+a grid layout:
+
+- [Overview](references/android/develop/ui/compose/layouts/adaptive/grid/index.md)
+- [Get started - setup](references/android/develop/ui/compose/layouts/adaptive/grid/get-started.md)
+- [Set container properties](references/android/develop/ui/compose/layouts/adaptive/grid/container-properties.md)
+- [Set item properties](references/android/develop/ui/compose/layouts/adaptive/grid/item-properties.md)
+
+---
+
+# Inlined references
+
+## references/android/develop/ui/compose/layouts/adaptive/flexbox/container-behavior.md
+
+To configure the behavior of the `FlexBox` container, create a `FlexBoxConfig`
+block and supply it using the `config` parameter.
+
+
+```kotlin
+FlexBox(
+    config = {
+        direction(FlexDirection.Column)
+        wrap(FlexWrap.Wrap)
+        alignItems(FlexAlignItems.Center)
+        alignContent(FlexAlignContent.SpaceAround)
+        justifyContent(FlexJustifyContent.Center)
+        gap(16.dp)
+    }
+) { // child items
+}
+```
+
+<br />
+
+Use `FlexBoxConfig` to define the layout direction, wrapping behavior,
+alignment, and gaps between items.
+
+## Layout direction
+
+The `direction` function sets the main axis, which dictates the direction
+items are laid out in. It accepts the following values:
+
+- `Row` (default): Sets the main axis to be horizontal. In left-to-right locales this will be left-to-right, with the opposite in right-to-left.
+- `RowReverse`: Reverses the direction of `Row`.
+- `Column`: Sets the main axis to be vertical, top-to-bottom.
+- `ColumnReverse`: Reverses the direction of `Column`.
+
+## Align items and distribute extra space
+
+The following sections describe how to align items and distribute extra space
+along the main and cross axes.
+
+### Along the main axis
+
+Use `justifyContent` to distribute items along the main axis. The following
+table shows the behavior when the direction is `Row`.
+
+|---|---|
+|   | ![Illustration of a horizontal main axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/main-axis.png) |
+| `Start` | ![Items aligned to the start of the main axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/mainaxis-start.png) |
+| `Center` | ![Items aligned to the center of the main axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/mainaxis-center.png) |
+| `End` | ![Items aligned to the end of the main axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/mainaxis-end.png) |
+| `SpaceBetween` | ![Items distributed along the main axis with space between them.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/mainaxis-spacebetween.png) |
+| `SpaceAround` | ![Items distributed along the main axis with space around them.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/mainaxis-spacearound.png) |
+| `SpaceEvenly` | ![Items distributed along the main axis with space evenly around them.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/mainaxis-spaceevenly.png) |
+
+### Along the cross axis
+
+Use `alignItems` to align items along the cross axis within a single line. This
+behavior can be overridden by individual items using the
+[`alignSelf` modifier](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/item-behavior#item-alignment).
+
+The following images show the behavior when the direction is `Row`:
+
+|---|---|---|---|---|---|
+| ![Illustration of a vertical cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/crossaxis.png) | ![Items aligned to the start of the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/crossaxis-start.png) | ![Items aligned to the end of the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/crossaxis-end.png) | ![Items aligned to the center of the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/crossaxis-center.png) | ![Items stretched to fill the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/crossaxis-stretch.png) | ![Items aligned to their baseline along the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/crossaxis-baseline.png) |
+|   | `Start` | `End` | `Center` | `Stretch` | `Baseline` |
+
+Use `alignContent` to align lines to the cross axis and to distribute extra
+space between lines. This property only applies when there are multiple lines
+(wrapping is enabled). The following images show the behavior when the direction
+is `Row`:
+
+|---|---|---|---|---|---|---|
+| ![Illustration of a vertical cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/crossaxis.png) | ![Multiple lines of items aligned to the start of the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/aligncontent-start.png) | ![Multiple lines of items aligned to the end of the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/aligncontent-end.png) | ![Multiple lines of items aligned to the center of the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/aligncontent-center.png) | ![Multiple lines of items stretched to fill the cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/aligncontent-stretch.png) | ![Multiple lines of items distributed along the cross axis with space between them.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/aligncontent-spacebetween.png) | ![Multiple lines of items distributed along the cross axis with space around them.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/aligncontent-spacearound.png) |
+|   | `Start` | `End` | `Center` | `Stretch` | `SpaceBetween` | `SpaceAround` |
+
+## Wrap items
+
+Wrapping lets a `FlexBox` container become multi-line, moving items that don't
+fit onto a new row or column along the cross-axis. Configure wrapping behavior
+using `wrap`.
+
+|---|---|
+| **`FlexWrap` value** | **Example using direction `Row`** |
+| `NoWrap` (default): Prevents items from wrapping. Items overflow if the main size is insufficient. | ![Items in a single line overflowing the container because wrapping is disabled.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/wrapitems-1.png) |
+| `Wrap`: When there is insufficient space for an item (plus any [gap](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior#add-gaps)), a new line is created in the direction of the cross axis. For example, if the direction is `Row`, a new line is added **below**. | ![Items wrapping onto a new line below because wrapping is enabled.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/wrapitems-2.png) |
+| `WrapReverse`: The same as `Wrap`, except the new line is added in the opposite direction to the cross axis. For example, if the direction is `Row`, a new line is added **above**. | ![Items wrapping onto a new line above because reverse wrapping is enabled.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/wrapitems-3.png) |
+
+The following example shows how the `FlexBox` wrapping algorithm works. The
+`FlexBox` container has a main size of `100dp`, with `wrap` set to
+`FlexWrap.Wrap` and a gap of `8dp`. It contains three items with `basis` `20dp`,
+`40dp`, and `50dp`, respectively.
+
+There is `100dp` available space in the line. Child 1 is `20dp`.
+There is space, so Child 1 is placed into the line.
+![First item placed in the FlexBox container.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/algorithm-1.png) **Figure 1.** First item placed in the `FlexBox` container.
+
+There is `80dp` available space in the line. The gap is `8dp`. Child 2 is
+`40dp`. The required space is `48dp`. There is space, so the gap and Child 2
+are placed into the line.
+![First item placed in the FlexBox container.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/algorithm-2.png) **Figure 2.** Second item placed in the `FlexBox` container after the first item.
+
+There is `32dp` available space in the line. The gap is `8dp`. Child 3 is
+`50dp`. The required space is `58dp`. There is not enough space in the current
+line, so Child 3 is placed in a new line.
+![Third item placed on a new line because it doesn't fit on the first line.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/algorithm-3.png) **Figure 3.** Third item placed on a new line because it doesn't fit on the first line.
+
+## Add gaps between items
+
+Add gaps between rows and columns using `rowGap` and `columnGap`. This is useful
+to avoid adding spacing modifiers to children.
+
+|---|---|---|
+| ![Row gap adds vertical space between items.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/gap-1.png) | ![Column gap adds horizontal space between items.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/gap-2.png) | ![Gap adds both horizontal and vertical space between items.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/gap-3.png) |
+| `rowGap` adds vertical space between items and lines. | `columnGap` adds horizontal space between items and lines. | `gap` is a convenience function that adds both `columnGap` and `rowGap`. |
+
+## references/android/develop/ui/compose/layouts/adaptive/flexbox/get-started.md
+
+This page describes how to implement basic `FlexBox` layouts.
+
+## Set up project
+
+1. Add the [`androidx.compose.foundation.layout`](https://developer.android.com/jetpack/androidx/versions) library to your project's
+   `lib.versions.toml`.
+
+       [versions]
+       compose = "1.12.0-alpha03"
+
+       [libraries]
+       androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "compose" }
+
+2. Add the library dependency to your app's `build.gradle.kts`.
+
+       dependencies {
+           implementation(libs.androidx.compose.foundation.layout)
+       }
+
+## Create basic FlexBox layouts
+
+**Example 1** : `FlexBox` lays out two `Text` elements that are centrally
+aligned.
+
+
+```kotlin
+FlexBox(
+    config = {
+        direction(FlexDirection.Column)
+        alignItems(FlexAlignItems.Center)
+    }
+) {
+    Text(text = "Hello", fontSize = 48.sp)
+    Text(text = "World!", fontSize = 48.sp)
+}
+```
+
+<br />
+
+![Hello World text composables stacked on top of each other in a basic FlexBox implementation.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/basic-flexbox.png)
+
+**Example 2** : `FlexBox` wraps five items onto two rows and grows them unequally
+to fill the available space on each row. There is an `8.dp`
+gap, both vertically and horizontally, between the items.
+
+
+```kotlin
+FlexBox(
+    config = {
+        wrap(FlexWrap.Wrap)
+        gap(8.dp)
+    }
+) {
+    // All boxes have an intrinsic width of 100.dp
+    // Some grow to fill any remaining space on the row.
+    RedRoundedBox()
+    BlueRoundedBox()
+    GreenRoundedBox(modifier = Modifier.flex { grow(1.0f) })
+    OrangeRoundedBox(modifier = Modifier.flex { grow(1.0f) })
+    PinkRoundedBox(modifier = Modifier.flex { grow(1.0f) })
+}
+```
+
+<br />
+
+![Two rows of colored items, with three unequally sized items distributed across the top row and two unequally sized items across the bottom row.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/basic-flexbox-2.png)
+
+To learn more about `FlexBox` behavior, see [Set container behavior](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior) and [Set
+item behavior](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/item-behavior).
+
+## references/android/develop/ui/compose/layouts/adaptive/flexbox/index.md
+
+> [!NOTE]
+> **Note:** FlexBox is an experimental API and is likely to change in the future. To use it, annotate your code with `@ExperimentalFlexBoxApi`. Please file any issues or feedback on the [issue tracker](https://issuetracker.google.com/issues/new?component=1876021&title=%5BFlexBox%5D).
+
+[`FlexBox`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/FlexBox.composable#FlexBox(androidx.compose.ui.Modifier,androidx.compose.foundation.layout.FlexBoxConfig,kotlin.Function1)) is a container that lays out items in a single direction. It can
+resize, wrap, align, and distribute space among items to optimally fill the
+available space. It's a useful layout for different sized items and for resizing
+items when the available space changes.
+
+With `FlexBox`, you can:
+
+- Control how items grow and shrink to fill the available space
+- Wrap items onto new rows or columns when there isn't enough space for them
+- Distribute extra space between items using convenient presets
+
+## When to use FlexBox
+
+`FlexBox` is usually used to display a small number of items *within* an
+overall screen layout. For an overall screen layout,
+`Grid` is usually a better choice. `FlexBox` does not support lazy-loading of
+items. To display large numbers of items, use [lazy lists and grids](https://developer.android.com/develop/ui/compose/lists). If you
+need to wrap items, use `FlexBox` instead of `FlowRow` and `FlowColumn`.
+
+## Terminology and concepts
+
+> [!IMPORTANT]
+> **Key Point:** `FlexBox` is heavily influenced by the [CSS Flexible Box Layout specification](https://www.w3.org/TR/css-flexbox-1/) and has almost identical concepts, terminology, and behavior. If you're familiar with `display: flex`, you'll find `FlexBox`'s properties and behavior almost identical.
+
+`FlexBox` lays out its items in either horizontal or vertical *lines* . This
+direction of these lines establishes the *main axis* . 90 degrees to the main
+axis is the *cross axis* . The length of the `FlexBox` along the main axis is
+known as the *main size* . The corresponding cross axis length is known as the
+*cross size* . These sizes and axes form the basis of `FlexBox`'s behavior.
+
+
+![FlexBox with horizontal main axis and vertical cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/intro-row-2.png) **Figure 1.** Axes and sizes when the `FlexBox` direction is `Row`. ![FlexBox with vertical main axis and horizontal cross axis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/intro-column.png) **Figure 2.** Axes and sizes when the `FlexBox` direction is `Column`.
+
+<br />
+
+### Apply properties
+
+You can apply `FlexBox` properties in two ways:
+
+- To the `FlexBox` container using `FlexBox(config)`
+- To an item inside the `FlexBox` using `Modifier.flex`
+
+| **Container properties (`config`**) | **Item properties (`Modifier.flex`**) |
+|---|---|
+| - `direction` - the item layout direction - `wrap` - whether to wrap items if the **main size** is insufficient - `justifyContent` - how to **distribute** items along the **main axis** - `alignItems` - how to **align** items along the **cross axis** - `alignContent` - how to distribute extra space from the **cross size** when there are multiple lines - `rowGap` / `columnGap` - adds space between items and lines See [Set container behavior](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior) for more information about these properties. | - `basis` - the size of the item before any extra space from the **main size** is distributed - `grow` - the share of extra space from the **main size** that this item should receive - `shrink` - the share of space deficit from the **main size** that this item should receive - `alignSelf` - how to distribute extra space from the **cross size** to this item, overrides `alignItems` - `order` - controls the layout order See [Set item behavior](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/item-behavior) for more information about these properties. |
+
+### Understand the `FlexBox` layout algorithm
+
+One of `FlexBox`'s most powerful features is its ability to resize its children
+to best fit the space available to it. Understanding how `FlexBox` does this can
+help you set `FlexBox` properties to optimize your UI for all possible sizes.
+
+`FlexBox`'s layout algorithm works in the following way:
+
+1. **Calculate child base size** : Use the child's [`basis` value](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/item-behavior#set-initial-size)
+   to calculate its initial size along the main axis before any extra space is
+   distributed.
+
+2. **Sort the children** : Sort the children by their [`order`](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/item-behavior#item-order) values, if
+   present.
+
+3. **Build lines** : For each child, check if its initial size plus
+   [`gap`](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior#add-gaps) will fit into the remaining space on the current line.
+   If so, place this child into the line. If not, place it onto a new line if
+   [wrapping is enabled](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior#wrap-items), or place the item into the current line
+   where it will overflow (it will be partially obscured by the edge of the
+   container).
+
+4. **Align or resize items in the main axis** : For each line, distribute extra
+   space *to* or between items by [resizing](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/item-behavior#item-size) or
+   [aligning](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior#main-axis) them.
+
+5. **Align or resize items in the cross axis** : For each line, distribute extra
+   space to or between items and lines by [stretching or aligning
+   them](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior#cross-axis).
+
+Now that you're familiar with `FlexBox` concepts, see [Get started](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/get-started) to
+create a basic `FlexBox`.
+
+## references/android/develop/ui/compose/layouts/adaptive/flexbox/item-behavior.md
+
+Use `Modifier.flex` to control how an item changes size, order, and is aligned
+inside a `FlexBox`.
+
+## Item size
+
+Use the `basis`, `grow`, and `shrink` functions to control an item's size.
+
+
+```kotlin
+FlexBox {
+    RedRoundedBox(
+        modifier = Modifier.flex {
+            basis(FlexBasis.Auto)
+            grow(1.0f)
+            shrink(0.5f)
+        }
+    )
+}
+```
+
+<br />
+
+### Set initial size
+
+Use `basis` to specify the item's initial size before any extra space is
+distributed. You can think of this as the item's *preferred* size.
+
+|---|---|---|---|
+| **Value type** | **Behavior** | **Code snippet** Note: The boxes have a maximum intrinsic size of `100dp` | **Example using container width `600dp`** |
+| `Auto` (default) | Use the item's maximum intrinsic size. For example, a `Text` composable's maximum intrinsic width is the width of all its text on a single line - no wrapping. | ```kotlin FlexBox { RedRoundedBox( Modifier.flex { basis(FlexBasis.Auto) } ) BlueRoundedBox( Modifier.flex { basis(FlexBasis.Auto) } ) } ``` | ![Items sized based on their intrinsic size using basis Auto.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/initialsize-1.png) |
+| Fixed `dp` | A fixed size in Dp. | ```kotlin FlexBox { RedRoundedBox( Modifier.flex { basis(200.dp) } ) BlueRoundedBox( Modifier.flex { basis(100.dp) } ) } ``` | ![Items sized to a fixed dp value using basis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/initialsize-2.png) |
+| Percentage | A percentage of the container size. | ```kotlin FlexBox { RedRoundedBox( Modifier.flex { basis(0.7f) } ) BlueRoundedBox( Modifier.flex { basis(0.3f) } ) } ``` | ![Items sized as a percentage of container size using basis.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/initialsize-3.png) |
+
+If the basis value is less than the item's intrinsic minimum size, the intrinsic
+minimum size is used instead. For example, if a `Text` item that contains a word
+requires `50dp` to display, but also has `basis = 10.dp`, a
+value of `50dp` is used.
+
+### Grow items when there's space
+
+Use `grow` to specify how much an item grows when there is extra space. This is
+space remaining in the `FlexBox` container after all the items' `basis` values
+have been added up. The `grow` value indicates *how much* of the extra space a
+given child will receive, relative to its siblings. By default, items won't
+grow.
+
+The following example shows a `FlexBox` with three child items. Each has a basis
+value of `100dp`. The first child has a positive `grow` value. Since there is
+only one child with a `grow` value, the actual value is irrelevant - as long as
+it's positive, the child receives all the extra space.
+
+The images show the `FlexBox` behavior when its container size is `600dp`.
+
+|---|---|
+| ```kotlin FlexBox { RedRoundedBox( title = "400dp", modifier = Modifier.flex { grow(1f) } ) BlueRoundedBox(title = "100dp") GreenRoundedBox(title = "100dp") } ``` | Each child has a basis value of `100dp`. There is `300dp` of extra space. ![Three items with 100dp basis each, in a 600dp container, before growth.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/growitems-1.png) Child 1 grows by `300dp` to fill the extra space. ![First item grows to fill 300dp of extra space.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/growitems-2.png) |
+
+In the following example, the container size and `basis` size are the same. The
+difference is that each child has a different `grow` value.
+
+|---|---|
+| ```kotlin FlexBox { RedRoundedBox( title = "150dp", modifier = Modifier.flex { grow(1f) } ) BlueRoundedBox( title = "200dp", modifier = Modifier.flex { grow(2f) } ) GreenRoundedBox( title = "250dp", modifier = Modifier.flex { grow(3f) } ) } ``` | Each child has a basis value of `100dp`. There is `300dp` of extra space. ![Three items with 100dp basis each, in a 600dp container, before growth, with different grow values.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/growitems-3.png) The total grow value is 6. Child 1 grows by (1 / 6) \* 300 = `50dp` Child 2 grows by (2 / 6) \* 300 = `100dp` Child 3 grows by (3 / 6) \* 300 = `150dp` ![Items grow to fill 300dp of extra space based on relative grow values.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/growitems-4.png) |
+
+### Shrink items when there's insufficient space
+
+Use `shrink` to specify how much an item shrinks when the `FlexBox` container
+has insufficient space for all the items. `shrink` works the same way as `grow`
+except that, instead of distributing *extra space* to items, the *space deficit*
+is distributed to items. The `shrink` value specifies how much of the space
+deficit the item receives, or rather, how much the item will shrink by. By
+default, items have a `shrink` value of `1f`, meaning they shrink equally.
+
+The following example shows two `Text` composables with the same text. The first
+child has a shrink value of `1f`, meaning it shrinks to absorb all the space
+deficit.
+
+
+```kotlin
+FlexBox {
+    Text(
+        "The quick brown fox",
+        fontSize = 36.sp,
+        modifier = Modifier
+            .background(PastelRed)
+            .flex { shrink(1f) }
+    )
+    Text(
+        "The quick brown fox",
+        fontSize = 36.sp,
+        modifier = Modifier
+            .background(PastelBlue)
+            .flex { shrink(0f) }
+    )
+}
+```
+
+<br />
+
+As the container size shrinks, Child 1 shrinks.
+
+|---|---|
+| **Container size** | **FlexBox UI** |
+| `700dp` | ![Two items in a 700dp container.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/containersize-1.png) |
+| `500dp` | ![First item shrinks as container size reduces to 500dp.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/containersize-2.png) |
+| `450dp` | ![First item shrinks further as container size reduces to 450dp.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/containersize-3.png) |
+
+## Item alignment
+
+Use `alignSelf` to control how an item is aligned to the cross axis. This
+overrides the [`alignItems` property](https://developer.android.com/develop/ui/compose/layouts/adaptive/flexbox/container-behavior#align-distribute) of the container for this item. It
+has all the same possible values, with the addition of `Auto` which inherits the
+behavior of the `FlexBox` container.
+
+For example, this `FlexBox` has `alignItems` set to `Start` and five children
+which override the cross axis alignment.
+
+
+```kotlin
+FlexBox(
+    config = {
+        alignItems(FlexAlignItems.Start)
+    }
+) {
+    RedRoundedBox()
+    BlueRoundedBox(modifier = Modifier.flex { alignSelf(FlexAlignSelf.Center) })
+    GreenRoundedBox(modifier = Modifier.flex { alignSelf(FlexAlignSelf.End) })
+    PinkRoundedBox(modifier = Modifier.flex { alignSelf(FlexAlignSelf.Stretch) })
+    OrangeRoundedBox(modifier = Modifier.flex { alignSelf(FlexAlignSelf.Baseline) })
+}
+```
+
+<br />
+
+![Five children of varying sizes overriding the alignItems property.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/item-alignment.png)
+
+## Item order
+
+By default, `FlexBox` lays out items in the order that they are declared in
+code. Override this behavior using `order`.
+
+The default value for `order` is zero, and `FlexBox` sorts items based on this
+value in ascending order. Any items that have the same `order` value are
+laid out in the same order they are declared in. Use negative and positive
+`order` values to move items to the start or end of a layout without changing
+where they are declared.
+
+The following example shows two child items. The first has the default `order`
+of zero, and the second has an order of `-1`. After sorting, Child 1 appears
+after Child 2.
+
+
+```kotlin
+FlexBox {
+    // Declared first, but will be placed after visually
+    RedRoundedBox(
+        title = "World"
+    )
+
+    // Declared second, but will be placed first visually
+    BlueRoundedBox(
+        title = "Hello",
+        modifier = Modifier.flex {
+            order(-1)
+        }
+    )
+}
+```
+
+<br />
+
+![Two rounded boxes, with the first containing the text Hello and the second containing the text World.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/flexbox/itemorder.png)
+
+## references/android/develop/ui/compose/layouts/adaptive/grid/container-properties.md
+
+You can define a Grid container configuration to create flexible layouts
+that respond to different screen sizes and content types.
+This page describes how to do the following:
+
+- [Define a grid](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid/container-properties#grid-definition): Set up the basic structure of rows and columns.
+- [Place items in a grid](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid/container-properties#item-placement): Understand how items are placed into grid cells and how to change flow direction.
+- [Manage track sizing](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid/container-properties#grid-track-size): Use fixed, percentage, flexible, and intrinsic sizing to set track sizes.
+- [Set gaps](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid/container-properties#grid-gap): Manage the "gutters" between rows and columns.
+
+## Define a grid
+
+A grid consists of columns and rows.
+The [`Grid`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/Grid.composable#Grid(kotlin.Function1,androidx.compose.ui.Modifier,kotlin.Function1)) composable has a `config` parameter
+that accepts a lambda to define the columns and rows
+within [`GridConfigurationScope`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridConfigurationScope).
+The following example defines a grid that has three rows and two columns,
+each with a fixed size specified in [`Dp`](https://developer.android.com/reference/kotlin/androidx/compose/ui/unit/Dp):
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+    }
+) {
+}
+```
+
+<br />
+
+## Place items in a grid
+
+`Grid` takes the UI elements
+in the `content` lambda and places them into grid cells.
+The grid lays out items regardless of
+whether you have explicitly defined the rows and columns.
+By default,
+`Grid` tries to place a UI element in the available grid cell in the row;
+if it can't, it places it in an available grid cell in the next row.
+If there are no empty cells, `Grid` creates a new row.
+
+In the following example, the grid has six grid cells
+and places a card into each one (Figure 1).
+Each grid cell is `160dp` x `90dp`,
+making the total grid size `320dp` x `270dp`.
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+    }
+) {
+    Card1()
+    Card2()
+    Card3()
+    Card4()
+    Card5()
+    Card6()
+}
+```
+
+<br />
+
+![Six cards are placed in a grid that has three rows and two columns.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/placement.png) **Figure 1**. Six cards are placed in a grid that has three rows and two columns.
+
+To change this default behavior to filling by column,
+set the [`flow`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridConfigurationScope#flow()) property to [`GridFlow.Column`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridFlow#Column()).
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+        gap(8.dp)
+        flow = GridFlow.Column // Grid tries to place items to fill the column
+    },
+) {
+    Card1()
+    Card2()
+    Card3()
+    Card4()
+    Card5()
+    Card6()
+}
+```
+
+<br />
+
+![The flow function changes the direction to place items.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/grid-flow.png) **Figure 2** . `GridFlow.Row` (left) and `GridFlow.Column` (right).
+
+## Manage track sizing
+
+Rows and columns are collectively referred to as a [grid track](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid#grid-track).
+You can specify the size of a grid track using one of the following methods:
+
+- **Fixed** (`Dp`): Allocates a specific size (e.g., `column(180.dp)`).
+- **Percentage** (`Float`): Allocates a percentage of the total available space from `0.0f` to `1.0f` (e.g., `row(0.5f)` for 50%).
+- **Flexible** ([`Fr`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/Fr)): Distributes remaining space proportionally after fixed and percentage tracks are calculated. For example, if two rows are set to `1.fr` and `3.fr`, the latter receives 75% of the remaining height.
+- **Intrinsic** : Sizes the track based on the content inside it. For more information, see [Determine grid track size intrinsically](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid/container-properties#intrisic-grid-track-size).
+
+The following example uses the different track sizing options
+to define the row heights:
+
+
+```kotlin
+Grid(
+    config = {
+        column(1f)
+
+        row(100.dp)
+        row(0.2f)
+        row(1.fr)
+        row(GridTrackSize.Auto)
+    },
+    modifier = Modifier.height(480.dp)
+) {
+    PastelRedCard("Fixed(100.dp)")
+```
+
+<br />
+
+![Row heights defined using the four primary track sizing options.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/track-sizes.png) **Figure 3** . Row heights defined using the four primary track sizing options in `Grid`.
+
+### Determine grid track size intrinsically
+
+You can use [intrinsic sizing](https://developer.android.com/develop/ui/compose/layouts/intrinsic-measurements) for a `Grid`
+when you want the layout to adapt to the content,
+rather than forcing it into a fixed container.
+The grid track size is determined with the following values:
+
+- [`GridTrackSize.MaxContent`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridTrackSize#MaxContent()): Use the content's maximum intrinsic size (e.g., the width is determined by the full length of the text in a text block with no wrapping).
+- [`GridTrackSize.MinContent`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridTrackSize#MinContent()): Use the content's minimum intrinsic size (e.g., the width is determined by the longest single word in a text block).
+- [`GridTrackSize.Auto`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridTrackSize#Auto()): Use a flexible size for a track that adapts based on available space. It behaves like `MaxContent` by default, but shrinks and wraps its content to fit within the parent container.
+
+The following example places two texts side by side.
+The column size for the first text is determined
+by the required minimum width to display the text,
+and the second column width depends on the required maximum width of the text.
+
+
+```kotlin
+Grid(
+    config = {
+        column(GridTrackSize.MinContent)
+        column(GridTrackSize.MaxContent)
+        row(1.0f)
+    },
+    modifier = Modifier.width(480.dp)
+) {
+    Text("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras imperdiet." )
+    Text("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras imperdiet." )
+}
+```
+
+<br />
+
+![Intrinsic sizes specified in the columns.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/intrinsic-size.png) **Figure 4**. Intrinsic sizes specified in the columns.
+
+## Set gaps between rows and columns
+
+Once your grid tracks are sized,
+you can modify the [grid gap](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid#grid-gap) to refine the spacing between the tracks.
+You can specify the column gap with the [`columnGap`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridConfigurationScope#columnGap(androidx.compose.ui.unit.Dp)) function,
+and the row gap with [`rowGap`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridConfigurationScope#rowGap(androidx.compose.ui.unit.Dp)). In the following example,
+there is a `16dp` gap between each row,
+and an `8dp` gap between each column (Figure 5).
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+        rowGap(16.dp)
+        columnGap(8.dp)
+    }
+) {
+    Card1()
+    Card2()
+    Card3()
+    Card4()
+    Card5()
+    Card6()
+}
+```
+
+<br />
+
+![Gaps between rows and columns.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/gaps.png) **Figure 5**. Gaps between rows and columns.
+
+You can also use the convenience function [`gap`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridConfigurationScope#gap(androidx.compose.ui.unit.Dp))
+to define gaps of the same column and row size,
+and to define column and gap sizes separately using a single function.
+The following code adds `8dp` gaps to the grid:
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+        gap(8.dp) // Equivalent to columnGap(8.dp) and rowGap(8.dp)
+    }
+) {
+    Card1()
+    Card2()
+    Card3()
+    Card4()
+    Card5()
+    Card6()
+}
+```
+
+<br />
+
+## references/android/develop/ui/compose/layouts/adaptive/grid/get-started.md
+
+This page describes how to implement basic [`Grid`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/Grid.composable#Grid(kotlin.Function1,androidx.compose.ui.Modifier,kotlin.Function1)) layouts.
+
+## Set up project
+
+1. Add the [`androidx.compose.foundation.layout`](https://developer.android.com/jetpack/androidx/versions) library to your project's
+   `lib.versions.toml`.
+
+       [versions]
+       compose = "1.12.0-alpha03"
+
+       [libraries]
+       androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "compose" }
+
+2. Add the library dependency to your app's `build.gradle.kts`.
+
+       dependencies {
+           implementation(libs.androidx.compose.foundation.layout)
+       }
+
+## Create a basic grid
+
+The following example creates a basic 2x3 grid,
+with the columns and rows having a fixed size of `100.dp`.
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(100.dp)
+        }
+        repeat(3) {
+            row(100.dp)
+        }
+    }
+) {
+    Card1(containerColor = PastelRed)
+    Card2(containerColor = PastelGreen)
+    Card3(containerColor = PastelBlue)
+    Card4(containerColor = PastelPink)
+    Card5(containerColor = PastelOrange)
+    Card6(containerColor = PastelYellow)
+}
+```
+
+<br />
+
+![A basic grid consists of rows and columns with fixed size.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/six-cards-in-grid.png) **Figure 1**. A basic grid consists of rows and columns with fixed size.
+
+To learn how to implement more advanced grids,
+see [Set container properties](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid/container-properties) and [Set item properties](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid/item-properties).
+
+## references/android/develop/ui/compose/layouts/adaptive/grid/index.md
+
+> [!NOTE]
+> **Note:** `Grid` is an experimental API and is subject to change. File any issues on the [issue tracker](https://issuetracker.google.com/issues/new?component=1876021&template=1424126).
+
+[`Grid`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/Grid.composable#Grid(kotlin.Function1,androidx.compose.ui.Modifier,kotlin.Function1)) is a Jetpack Compose API
+that lets you flexibly implement a two-dimensional layout.
+With this API, you can display items in multi-column
+or multi-row layouts that adapt to the available container size.
+![A flexible and adaptive two-dimensional layout with Grid](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/example.png) **Figure 1.** A flexible and adaptive two-dimensional layout with `Grid`.
+
+## How is Grid different from similar composables?
+
+Compose already offers similar components, such as [`LazyVerticalGrid`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/lazy/grid/LazyVerticalGrid.composable#LazyVerticalGrid(androidx.compose.foundation.lazy.grid.GridCells,androidx.compose.ui.Modifier,androidx.compose.foundation.lazy.grid.LazyGridState,androidx.compose.foundation.layout.PaddingValues,kotlin.Boolean,androidx.compose.foundation.layout.Arrangement.Vertical,androidx.compose.foundation.layout.Arrangement.Horizontal,androidx.compose.foundation.gestures.FlingBehavior,kotlin.Boolean,androidx.compose.foundation.OverscrollEffect,kotlin.Function1)).
+These components are mainly for visualization of large, homogeneous data sets---
+for example, displaying a content catalog in a video streaming app.
+These components are NOT designed
+for the structural layout of a screen or complex component.
+
+You can also implement a two-dimensional layout
+by combining multiple `Row` and `Column` composables.
+However, this approach has some downsides,
+such as deep hierarchies and difficulties in adaptability.
+
+The following table provides an overview
+of which layouts are suitable for each API:
+
+| Component | Purpose |
+|---|---|
+| `LazyVerticalGrid`, `LazyStaggeredGrid`, `LazyHorizontalGrid` | Visualization of large, homogeneous data sets that requires lazy loading. |
+| `Row`, `Column`, `FlexBox` | One-dimensional layout |
+| `Grid` | Two-dimensional layout |
+
+> [!NOTE]
+> **Note:** `Grid` doesn't support lazy loading.
+
+## Terminology
+
+Familiarize yourself with the following terminology
+to understand how `Grid` works.
+
+### Grid line
+
+A grid is made up of lines, which run horizontally and vertically.
+If your grid has three rows, it has four horizontal lines,
+including the one after the last row.
+In the following image, each dotted line represents a grid line:
+![The grid consists of four horizontal lines and three vertical lines.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/grid-line.png) **Figure 2**. The grid consists of four horizontal lines and three vertical lines.
+
+### Grid track
+
+A grid track is the space between two grid lines.
+A row track is between two horizontal lines,
+and a column track is between two vertical lines.
+To define the size of these tracks,
+assign a size to them when you create the grid.
+![A grid track for the first row.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/grid-track.png) **Figure 3**. A grid track for the first row.
+
+### Grid cell
+
+A grid cell is the intersection of a row and column track.
+![A grid cell that is an intersection of the second row and the second column.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/grid-cell.png) **Figure 4**. A grid cell that is an intersection of the second row and the second column.
+
+### Grid area
+
+A grid area consists of several grid cells.
+You can define a grid area by making an item span multiple tracks.
+![A grid area that consists of four grid cells.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/grid-area.png) **Figure 5**. A grid area that consists of four grid cells.
+
+### Grid gap
+
+A grid gap is the gutter between grid tracks.
+You can't place a UI element into a gap,
+but you can span a UI element across it.
+![A grid gap between the first column and the second column.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/grid-gap.png) **Figure 6**. A grid gap between the first column and the second column.
+
+## references/android/develop/ui/compose/layouts/adaptive/grid/item-properties.md
+
+While the `Grid` config defines the overall structure,
+you use the [`gridItem`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridScope#(androidx.compose.ui.Modifier).gridItem(kotlin.Int,kotlin.Int,kotlin.Int,kotlin.Int,androidx.compose.ui.Alignment)) modifier to control the position, spanning,
+and alignment of items within that structure.
+
+## Set the item position
+
+Place an item into a specific track or cell
+with the `row` and `column` parameters.
+
+The `row` and `column` parameters specify the row and column track indexes
+that the item is placed in.
+Track indexes are 1-based---they start at one.
+Specifying only `row` or `column` (not both) places the item
+in the next available space in that track.
+Specifying both places the item into that cell.
+
+Use a positive integer to specify the track index from the start.
+For example, to place an item in the first row and column,
+use `gridItem(row = 1, column = 1)`.
+
+Use a negative integer to specify the track relative to the end.
+For example, to place an item in the second-to-last row and column, use
+`gridItem(row = -2, column = -2)`.
+
+In the following example, Card **#2** is placed
+in the second row and the second column.
+Card **#3** is assigned to the last row (indexed by -1),
+where it automatically occupies
+the first available column in that track (Figure 1).
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+        gap(8.dp)
+    }
+) {
+    Card1()
+    Card2(modifier = Modifier.gridItem(row = 2, column = 2))
+    Card3(modifier = Modifier.gridItem(row = -1, column = -2))
+}
+```
+
+<br />
+
+![Card #2 is placed in the grid cell
+in the second row and the second column,
+and Card #3 is placed in the first column in the third row.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/position.png) **Figure 1** . Card **#2** is placed in the grid cell in the second row and the second column, and Card **#3** is placed in the first column in the third row.
+
+## Span rows and columns
+
+Use the `rowSpan` and `columnSpan` parameters
+to span an item over multiple cells.
+You can place a UI element into a [grid area](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid#grid-area),
+which is the area consisting of several [grid cells](https://developer.android.com/develop/ui/compose/layouts/adaptive/grid#grid-cell).
+The `gridItem` modifier lets you specify the grid area
+with the `rowSpan` and `columnSpan` parameters.
+In the following example,
+Card **#1** is placed in the area consisting of two rows and two columns
+(Figure 2).
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(3) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+        rowGap(8.dp)
+        columnGap(8.dp)
+    }
+) {
+    Card1(modifier = Modifier.gridItem(rowSpan = 2, columnSpan = 2))
+    Card2()
+    Card3()
+    Card4(modifier = Modifier.gridItem(columnSpan = 3))
+}
+```
+
+<br />
+
+![Card #4 spans three columns](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/spanning.png) **Figure 2** . Card **#4** spans three columns.
+
+## Set the alignment in a grid area
+
+You can set the alignment of the UI element in a grid area
+by specifying it in the `alignment` parameter of the [`gridItem`](https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/GridScope#(androidx.compose.ui.Modifier).gridItem(kotlin.Int,kotlin.Int,kotlin.Int,kotlin.Int,androidx.compose.ui.Alignment)) modifier.
+In the following example, **#1** is placed in the center of the grid area
+consisting of two columns and two rows.
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(3) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+        rowGap(8.dp)
+        columnGap(8.dp)
+    },
+) {
+    Text(
+        text = "#1",
+        modifier = Modifier
+            .gridItem(
+                rowSpan = 2,
+                columnSpan = 2,
+                alignment = Alignment.Center
+            ),
+    )
+    Card2()
+    Card3()
+    Card4(modifier = Modifier.gridItem(columnSpan = 3))
+}
+```
+
+<br />
+
+![The Text with #1 is placed in the center of the grid area
+consisting of two rows and two columns.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/alignment.png) **Figure 3** . The Text with **#1** is placed in the center of the grid area consisting of two rows and two columns.
+
+## Auto-placement mixed with placed items
+
+A UI element in `Grid`
+that has no position specification undergoes auto-placement.
+This example shows how you can mix auto-placed elements
+and the UI elements with specified grid cells.
+Card **#2** and card **#4** are specified grid cells,
+and the other items are auto-placed.
+
+
+```kotlin
+Grid(
+    config = {
+        repeat(2) {
+            column(160.dp)
+        }
+        repeat(3) {
+            row(90.dp)
+        }
+        rowGap(16.dp)
+        columnGap(8.dp)
+    }
+) {
+    Card1()
+    Card2(modifier = Modifier.gridItem(row = 2, column = 2))
+    Card3()
+    Card4(modifier = Modifier.gridItem(row = 3, column = 1))
+    Card5()
+    Card6()
+}
+```
+
+<br />
+
+![Card #3 is placed next to card <b>#1</b>, as it is an auto-placement.](https://developer.android.com/static/develop/ui/compose/images/layouts/adaptive/grid/autoplacement-mixed-with-placement.png) **Figure 4** . Card **#3** is placed next to card **#1**, as it is an auto-placement.
+
+## references/android/develop/ui/compose/layouts/adaptive/mediaquery/index.md
+
+> [!NOTE]
+> **Note:** The `mediaQuery` function and the related data types are experimental and subject to change. File any issues on the [issue tracker](https://issuetracker.google.com/issues?q=componentid:1876021).
+
+You need various types of information, such as device capability
+and app status, to update your app layout.
+Window width and height are the most commonly used information.
+In addition to that, you can refer to the following information:
+
+- Window posture
+- Pointing devices precision
+- Keyboard type
+- Whether the camera and microphone are supported by the device
+- The distance between a user and the device display
+
+Because the information is updated dynamically,
+you need to monitor it and trigger recomposition when any update happens.
+The [`mediaQuery`](https://developer.android.com/reference/kotlin/androidx/compose/ui/mediaQuery.composable#mediaQuery(kotlin.Function1)) function abstracts the details of the information retrieval
+and lets you focus on defining the condition to trigger the layout updates.
+The following example switches the layout to `TabletopLayout`
+when the foldable posture is tabletop:
+
+
+```kotlin
+@Composable
+fun VideoPlayer(
+    // ...
+) {
+    // ...
+            if (mediaQuery { windowPosture == UiMediaScope.Posture.Tabletop }) {
+                TabletopLayout()
+            } else {
+                FlatLayout()
+            }
+    // ...
+}
+```
+
+<br />
+
+## Enable the `mediaQuery` function
+
+To enable the `mediaQuery` function,
+set the `isMediaQueryIntegrationEnabled` attribute of
+the [`ComposeUiFlags`](https://developer.android.com/reference/kotlin/androidx/compose/ui/ComposeUiFlags) object to `true`:
+
+
+```kotlin
+class MyApplication : Application() {
+    override fun onCreate() {
+        ComposeUiFlags.isMediaQueryIntegrationEnabled = true
+        super.onCreate()
+    }
+}
+```
+
+<br />
+
+## Define a condition with parameters
+
+You can define a condition as a lambda
+that is evaluated within [`UiMediaScope`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope).
+The `mediaQuery` function evaluates the condition according to
+the current status and the device capabilities.
+The function returns a boolean value,
+so you can determine the layout with conditional branches
+like an `if` expression.
+Table 1 describes the parameters available in `UiMediaScope`.
+
+| Parameter | Value type | Description |
+|---|---|---|
+| `windowWidth` | [`Dp`](https://developer.android.com/reference/kotlin/androidx/compose/ui/unit/Dp) | The current window width in dp. |
+| `windowHeight` | `Dp` | The current window height in dp. |
+| `windowPosture` | [`UiMediaScope.Posture`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.Posture) | The current posture of the application window. |
+| `pointerPrecision` | [`UiMediaScope.PointerPrecision`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.PointerPrecision) | The highest precision of the available pointing devices. |
+| `keyboardKind` | [`UiMediaScope.KeyboardKind`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.KeyboardKind) | The type of keyboard available or connected. |
+| `hasCamera` | `Boolean` | Whether the camera is supported on the device. |
+| `hasMicrophone` | `Boolean` | Whether the microphone is supported on the device. |
+| `viewingDistance` | [`UiMediaScope.ViewingDistance`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.ViewingDistance) | The typical distance between the user and the device screen. |
+
+A `UiMediaScope` object resolves the values of the parameters.
+The `mediaQuery` function uses [`LocalUiMediaScope.current`](https://developer.android.com/reference/kotlin/androidx/compose/ui/package-summary#LocalUiMediaScope())
+to access the `UiMediaScope` object,
+which represents the current device capabilities and context.
+This object is dynamically updated when any changes are made,
+such as when the user changes the device posture.
+The `mediaQuery` function then evaluates the `query` lambda
+with the updated `UiMediaScope` object and returns a boolean value.
+For example, the following snippet chooses between `TabletopLayout`
+and `FlatLayout` based on the `windowPosture` parameter value.
+
+
+```kotlin
+@Composable
+fun VideoPlayer(
+    // ...
+) {
+    // ...
+            if (mediaQuery { windowPosture == UiMediaScope.Posture.Tabletop }) {
+                TabletopLayout()
+            } else {
+                FlatLayout()
+            }
+    // ...
+}
+```
+
+<br />
+
+### Make a decision based on the window size
+
+[Window size classes](https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes) are a set of opinionated viewport breakpoints
+that help you design, develop, and test adaptive layouts.
+You can compare the two parameters representing the current window size
+with the threshold defined in the window size classes.
+The following example changes the number of panes according to the window width.
+[`WindowSizeClass`](https://developer.android.com/reference/androidx/window/core/layout/WindowSizeClass) class has constants for the thresholds
+of window size classes (Figure 1).
+
+The [`derivedMediaQuery`](https://developer.android.com/reference/kotlin/androidx/compose/ui/derivedMediaQuery.composable#derivedMediaQuery(kotlin.Function1)) function evaluates the `query` lambda
+and wraps the result in a [`derivedStateOf`](https://developer.android.com/develop/ui/compose/side-effects#derivedstateof).
+Because `windowWidth` and `windowHeight` can update frequently,
+call the `derivedMediaQuery` function instead of the `mediaQuery` function
+when you refer to those parameters in the `query` lambda.
+
+
+```kotlin
+val narrowerThanMedium by derivedMediaQuery {
+    windowWidth < WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp
+}
+val narrowerThanExpanded by derivedMediaQuery {
+    windowWidth < WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND.dp
+}
+when {
+    narrowerThanMedium -> SinglePaneLayout()
+    narrowerThanExpanded -> TwoPaneLayout()
+    else -> ThreePaneLayout()
+}
+```
+
+<br />
+
+**Figure 1**. Layout is updated according to the window width.
+
+### Update layout according to the window posture
+
+The `windowPosture` parameter describes the current window posture
+as a `UiMediaScope.Posture` object.
+You can check the current [posture](https://developer.android.com/develop/ui/compose/layouts/adaptive/foldables/learn-about-foldables) by comparing the parameter
+with the values defined in the `UiMediaScope.Posture` class.
+The following example switches layout according to the window posture:
+
+
+```kotlin
+when {
+    mediaQuery { windowPosture == UiMediaScope.Posture.Tabletop } -> TabletopLayout()
+    mediaQuery { windowPosture == UiMediaScope.Posture.Book } -> BookLayout()
+    mediaQuery { windowPosture == UiMediaScope.Posture.Flat } -> FlatLayout()
+}
+```
+
+<br />
+
+### Check the precision of the available pointing device
+
+A high precision pointing device helps users to point a UI element precisely.
+The precision of a pointing device depends on the device type.
+
+The `pointerPrecision` parameter describes the precision
+of the available pointing devices, such as a mouse and touchscreen.
+There are four values defined in the `UiMediaScope.PointerPrecision` class:
+[`Fine`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.PointerPrecision#Fine()), [`Coarse`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.PointerPrecision#Coarse()), [`Blunt`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.PointerPrecision#Blunt()), and [`None`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.PointerPrecision#None()).
+`None` means that no pointing device is available.
+The precision ranges from highest to lowest in this order:
+`Fine`, `Coarse`, and `Blunt`.
+
+If multiple pointing devices are available and their precisions are different,
+the parameter is resolved with the highest one.
+For example, if there are two pointing devices --- a `Fine` precision device and
+a `Blunt` precision device ---
+`Fine` is the value of the `pointerPrecision` parameter.
+
+The following example shows a larger button
+when the user is using a pointing device with low precision:
+
+
+```kotlin
+if (mediaQuery { pointerPrecision == UiMediaScope.PointerPrecision.Blunt }) {
+    LargeSizeButton()
+} else {
+    NormalSizeButton()
+}
+```
+
+<br />
+
+### Check the available keyboard type
+
+The `keyboardKind` parameter represents the type of the available keyboards:
+[`Physical`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.KeyboardKind#Physical()), [`Virtual`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.KeyboardKind#Virtual()), and [`None`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.KeyboardKind#None()).
+If an on-screen keyboard is displayed and
+a hardware keyboard is available at the same time,
+the parameter is resolved as `Physical`.
+If neither is detected, `None` is the value of the parameter.
+The following example shows a message suggesting that users connect a keyboard
+when no keyboard is detected:
+
+
+```kotlin
+if (mediaQuery { keyboardKind == UiMediaScope.KeyboardKind.None }) {
+    SuggestKeyboardConnect()
+}
+```
+
+<br />
+
+### Check if the device supports camera and microphone
+
+Some devices don't support cameras or microphones.
+You can check if the device supports a camera and a microphone
+with the `hasCamera` parameter and the `hasMicrophone` parameter.
+The following example shows buttons to use with camera and microphone
+when the device supports them:
+
+
+```kotlin
+Row {
+    OutlinedTextField(state = rememberTextFieldState())
+    // Show the MicButton when the device supports a microphone.
+    if (mediaQuery { hasMicrophone }) {
+        MicButton()
+    }
+    // Show the CameraButton when the device supports a camera.
+    if (mediaQuery { hasCamera }) {
+        CameraButton()
+    }
+}
+```
+
+<br />
+
+### Adjust UI with the estimated viewing distance
+
+Viewing distance is a factor that helps determine layout.
+If the user is using the app from a distance,
+they would expect the text and UI elements to be bigger.
+The `viewingDistance` parameter provides an estimate of the viewing distance
+based on the device type and its typical usage context.
+
+There are three values defined in the `UiMediaScope.ViewingDistance` class:
+[`Near`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.ViewingDistance#Near()), [`Medium`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.ViewingDistance#Medium()), and [`Far`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.ViewingDistance#Far()).
+`Near` means that the screen is in close range,
+and `Far` means that the device is viewed from a distance.
+The following example increases the font size when the viewing distance is
+`Far` or `Medium`:
+
+
+```kotlin
+val fontSize = when {
+    mediaQuery { viewingDistance == UiMediaScope.ViewingDistance.Far } -> 20.sp
+    mediaQuery { viewingDistance == UiMediaScope.ViewingDistance.Medium } -> 18.sp
+    else -> 16.sp
+}
+```
+
+<br />
+
+## Preview a UI component
+
+You can call the `mediaQuery` and `derivedMediaQuery` functions in the
+composable functions to preview UI components.
+The following snippet chooses between `TabletopLayout`
+and `FlatLayout` based on the `windowPosture` parameter value.
+To preview the `TabletopLayout`, the `windowPosture` parameter should be
+[`UiMediaScope.Posture.Tabletop`](https://developer.android.com/reference/kotlin/androidx/compose/ui/UiMediaScope.Posture#Tabletop()).
+
+
+```kotlin
+when {
+    mediaQuery { windowPosture == UiMediaScope.Posture.Tabletop } -> TabletopLayout()
+    mediaQuery { windowPosture == UiMediaScope.Posture.Book } -> BookLayout()
+    mediaQuery { windowPosture == UiMediaScope.Posture.Flat } -> FlatLayout()
+}
+```
+
+<br />
+
+The `mediaQuery` and `derivedMediaQuery` functions evaluate
+the given `query` lambda within a `UiMediaScope` object,
+which is provided as `LocalUiMediaScope.current`.
+You can override it with the following steps:
+
+1. Enable the `mediaQuery` function.
+2. Define a custom object that implements the `UiMediaScope` interface.
+3. Set the custom object to the `LocalUiMediaScope` with the [`CompositionLocalProvider`](https://developer.android.com/reference/kotlin/androidx/compose/runtime/CompositionLocalProvider.composable#CompositionLocalProvider(androidx.compose.runtime.CompositionLocalContext,kotlin.Function0)) function.
+4. Call the composable to preview in the content lambda of the `CompositionLocalProvider` function.
+
+You can preview the `TabletopLayout` with the following example:
+
+
+```kotlin
+@Preview
+@Composable
+fun PreviewLayoutForTabletop() {
+    // Step 1: Enable the mediaQuery function
+    ComposeUiFlags.isMediaQueryIntegrationEnabled = true
+
+    val currentUiMediaScope = LocalUiMediaScope.current
+    // Step 2: Define a custom object implementing the UiMediaScope interface.
+    // The object overrides the windowPosture parameter.
+    // The resolution of the remaining parameters is deferred to the currentUiMediaScope object.
+    val uiMediaScope = remember(currentUiMediaScope) {
+        object : UiMediaScope by currentUiMediaScope {
+            override val windowPosture: UiMediaScope.Posture = UiMediaScope.Posture.Tabletop
+        }
+    }
+
+    // Step 3: Set the object to the LocalUiMediaScope.
+    CompositionLocalProvider(LocalUiMediaScope provides uiMediaScope) {
+        // Step 4: Call the composable to preview.
+        when {
+            mediaQuery { windowPosture == UiMediaScope.Posture.Tabletop } -> TabletopLayout()
+            mediaQuery { windowPosture == UiMediaScope.Posture.Book } -> BookLayout()
+            mediaQuery { windowPosture == UiMediaScope.Posture.Flat } -> FlatLayout()
+        }
+    }
+}
+```
+
+<br />
+
+## references/android/develop/ui/compose/tooling/debug.md
+
+Tools for debugging your Compose UI are available in Android Studio.
+
+## Layout Inspector
+
+Layout Inspector lets you inspect a Compose layout inside a running app in an
+emulator or physical device. You can use the Layout Inspector to check how often
+a composable is recomposed or skipped, which can help identify issues with your
+app. For example, some coding errors might force your UI to recompose
+excessively, which can cause [poor performance](https://developer.android.com/develop/ui/compose/performance).
+Some coding errors can prevent your UI from recomposing and, therefore,
+prevent your UI changes from showing up on the screen. If you're new to
+Layout inspector, check the [guidance](https://developer.android.com/studio/debug/layout-inspector) on how to
+run it.
+
+> [!NOTE]
+> **Note:** If you're not seeing Compose components in layout inspector, make sure you are not removing `META-INF/androidx.compose.*.version` files from the APK. These are required for layout inspector to work.
+
+### Get recomposition counts
+
+When debugging your Compose layouts, knowing when composables
+[recompose](https://developer.android.com/develop/ui/compose/mental-model#recomposition) is important in
+understanding whether your UI is implemented properly. For example, if it's
+recomposing too many times, your app might be doing more work than is necessary.
+On the other hand, components that don't recompose when you anticipate them to
+can lead to unexpected behaviors.
+
+The Layout Inspector shows you when discrete composables in your layout
+hierarchy have either recomposed or skipped, as you interact with your app. In
+Android Studio, your recompositions are highlighted to help you determine
+where in the UI your composables are recomposing.
+
+**Figure 1.** Recompositions are highlighted in Layout Inspector.
+
+The highlighted portion shows a gradient overlay of the composable in the image
+section of the Layout Inspector, and gradually disappears so that you can get an
+idea of where in the UI the composable with the highest recompositions can be
+found. If one composable is recomposing at a higher rate than another
+composable, then the first composable receives a stronger gradient overlay
+color. If you double-click a composable in the layout inspector, you're taken to
+the corresponding code for analysis.
+
+> [!NOTE]
+> **Note:** To view recomposition counts, make sure your app is using an API level of 29 or higher, and `Compose 1.2.0` or higher. Then, deploy your app as you normally would.
+
+![](https://developer.android.com/static/develop/ui/compose/images/li-recomposition-counts.png) **Figure 2.**The composition and skip counter in Layout Inspector.
+
+Open the **Layout Inspector** window and connect to your app process. In the
+**Component Tree** , there are two columns that appear next to the layout
+hierarchy. The first column shows the number of compositions for each node and
+the second column displays the number of skips for each node. Selecting a
+composable node shows the dimensions and parameters of the composable, unless
+it's an inline function, in which case the parameters can't be shown. You can
+also see similar information in the **Attributes** pane when you select a
+composable from the **Component Tree** or the **Layout Display**.
+
+Resetting the count can help you understand recompositions or skips during a
+specific interaction with your app. If you want to reset the count, click
+**Reset** near the top of the **Component Tree** pane.
+
+> [!NOTE]
+> **Note:** If you don't see the new columns in the **Component Tree** pane, you can view them by selecting **Show Recomposition Counts** from the **View Options** menu ![Layout Inspector View Options
+> icon](https://developer.android.com/static/studio/images/buttons/live-layout-inspector-view-options-icon.png) near the top of the **Component Tree** pane, as shown in the following image.
+
+![Enable the composition and skip counter in Layout
+Inspector](https://developer.android.com/static/develop/ui/compose/images/li-show-recomposition-counts.png)
+
+**Figure 3**. Enable the composition and skip counter in Layout Inspector.
+
+### Compose semantics
+
+In Compose, [Semantics](https://developer.android.com/develop/ui/compose/semantics) describe your UI in an
+alternative manner that is understandable for
+[Accessibility](https://developer.android.com/develop/ui/compose/accessibility) services and for the
+[Testing](https://developer.android.com/develop/ui/compose/testing) framework. You can use the Layout Inspector
+to inspect semantic information in your Compose layouts.
+![Semantic information displayed using the Layout Inspector.](https://developer.android.com/static/develop/ui/compose/images/layout_inspector_semantics_new.png) **Figure 4.** Semantic information displayed using the Layout Inspector.
+
+When selecting a Compose node, use the **Attributes** pane to check whether it
+declares semantic information directly, merges semantics from its children, or
+both. To quickly identify which nodes include semantics, either declared or
+merged, use select the **View options** drop-down in the **Component Tree** pane
+and select **Highlight Semantics Layers**. This highlights only the nodes in the
+tree that include semantics, and you can use your keyboard to quickly navigate
+between them.
+
+## Compose UI Check
+
+To help you build more adaptive and accessible UIs in Jetpack Compose, Android
+Studio provides a UI Check mode in Compose Preview. This feature is similar
+to [Accessibility Scanner](https://developer.android.com/guide/topics/ui/accessibility/testing#accessibility-scanner)
+for views.
+
+When you activate Compose UI check mode on a Compose Preview, Android Studio
+automatically audits your Compose UI and suggests improvements to make your UI
+more accessible and adaptive. Android Studio checks that your UI works across
+different screen sizes. In the **Problems** panel, the tool shows the issues
+that it detects, such as text stretched on large screens or low color contrast.
+
+To access this feature, click the UI Check icon on Compose Preview:
+![](https://developer.android.com/static/studio/images/design/compose-ui-check-entry.png) **Figure 5.** Entry point to UI check mode.
+
+UI check automatically previews your UI in different configurations and
+highlights issues found in different configurations. In the **Problems** panel,
+when you click an issue, you can see the details of the issue, suggested fixes,
+and the renderings that highlight the area of the issue.
+![](https://developer.android.com/static/studio/images/design/compose-ui-check.png) **Figure 6.** UI check mode in action.
+
+### Fix with AI
+
+For issues detected in UI Check mode, you can use the AI agent to propose and
+apply code fixes. Click the **Fix with AI** button on an issue in the
+**Problems** panel. The agent analyzes the problem and your code to suggest
+changes that resolve the accessibility or adaptive issue.
+![](https://developer.android.com/static/studio/preview/features/images/ui-check-mode-single-fix.png) **Figure 7.** The agent fixes UI issues in UI Check mode.
+
+## references/android/guide/navigation/navigation-3/recipes/material-listdetail.md
+
+# Material List-Detail Recipe
+
+This recipe demonstrates how to create an adaptive list-detail layout using the `ListDetailSceneStrategy` from the Material 3 Adaptive library. This layout automatically adjusts to show one, two, or three panes depending on the available screen width.
+
+## How it works
+
+This example has three destinations: `ConversationList`, `ConversationDetail`, and `Profile`.
+
+### `ListDetailSceneStrategy`
+
+The key to this recipe is the `rememberListDetailSceneStrategy`, which provides the logic for the adaptive layout.
+
+- **Pane Roles**: Each destination is assigned a role using metadata:
+
+  - `ListDetailSceneStrategy.listPane()`: For the primary (list) content. This pane is always visible. A placeholder can be provided to be shown in the detail pane area when no detail content is selected.
+  - `ListDetailSceneStrategy.detailPane()`: For the secondary (detail) content.
+  - `ListDetailSceneStrategy.extraPane()`: For tertiary content.
+- **Adaptive Layout** : The `ListDetailSceneStrategy` automatically handles the layout. On smaller screens, only one pane is shown at a time. On wider screens, it will show the list and detail panes side-by-side. On very wide screens, it can show all three panes: list, detail, and extra.
+
+- **Navigation** : Navigation between the panes is handled by adding and removing destinations from the back stack as usual. The `ListDetailSceneStrategy` observes the back stack and adjusts the layout accordingly.
+
+[![](https://developer.android.com/static/images/picto-icons/code.svg) Explore View the full recipe on GitHub.](https://github.com/android/nav3-recipes/tree/main/app/src/main/java/com/example/nav3recipes/material/listdetail)
+
+```
+package com.example.nav3recipes.material.listdetail
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
+import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.dropUnlessResumed
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
+import com.example.nav3recipes.content.ContentBlue
+import com.example.nav3recipes.content.ContentGreen
+import com.example.nav3recipes.content.ContentRed
+import com.example.nav3recipes.content.ContentYellow
+import com.example.nav3recipes.ui.setEdgeToEdgeConfig
+import kotlinx.serialization.Serializable
+
+@Serializable
+private object ConversationList : NavKey
+
+@Serializable
+private data class ConversationDetail(val id: String) : NavKey
+
+@Serializable
+private data object Profile : NavKey
+
+class MaterialListDetailActivity : ComponentActivity() {
+
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        setEdgeToEdgeConfig()
+        super.onCreate(savedInstanceState)
+
+        setContent {
+
+            val backStack = rememberNavBackStack(ConversationList)
+
+            // Override the defaults so that there isn't a horizontal space between the panes.
+            // See b/418201867
+            val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+            val directive = remember(windowAdaptiveInfo) {
+                calculatePaneScaffoldDirective(windowAdaptiveInfo)
+                    .copy(horizontalPartitionSpacerSize = 0.dp)
+            }
+            val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
+
+            NavDisplay(
+                backStack = backStack,
+                onBack = { backStack.removeLastOrNull() },
+                sceneStrategies = listOf(listDetailStrategy),
+                entryProvider = entryProvider {
+                    entry<ConversationList>(
+                        metadata = ListDetailSceneStrategy.listPane(
+                            detailPlaceholder = {
+                                ContentYellow("Choose a conversation from the list")
+                            }
+                        )
+                    ) {
+                        ContentRed("Welcome to Nav3") {
+                            Button(onClick = dropUnlessResumed {
+                                backStack.add(ConversationDetail("ABC"))
+                            }) {
+                                Text("View conversation")
+                            }
+                        }
+                    }
+                    entry<ConversationDetail>(
+                        metadata = ListDetailSceneStrategy.detailPane()
+                    ) { conversation ->
+                        ContentBlue("Conversation ${conversation.id} ") {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Button(onClick = dropUnlessResumed {
+                                    backStack.add(Profile)
+                                }) {
+                                    Text("View profile")
+                                }
+                            }
+                        }
+                    }
+                    entry<Profile>(
+                        metadata = ListDetailSceneStrategy.extraPane()
+                    ) {
+                        ContentGreen("Profile")
+                    }
+                }
+            )
+        }
+    }
+}
+```
+

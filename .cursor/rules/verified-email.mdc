@@ -1,0 +1,1602 @@
+---
+description: |-
+  Provides a complete workflow for implementing verified email retrieval on Android Credential Manager API. Use this skill to integrate a secure, OTP-less email verification flow into an Android app. This skill solves the problem of high-friction sign-up processes by leveraging cryptographically verified credentials from trusted providers like Google.
+alwaysApply: false
+---
+
+
+## Fundamentals
+
+- *[Overview of Digital Credentials](references/android/identity/digital-credentials/email-verification.md)*: Learn about cryptographically verifiable documents and the role of Credential Manager.
+- *[Glossary](references/android/identity/digital-credentials/email-verification-implementation.md)* : Definitions for `dcql_query`, `UserInfoCredential`, and `GetDigitalCredentialOption`.
+
+### Standards \& Examples
+
+- *[OpenID4VP Standard](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-introduction)*: The specification used to create digital credentials requests.
+- *[Digital Credentials Demo](https://digital-credentials.dev/)*: Example requests and cross-platform testing tool.
+- *[W3C Verifiable Credentials](https://www.w3.org/TR/vc-data-model-2.0/)*: The data model for cryptographically secured claims.
+- *[SD-JWT](https://datatracker.ietf.org/doc/draft-ietf-oauth-selective-disclosure-jwt/)*: Selective Disclosure JSON Web Token format used for responses.
+- *[mdoc](https://www.iso.org/standard/69084.html)*: ISO/IEC 18013-5 standard for mobile documents.
+
+### Requirements
+
+- **SDK Version**: Minimum SDK 28 (Android 9) is required.
+- **GMS Version**: Google Play services version 25.49.x or higher.
+
+### Use Cases
+
+Email verification is applicable for the following use cases:
+
+- **Account Creation/Sign-up**: Remove friction by skipping manual email verification.
+- **Account Recovery**: Securely verify email ownership during recovery flows.
+- **Re-authentication**: Versatile verification for high-risk actions, independent of the initial sign-in method.
+
+### Limitations \& Nuances
+
+- **Workspace Accounts**: Google does not issue verifiable credentials for Google Workspace Accounts.
+- **Freshness**: For non-@gmail.com addresses, Google verifies the email at account creation but there is no freshness claim; implement an additional challenge like an OTP.
+
+### Scope \& Pre-requisites
+
+**Crucial** : This skill focuses exclusively on the **Android client-side
+integration** . It does **not** implement the app's server-side cryptographic
+validation logic. Server-side validation of the returned credential is required
+for security and must be implemented in your backend.
+
+## Codebase exploration for Use Cases
+
+Get started with the following queries in project source code to find relevant
+screens with different use cases to implement verified email:
+
+- `SignUpScreen`
+- `"Email address"`
+- `"Recover Account"`
+- `"Account Recovery"`
+- `"Forgot password?"`
+- `"Delete Account"`
+
+## Identifying Integration Points
+
+To implement this feature effectively, you must first locate the relevant
+flows in your codebase. To initiate, start with the following strategies to
+cater to different use cases using verified email:
+
+### 1. Search for Navigation Routes
+
+If your app uses Navigation, search for routes or destinations related
+to authentication:
+
+Look for:
+
+- **Keywords** : `signup`, `registration`, `create_account`, `forgot_password`, `recovery`, `verify_email`.
+- **Code Pattern** : Search for `NavHost` or `composable` destinations using these strings.
+
+### 2. Locate Authentication ViewModels
+
+Find the business logic handling user attributes and account creation, account
+recovery:
+
+- **Keywords** : `SignUpViewModel`, `AuthViewModel`, `RegistrationRepository`.
+- **Code Pattern** : Look for methods like `onCrea teAccount`, `onRecoverAccount`, or `validateEmail`.
+
+### 3. Find instances of reauthentication for sensitive actions
+
+For reauthentication use cases, find areas where users perform sensitive
+actions:
+
+- **Keywords** : `ChangePassword`, `UpdatePayment`, `DeleteAccount`, `UpdateDetails`, `EditUserDetails`
+
+## Important pointers for Implementation
+
+- Construct a Digital Credential Request and present it to the user.
+- Make sure to follow the request JSON structure as mentioned in [documentation](references/android/identity/digital-credentials/email-verification-implementation.md).
+- While presenting the request to the user, check if result credential is DigitalCredential and credential.credentialJson as responseJsonString
+- Parse the response from the client.
+- Offer a passkey creation option if one is not already present.
+- Assume a local `SdJwtParser` to parse raw SD-JWT and return a `JSONObject`.
+- Use a `VerifiedUserInfo` data class to store the parsed name and email.
+- Leave a TODO for developers to handle the app's server-side validation and parsing.
+- Direct users to the home screen after API call success and show a snackbar with user details for reference purpose only.
+
+This guide describes how to implement verified email retrieval using the
+[Digital Credentials Verifier API](references/android/identity/digital-credentials/credential-verifier.md) through an [OpenID for Verifiable
+Presentations (OpenID4VP)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) request.
+
+## Add dependencies
+
+In your app's `build.gradle` file, add the following dependencies for Credential
+Manager:
+
+### Kotlin
+
+```kotlin
+dependencies {
+    implementation("androidx.credentials:credentials:1.7.0-alpha02")
+    implementation("androidx.credentials:credentials-play-services-auth:1.7.0-alpha02")
+}
+```
+
+### Groovy
+
+```groovy
+dependencies {
+    implementation "androidx.credentials:credentials:1.7.0-alpha02"
+    implementation "androidx.credentials:credentials-play-services-auth:1.7.0-alpha02"
+}
+```
+
+## Initialize Credential Manager
+
+Use your app or activity context to create a `CredentialManager` object.
+
+    // Use your app or activity context to instantiate a client instance of
+    // CredentialManager.
+    private val credentialManager = CredentialManager.create(context)
+
+## Construct the Digital Credential request
+
+To request a verified email, construct a [`GetCredentialRequest`](https://developer.android.com/reference/android/credentials/GetCredentialRequest)
+containing a [`GetDigitalCredentialOption`](https://developer.android.com/reference/androidx/credentials/GetDigitalCredentialOption). This option requires a
+`requestJson` string formatted as an OpenID for Verifiable Presentations
+(OpenID4VP) request.
+
+The OpenID4VP request JSON must follow a specific structure. The current
+providers support a JSON structure with an outer `"digital": {"requests":
+[...]}` wrapper.
+
+        val nonce = generateSecureRandomNonce()
+
+        // This request follows the OpenID4VP spec
+        val openId4vpRequest = """
+    {
+      "requests": [
+        {
+          "protocol": "openid4vp-v1-unsigned",
+          "data": {
+            "response_type": "vp_token",
+            "response_mode": "dc_api",
+            "nonce": "$nonce",
+            "dcql_query": {
+              "credentials": [
+                {
+                  "id": "user_info_query",
+                  "format": "dc+sd-jwt",
+                   "meta": { 
+                      "vct_values": ["UserInfoCredential"] 
+                   },
+                  "claims": [ 
+                    {"path": ["email"]}, 
+                    {"path": ["name"]},  
+                    {"path": ["given_name"]},
+                    {"path": ["family_name"]},
+                    {"path": ["picture"]},
+                    {"path": ["hd"]},
+                    {"path": ["email_verified"]}
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+    """
+
+        val getDigitalCredentialOption = GetDigitalCredentialOption(requestJson = openId4vpRequest)
+        val request = GetCredentialRequest(listOf(getDigitalCredentialOption))
+
+The request contains the following key information:
+
+- **DCQL query** : The `dcql_query` specifies the credential type and the
+  claims being requested (`email_verified`). You can request other claims to
+  determine the level of verification. A few possible claims are as follows:
+
+  - `email_verified`: In the response, this is a Boolean that indicates whether the email is verified.
+  - `hd` (hosted domain): In the response, this is empty.
+
+  > [!NOTE]
+  > **Note:** If `email_verified` is `true` and `hd` is empty in the response, it implies that the account is an authorized Google Account. Currently, Google does not issue [verifiable credentials](references/android/identity/digital-credentials/index.md) for Google Workspace Accounts. However, the `hd` field is present in verifiable credentials issued for non-workspace accounts. You are encouraged to implement handling this field to future-proof your app.
+
+- If the email is non-@gmail.com, Google verified this email when the Google
+  Account was created, but there is no freshness claim. Therefore, for
+  non-Google emails, you should consider an additional challenge, such as an
+  OTP, to verify the user. To understand the schema of the credential and the
+  specific rules for validating fields like `email_verified`, refer to the
+  [Google Identity guides](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+
+- **nonce**: A unique, cryptographically secure random value is generated for
+  each request. This is critical for security, as it prevents replay attacks.
+
+- `UserInfoCredential`: This value implies a specific type of digital
+  credential that contains user attributes. Including this in the request is
+  pivotal to distinguish the email verification use case.
+
+Next, wrap the `openId4vpRequest` JSON in a `GetDigitalCredentialOption`, create
+a `GetCredentialRequest`, and call `getCredential()`.
+
+## Present the request to the user
+
+Present the user with the request, using the Credential Manager built-in UI.
+
+    try {
+        // Requesting Digital Credential from user...
+        val result = credentialManager.getCredential(activity, request)
+
+        when (val credential = result.credential) {
+            is DigitalCredential -> {
+                val responseJsonString = credential.credentialJson
+
+                // Successfully received digital credential response.
+
+                // Next, parse this response and send it to your server.
+                // ...
+            }
+
+            else -> {
+                // handle Unexpected State() - Up to the developer
+            }
+        }
+    } catch (e: Exception) {
+        // handle exceptions - Up to the developer
+    }
+
+> [!NOTE]
+> **Note:** There is no equivalent of Sign in with Google's `preferImmediatelyAvailableCredentials` for Digital Credentials. If no verifiable credential is found (for example, no eligible account on device), the user will be shown a "No options available" or similar system screen.
+
+## Parse the response on the client
+
+After receiving the response, you can perform a preliminary parse on the client.
+This is useful for immediately updating the UI, for example, by showing the
+user's name.
+
+> [!IMPORTANT]
+> **Important:** This step is not for validation. Full cryptographic verification must be performed on your server.
+
+The following code extracts the raw [Selective Disclosure JWT
+(SD-JWT)](https://datatracker.ietf.org/doc/rfc9901/) and uses a helper to decode its claims.
+
+    // 1. Parse the outer JSON wrapper to get the `vp_token`
+    val responseData = JSONObject(responseJsonString)
+    val vpToken = responseData.getJSONObject("vp_token")
+
+    // 2. Extract the raw SD-JWT string
+    val credentialId = vpToken.keys().next()
+    val rawSdJwt = vpToken.getJSONArray(credentialId).getString(0)
+
+    // 3. Use your parser to get the verified claims
+    // Server-side validation/parsing is highly recommended.
+
+    // Assumes a local parser like the one in our SdJwtParser.kt sample
+    val claims = SdJwtParser.parse(rawSdJwt)
+    Log.d("TAG", "Parsed Claims: ${claims.toString(2)}")
+
+    // 4. Create your VerifiedUserInfo object with REAL data
+    val userInfo = VerifiedUserInfo(
+        email = claims.getString("email"),
+        displayName = claims.optString("name", claims.getString("email"))
+    )
+
+## Handle the response
+
+The Credential Manager API will return a [`DigitalCredential`](https://developer.android.com/reference/androidx/credentials/DigitalCredential)
+response.
+
+The following is an example of what the raw `responseJsonString` looks like, and
+what the claims look like after parsing the inner SD-JWT where you get
+additional metadata as well along with verified email:
+
+    /*
+    // Example of the raw JSON response from credential.credentialJson:
+    {
+      "vp_token": {
+        // This key matches the 'id' you set in your dcql_query
+        "user_info_query": [
+          // The SD-JWT string (Issuer JWT ~ Disclosures ~ Key Binding JWT)
+          "eyJhbGciOiJ...~WyI...IiwgImVtYWlsIiwgInVzZXJAZXhhbXBsZS5jb20iXQ~...~eyJhbGciOiJ..."
+        ]
+      }
+    }
+
+    // Example of the parsed and verified claims from the SD-JWT on your server:
+    {
+      "cnf": {
+        "jwk": {..}
+      },
+      "exp": 1775688222,
+      "iat": 1775083422,
+      "iss": "https://verifiablecredentials-pa.googleapis.com",
+      "vct": "UserInfoCredential",
+      "email": "jane.doe.246745@gmail.com",
+      "email_verified": true,
+      "given_name": "Jane",
+      "family_name": "Doe",
+      "name": "Jane Doe",
+      "picture": "http://example.com/janedoe/me.jpg",
+      "hd": ""
+    }
+     */
+
+> [!NOTE]
+> **Note:** We highly recommend that after receiving the verified email, you trigger Credential Manager's [passkey creation](https://developer.android.com/identity/credential-manager/passkeys/create-passkeys).
+
+## Server-side validation for account creation
+
+Since the retrieved email is cryptographically verified, you can omit the email
+OTP verification step, significantly reducing sign-up friction and potentially
+increasing conversion. This process is best handled on your server. The client
+sends the raw response (containing the `vp_token`) and the original nonce to a
+new server endpoint.
+
+For verification, your application must send the full `responseJsonString` to
+your server for cryptographic validation before creating an account or logging
+the user in.
+
+The digital credential provides two critical levels of verification for your
+server:
+
+- **Authenticity of the data** : Verifying the issuer (`iss`) URL and the `SD-JWT` signature proves that a trusted authority issued this data.
+- **Identity of the presenter** : Verifying the `cnf` field and the Key Binding (`kb`) signature confirms that the credential is being shared by the same device it was originally issued to, preventing it from being intercepted or used on another device.
+
+The validation on the server must achieve the following:
+
+- **Verify issuer** : Ensure the `iss` (issuer) field matches `https://verifiablecredentials-pa.googleapis.com`.
+- **Verify signature**: Check the signature of the SD-JWT using the public keys (JWKs) available at https://verifiablecredentials-pa.googleapis.com/.well-known/vc-public-jwks.
+
+> [!NOTE]
+> **Note:** Use a standard library (such as [@sd-jwt/sd-jwt-vc](https://datatracker.ietf.org/doc/rfc9901/) for Node.js) to perform the verification steps as outlined in the [OpenID for Verifiable
+> Presentations specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html).
+
+For full security, make sure that you also validate the `nonce` to prevent
+replay attacks.
+
+By combining these steps, your server can validate both the authenticity of the
+data and the identity of the presenter, ensuring the credential wasn't
+intercepted or spoofed before provisioning the new account.
+
+    try {
+        // Send the raw credential response and the original nonce to your server.
+        // Your server must validate the response. createAccountWithVerifiedCredentials
+        // is a custom implementation per each RP for server side verification and account creation.
+        val serverResponse = createAccountWithVerifiedCredentials(responseJsonString, nonce)
+
+        // Server returns the new account info (e.g., email, name)
+        val claims = JSONObject(serverResponse.json)
+
+        val userInfo = VerifiedUserInfo(
+            email = claims.getString("email"),
+            displayName = claims.optString("name", claims.getString("email"))
+        )
+
+        // handle response - Up to the developer
+    } catch (e: Exception) {
+        // handle exceptions - Up to the developer
+    }
+
+## Passkey creation
+
+An optional but highly recommended next step after provisioning an account is to
+immediately [create a passkey](references/android/identity/passkeys/create-passkeys.md) for that account. This provides a secure,
+passwordless method for the user to sign in. This flow is identical to a
+standard passkey registration.
+
+## WebView support
+
+For the flow to work on a WebView, developers should implement a [JavaScript
+bridge](references/android/identity/sign-in/credential-manager-webview.md) (JS Bridge) to facilitate the handoff. This bridge allows the
+Webview to signal the native app, which can then perform the actual call
+to the Credential Manager API.
+
+## See also
+
+- [Overview of verified email retrieval](references/android/identity/digital-credentials/email-verification.md)
+- [Credential Manager](references/android/identity/credential-manager/index.md)
+
+## Critical Security Guidelines
+
+To maintain the integrity of the email verification flow, the following security
+requirements are mandatory:
+
+- **Server-side Validation** : Never trust claims parsed on the client for security-sensitive operations like account creation. Send the complete, raw `responseJsonString` and the original `nonce` to the app's server for full verification.
+- **Nonce Integrity** : Generate a unique, cryptographically secure nonce for every request and **never** reuse a nonce across multiple requests to prevent replay attacks.
+- **Cryptographic Checks** : The app's server must validate the issuer (`iss`) field, the SD-JWT signature, and the presenter identity using the `cnf` field.
+
+---
+
+# Inlined references
+
+## references/android/identity/credential-manager/index.md
+
+[Credential Manager](https://developer.android.com/reference/kotlin/androidx/credentials/package-summary) is the recommended Jetpack API for credential exchange
+in Android apps. The Credential Manager API streamlines credential exchange
+across form factors for use cases spanning authentication and authorization. You
+can also use Credential Manager to handle digital credentials and restore user
+credentials on new Android devices.
+
+## Credential Manager features
+
+Credential Manager streamlines the sign-in process and enhances security by
+offering a robust set of capabilities, including:
+
+- **Support for various authentication mechanisms** : Enables users to sign up or sign in to your app using:
+  - [Passkeys](https://developer.android.com/identity/passkeys)
+  - [Sign-in with Google](https://developer.android.com/identity/sign-in/credential-manager-siwg) and other federated sign-in mechanisms
+  - [Passwords](https://developer.android.com/identity/passwords)
+  - [Digital credentials](https://developer.android.com/identity/digital-credentials)
+- **Cross-device credential restore** : Provides integration with [Restore
+  Credentials](https://developer.android.com/identity/sign-in/restore-credentials), allowing users to seamlessly start using your app on a new device.
+- **Seamless integration with credential providers** : Offers support for [credential providers](https://developer.android.com/identity/sign-in/credential-provider), including password managers such as Google Password Manager.
+- **Credential management**: Enables updating the metadata for user credentials, helping to keep credentials consistent across your app and credential providers.
+- **WebView compatibility** : Works with apps that use [WebView](https://developer.android.com/identity/sign-in/credential-manager-webview).
+- **Autofill integration** : Integrates with [autofill](https://developer.android.com/identity/autofill/credential-manager-autofill) to display credentials within the autofill UI.
+
+## Benefits of using Credential Manager
+
+Adopting Credential Manager provides several key advantages for both your
+application and your users:
+
+- **Enhanced security**: Passkeys offer enhanced security and protect users from phishing attempts.
+- **Support for various form factors** : The APIs work across Android [form
+  factors](https://developer.android.com/identity/form-factors), including mobile, Android XR, and Wear OS devices.
+- **Simplified authentication across use cases** : [Digital credentials](https://developer.android.com/identity/digital-credentials), such as digital driver's licenses, corporate IDs, and national ID cards, enable authentication across various use cases, including those requiring [phone number verification](https://developer.android.com/identity/digital-credentials/phone-number-verification).
+- **Improved user experience**: Credential Manager's unified interface gives users a familiar and consistent experience and improves registration and sign-in speeds. The bottom sheet UI appears inline to your app's content, so your users remain within your app's context during sign-in. The following image shows Credential Manager's built-in UI:
+
+![The Credential Manager user interface for passkeys, passwords, and federated sign-ins](https://developer.android.com/static/identity/credential-manager/images/credman-ui.png) **Figure 1.**Credential Manager's built-in unified interface for passkeys, passwords, and federated sign-ins
+
+## Authentication terminology
+
+An entity that requires authentication for its users is known as a **relying
+party**. An authentication workflow typically includes the following components:
+
+- **Relying party client app**: The client---in this case, your Android app---that handles the user interface to create and use passkeys.
+- **Relying party server**: An app server that helps with the creation, storage, and verification of passkeys.
+- **Credential provider** : A component that stores and provides user credentials, such as Google Password Manager. Note that the [FIDO documentation](https://fidoalliance.org/passkeys/) refers to credential providers as credential managers.
+
+## Credential storage
+
+Credential providers, such as Google Password Manager, provide a centralized and
+secure location for users to manage credentials across their devices, further
+simplifying the authentication process. To integrate with Credential Manager as
+a credential provider, see
+[Implement authentication as a credential provider](https://developer.android.com/identity/sign-in/credential-provider).
+
+For more information about how Google Password Manager keeps your credentials
+secure, see
+[Security of Passkeys in the Google Password Manager](https://security.googleblog.com/2022/10/SecurityofPasskeysintheGooglePasswordManager.html).
+
+## Migrate to Credential Manager
+
+Credential Manager is intended to replace legacy Android authentication APIs and
+local FIDO2 credentials. For more information about migrating to Credential
+Manager, see the following guides:
+
+- [Google Sign-In](https://developer.android.com/identity/sign-in/legacy-gsi-migration)
+- [One Tap](https://developer.android.com/identity/legacy/one-tap)
+- [Smart Lock for Passwords](https://developer.android.com/identity/sign-in/smart-lock-migration)
+- [FIDO2](https://developer.android.com/identity/sign-in/fido2-migration)
+
+## references/android/identity/digital-credentials/credential-verifier.md
+
+Digital credential verification within Android apps can be used to authenticate
+and authorize a user's identity (such as a government ID), properties about that
+user (such as a driver's license, academic degree, or attributes such as age or
+address), or other scenarios where a credential needs to be issued and verified
+to assert the authenticity of an entity.
+
+Digital Credentials is a public W3C standard that specifies how to access a
+user's verifiable digital credentials from a digital wallet, and is implemented
+for web use cases with the [W3C Credential Management API](https://www.w3.org/TR/credential-management-1/). On
+Android, Credential Manager's [`DigitalCredential`](https://developer.android.com/reference/kotlin/androidx/credentials/DigitalCredential) API is used for
+verifying digital credentials.
+
+### Android version compatibility
+
+The Verifier API is supported on Android 9 (API level 28) and higher.
+
+### Implementation
+
+To verify digital credentials in your Android project, do the following:
+
+1. Add dependencies to your app's build script and initialize a `CredentialManager` class.
+2. Construct a digital credential request and use it to initialize a `DigitalCredentialOption`, followed by building the `GetCredentialRequest`.
+3. Launch the `getCredential` flow with the constructed request to receive a successful `GetCredentialResponse` or handle any exceptions that may occur. Upon successful retrieval, validate the response.
+
+#### Add dependencies and initialize
+
+Add the following dependencies to your Gradle build script:
+
+    dependencies {
+        implementation("androidx.credentials:credentials:1.6.0-beta01")
+        implementation("androidx.credentials:credentials-play-services-auth:1.6.0-beta01")
+    }
+
+Next, Initialize an instance of the `CredentialManager` class.
+
+    val credentialManager = CredentialManager.create(context)
+
+#### Construct a digital credential request
+
+Construct a digital credential request and use it to initialize a
+`DigitalCredentialOption`.
+
+    // The request in the JSON format to conform with
+    // the JSON-ified Credential Manager - Verifier API request definition.
+    val requestJson = generateRequestFromServer()
+    val digitalCredentialOption =
+        GetDigitalCredentialOption(requestJson = requestJson)
+
+    // Use the option from the previous step to build the `GetCredentialRequest`.
+    val getCredRequest = GetCredentialRequest(
+        listOf(digitalCredentialOption)
+    )
+
+Here is an example of an OpenId4Vp request. A full reference can be found at
+this [website](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html).
+
+    {
+      "requests": [
+        {
+          "protocol": "openid4vp-v1-unsigned",
+          "data": {
+            "response_type": "vp_token",
+            "response_mode": "dc_api",
+            "nonce": "OD8eP8BYfr0zyhgq4QCVEGN3m7C1Ht_No9H5fG5KJFk",
+            "dcql_query": {
+              "credentials": [
+                {
+                  "id": "cred1",
+                  "format": "mso_mdoc",
+                  "meta": {
+                    "doctype_value": "org.iso.18013.5.1.mDL"
+                  },
+                  "claims": [
+                    {
+                      "path": [
+                        "org.iso.18013.5.1",
+                        "family_name"
+                      ]
+                    },
+                    {
+                      "path": [
+                        "org.iso.18013.5.1",
+                        "given_name"
+                      ]
+                    },
+                    {
+                      "path": [
+                        "org.iso.18013.5.1",
+                        "age_over_21"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+
+#### Get the credential
+
+Launch the `getCredential` flow with the constructed request. You will receive
+either a successful `GetCredentialResponse`, or a `GetCredentialException` if
+the request fails.
+
+The `getCredential` flow triggers Android system dialogs to present the user's
+available credential options and collect their selection. Next, the wallet app
+that contains the chosen credential option will display UIs to collect consent
+and perform actions needed to generate a digital credential response.
+
+    coroutineScope.launch {
+        try {
+            val result = credentialManager.getCredential(
+                context = activityContext,
+                request = getCredRequest
+            )
+            verifyResult(result)
+        } catch (e : GetCredentialException) {
+            handleFailure(e)
+        }
+    }
+
+    // Handle the successfully returned credential.
+    fun verifyResult(result: GetCredentialResponse) {
+        val credential = result.credential
+        when (credential) {
+            is DigitalCredential -> {
+                val responseJson = credential.credentialJson
+                validateResponseOnServer(responseJson)
+            }
+            else -> {
+                // Catch any unrecognized credential type here.
+                Log.e(TAG, "Unexpected type of credential ${credential.type}")
+            }
+        }
+    }
+
+    // Handle failure.
+    fun handleFailure(e: GetCredentialException) {
+      when (e) {
+            is GetCredentialCancellationException -> {
+                // The user intentionally canceled the operation and chose not
+                // to share the credential.
+            }
+            is GetCredentialInterruptedException -> {
+                // Retry-able error. Consider retrying the call.
+            }
+            is NoCredentialException -> {
+                // No credential was available.
+            }
+            is CreateCredentialUnknownException -> {
+                // An unknown, usually unexpected, error has occurred. Check the
+                // message error for any additional debugging information.
+            }
+            is CreateCredentialCustomException -> {
+                // You have encountered a custom error thrown by the wallet.
+                // If you made the API call with a request object that's a
+                // subclass of CreateCustomCredentialRequest using a 3rd-party SDK,
+                // then you should check for any custom exception type constants
+                // within that SDK to match with e.type. Otherwise, drop or log the
+                // exception.
+            }
+            else -> Log.w(TAG, "Unexpected exception type ${e::class.java}")
+        }
+    }
+
+## references/android/identity/digital-credentials/email-verification-implementation.md
+
+This guide describes how to implement verified email retrieval using the
+[Digital Credentials Verifier API](https://developer.android.com/identity/digital-credentials/credential-verifier) through an [OpenID for Verifiable
+Presentations (OpenID4VP)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) request.
+
+## Add dependencies
+
+In your app's `build.gradle` file, add the following dependencies for Credential
+Manager:
+
+### Kotlin
+
+```kotlin
+dependencies {
+    implementation("androidx.credentials:credentials:1.7.0-alpha02")
+    implementation("androidx.credentials:credentials-play-services-auth:1.7.0-alpha02")
+}
+```
+
+### Groovy
+
+```groovy
+dependencies {
+    implementation "androidx.credentials:credentials:1.7.0-alpha02"
+    implementation "androidx.credentials:credentials-play-services-auth:1.7.0-alpha02"
+}
+```
+
+## Initialize Credential Manager
+
+Use your app or activity context to create a `CredentialManager` object.
+
+    // Use your app or activity context to instantiate a client instance of
+    // CredentialManager.
+    private val credentialManager = CredentialManager.create(context)
+
+## Construct the Digital Credential request
+
+To request a verified email, construct a [`GetCredentialRequest`](https://developer.android.com/reference/android/credentials/GetCredentialRequest)
+containing a [`GetDigitalCredentialOption`](https://developer.android.com/reference/androidx/credentials/GetDigitalCredentialOption). This option requires a
+`requestJson` string formatted as an OpenID for Verifiable Presentations
+(OpenID4VP) request.
+
+The OpenID4VP request JSON must follow a specific structure. The current
+providers support a JSON structure with an outer `"digital": {"requests":
+[...]}` wrapper.
+
+        val nonce = generateSecureRandomNonce()
+
+        // This request follows the OpenID4VP spec
+        val openId4vpRequest = """
+    {
+      "requests": [
+        {
+          "protocol": "openid4vp-v1-unsigned",
+          "data": {
+            "response_type": "vp_token",
+            "response_mode": "dc_api",
+            "nonce": "$nonce",
+            "dcql_query": {
+              "credentials": [
+                {
+                  "id": "user_info_query",
+                  "format": "dc+sd-jwt",
+                   "meta": { 
+                      "vct_values": ["UserInfoCredential"] 
+                   },
+                  "claims": [ 
+                    {"path": ["email"]}, 
+                    {"path": ["name"]},  
+                    {"path": ["given_name"]},
+                    {"path": ["family_name"]},
+                    {"path": ["picture"]},
+                    {"path": ["hd"]},
+                    {"path": ["email_verified"]}
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+    """
+
+        val getDigitalCredentialOption = GetDigitalCredentialOption(requestJson = openId4vpRequest)
+        val request = GetCredentialRequest(listOf(getDigitalCredentialOption))
+
+The request contains the following key information:
+
+- **DCQL query** : The `dcql_query` specifies the credential type and the
+  claims being requested (`email_verified`). You can request other claims to
+  determine the level of verification. A few possible claims are as follows:
+
+  - `email_verified`: In the response, this is a Boolean that indicates whether the email is verified.
+  - `hd` (hosted domain): In the response, this is empty.
+
+  > [!NOTE]
+  > **Note:** If `email_verified` is `true` and `hd` is empty in the response, it implies that the account is an authorized Google Account. Currently, Google does not issue [verifiable credentials](https://developer.android.com/identity/digital-credentials#verifiable-credentials) for Google Workspace Accounts. However, the `hd` field is present in verifiable credentials issued for non-workspace accounts. You are encouraged to implement handling this field to future-proof your app.
+
+- If the email is non-@gmail.com, Google verified this email when the Google
+  Account was created, but there is no freshness claim. Therefore, for
+  non-Google emails, you should consider an additional challenge, such as an
+  OTP, to verify the user. To understand the schema of the credential and the
+  specific rules for validating fields like `email_verified`, refer to the
+  [Google Identity guides](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+
+- **nonce**: A unique, cryptographically secure random value is generated for
+  each request. This is critical for security, as it prevents replay attacks.
+
+- `UserInfoCredential`: This value implies a specific type of digital
+  credential that contains user attributes. Including this in the request is
+  pivotal to distinguish the email verification use case.
+
+Next, wrap the `openId4vpRequest` JSON in a `GetDigitalCredentialOption`, create
+a `GetCredentialRequest`, and call `getCredential()`.
+
+## Present the request to the user
+
+Present the user with the request, using the Credential Manager built-in UI.
+
+    try {
+        // Requesting Digital Credential from user...
+        val result = credentialManager.getCredential(activity, request)
+
+        when (val credential = result.credential) {
+            is DigitalCredential -> {
+                val responseJsonString = credential.credentialJson
+
+                // Successfully received digital credential response.
+
+                // Next, parse this response and send it to your server.
+                // ...
+            }
+
+            else -> {
+                // handle Unexpected State() - Up to the developer
+            }
+        }
+    } catch (e: Exception) {
+        // handle exceptions - Up to the developer
+    }
+
+> [!NOTE]
+> **Note:** There is no equivalent of Sign in with Google's `preferImmediatelyAvailableCredentials` for Digital Credentials. If no verifiable credential is found (for example, no eligible account on device), the user will be shown a "No options available" or similar system screen.
+
+## Parse the response on the client
+
+After receiving the response, you can perform a preliminary parse on the client.
+This is useful for immediately updating the UI, for example, by showing the
+user's name.
+
+> [!IMPORTANT]
+> **Important:** This step is not for validation. Full cryptographic verification must be performed on your server.
+
+The following code extracts the raw [Selective Disclosure JWT
+(SD-JWT)](https://datatracker.ietf.org/doc/rfc9901/) and uses a helper to decode its claims.
+
+    // 1. Parse the outer JSON wrapper to get the `vp_token`
+    val responseData = JSONObject(responseJsonString)
+    val vpToken = responseData.getJSONObject("vp_token")
+
+    // 2. Extract the raw SD-JWT string
+    val credentialId = vpToken.keys().next()
+    val rawSdJwt = vpToken.getJSONArray(credentialId).getString(0)
+
+    // 3. Use your parser to get the verified claims
+    // Server-side validation/parsing is highly recommended.
+
+    // Assumes a local parser like the one in our SdJwtParser.kt sample
+    val claims = SdJwtParser.parse(rawSdJwt)
+    Log.d("TAG", "Parsed Claims: ${claims.toString(2)}")
+
+    // 4. Create your VerifiedUserInfo object with REAL data
+    val userInfo = VerifiedUserInfo(
+        email = claims.getString("email"),
+        displayName = claims.optString("name", claims.getString("email"))
+    )
+
+## Handle the response
+
+The Credential Manager API will return a [`DigitalCredential`](https://developer.android.com/reference/androidx/credentials/DigitalCredential)
+response.
+
+The following is an example of what the raw `responseJsonString` looks like, and
+what the claims look like after parsing the inner SD-JWT where you get
+additional metadata as well along with verified email:
+
+    /*
+    // Example of the raw JSON response from credential.credentialJson:
+    {
+      "vp_token": {
+        // This key matches the 'id' you set in your dcql_query
+        "user_info_query": [
+          // The SD-JWT string (Issuer JWT ~ Disclosures ~ Key Binding JWT)
+          "eyJhbGciOiJ...~WyI...IiwgImVtYWlsIiwgInVzZXJAZXhhbXBsZS5jb20iXQ~...~eyJhbGciOiJ..."
+        ]
+      }
+    }
+
+    // Example of the parsed and verified claims from the SD-JWT on your server:
+    {
+      "cnf": {
+        "jwk": {..}
+      },
+      "exp": 1775688222,
+      "iat": 1775083422,
+      "iss": "https://verifiablecredentials-pa.googleapis.com",
+      "vct": "UserInfoCredential",
+      "email": "jane.doe.246745@gmail.com",
+      "email_verified": true,
+      "given_name": "Jane",
+      "family_name": "Doe",
+      "name": "Jane Doe",
+      "picture": "http://example.com/janedoe/me.jpg",
+      "hd": ""
+    }
+     */
+
+> [!NOTE]
+> **Note:** We highly recommend that after receiving the verified email, you trigger Credential Manager's [passkey creation](https://developer.android.com/identity/credential-manager/passkeys/create-passkeys).
+
+## Server-side validation for account creation
+
+Since the retrieved email is cryptographically verified, you can omit the email
+OTP verification step, significantly reducing sign-up friction and potentially
+increasing conversion. This process is best handled on your server. The client
+sends the raw response (containing the `vp_token`) and the original nonce to a
+new server endpoint.
+
+For verification, your application must send the full `responseJsonString` to
+your server for cryptographic validation before creating an account or logging
+the user in.
+
+The digital credential provides two critical levels of verification for your
+server:
+
+- **Authenticity of the data** : Verifying the issuer (`iss`) URL and the `SD-JWT` signature proves that a trusted authority issued this data.
+- **Identity of the presenter** : Verifying the `cnf` field and the Key Binding (`kb`) signature confirms that the credential is being shared by the same device it was originally issued to, preventing it from being intercepted or used on another device.
+
+The validation on the server must achieve the following:
+
+- **Verify issuer** : Ensure the `iss` (issuer) field matches `https://verifiablecredentials-pa.googleapis.com`.
+- **Verify signature**: Check the signature of the SD-JWT using the public keys (JWKs) available at https://verifiablecredentials-pa.googleapis.com/.well-known/vc-public-jwks.
+
+> [!NOTE]
+> **Note:** Use a standard library (such as [@sd-jwt/sd-jwt-vc](https://datatracker.ietf.org/doc/rfc9901/) for Node.js) to perform the verification steps as outlined in the [OpenID for Verifiable
+> Presentations specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html).
+
+For full security, make sure that you also validate the `nonce` to prevent
+replay attacks.
+
+By combining these steps, your server can validate both the authenticity of the
+data and the identity of the presenter, ensuring the credential wasn't
+intercepted or spoofed before provisioning the new account.
+
+    try {
+        // Send the raw credential response and the original nonce to your server.
+        // Your server must validate the response. createAccountWithVerifiedCredentials
+        // is a custom implementation per each RP for server side verification and account creation.
+        val serverResponse = createAccountWithVerifiedCredentials(responseJsonString, nonce)
+
+        // Server returns the new account info (e.g., email, name)
+        val claims = JSONObject(serverResponse.json)
+
+        val userInfo = VerifiedUserInfo(
+            email = claims.getString("email"),
+            displayName = claims.optString("name", claims.getString("email"))
+        )
+
+        // handle response - Up to the developer
+    } catch (e: Exception) {
+        // handle exceptions - Up to the developer
+    }
+
+## Passkey creation
+
+An optional but highly recommended next step after provisioning an account is to
+immediately [create a passkey](https://developer.android.com/identity/passkeys/create-passkeys) for that account. This provides a secure,
+passwordless method for the user to sign in. This flow is identical to a
+standard passkey registration.
+
+## WebView support
+
+For the flow to work on a WebView, developers should implement a [JavaScript
+bridge](https://developer.android.com/identity/sign-in/credential-manager-webview) (JS Bridge) to facilitate the handoff. This bridge allows the
+Webview to signal the native app, which can then perform the actual call
+to the Credential Manager API.
+
+## See also
+
+- [Overview of verified email retrieval](https://developer.android.com/identity/digital-credentials/email-verification)
+- [Credential Manager](https://developer.android.com/identity/credential-manager)
+
+## references/android/identity/digital-credentials/email-verification.md
+
+This document describes using Credential Manager to get a cryptographically
+verified email address from a user's device. This process removes the need for
+your app users to verify their email with one-time passwords (OTPs) or magic
+links.
+
+This document explains the following areas:
+
+- Android compatibility
+- User experience
+- Accounts supported
+- Implication of email deliverability
+- Comparison with [Sign in with Google](https://developer.android.com/identity/sign-in/credential-manager-siwg)
+
+This guide assumes you are familiar with the following concepts:
+
+- [Credential Manager](https://developer.android.com/identity/credential-manager)
+- [Digital Credentials](https://developer.android.com/identity/digital-credentials)
+- [Verifiable Credentials](https://developer.android.com/identity/digital-credentials#verifiable-credentials)
+
+## Android compatibility
+
+This feature is supported on mobiles, tablets, and foldable devices running
+Android 9 (API level 28) and higher. The minimum version of Google Play services
+(GMS) required is 25.49.x.
+
+## User experience
+
+The following sections describe the user experience during the verification
+flow, the need to include fallback verification methods, as well as the
+recommended user experience for various use cases.
+
+### The verification flow
+
+The user experience for sharing a verified email is as follows:
+
+1. The user either focuses on an input field or taps a button that calls the
+   Credential Manager API. Depending on the design of the screen, you can also
+   call the API on your app's screen load.
+
+2. A bottom sheet appears, showing the information that will be shared with the
+   app. If no information is available on that device, the user sees a generic
+   error message.
+
+3. After the user taps **Agree and Continue**, display a success or failure
+   message.
+
+   > [!NOTE]
+   > **Note:** If the verified email you receive does not match what you expect, inform the user about the mismatch and either ask them to try again with a different credential or provide an alternate verification method, such as through OTPs.
+
+4. (Optional, recommended) If the user is signing up for your service, you
+   should prompt the user to [create](https://developer.android.com/identity/passkeys/create-passkeys) a [passkey](https://developer.android.com/identity/passkeys) to make it easier for
+   them to sign in subsequently.
+
+   > [!NOTE]
+   > **Note:** The email verification process doesn't automatically trigger passkey creation. However, it is highly recommended to include the steps for passkey creation. Passkeys help users by making it easier and more secure for them to sign in, and remove the need for the conventional username and password interaction.
+
+### Include primary and fallback flows
+
+To ensure a streamlined user experience, include the following options on
+screens that require email verification:
+
+- **Primary verification option**: An email field or button to trigger the Credential Manager API flow for quick verification.
+- **Alternate verification options**: A link or button for users to "Verify another way" or with "Other options" for manual email entry in case of failures, such as no information available on the device, or a mismatch between the retrieved and expected email. This should allow users to try verification with a different credential or by providing a manual OTP.
+
+### Use cases
+
+The following sections describe the recommended use cases, as well as the
+suggested user experience, for email verification.
+
+#### Sign up
+
+Users can immediately create an account with a verified email without a separate
+verification step. Optionally, prompt the user to add a passkey. If they opt to
+add a passkey, trigger the [passkey creation](https://developer.android.com/identity/passkeys/create-passkeys) flow.
+![Using email verification during sign up, and then creating passkeys](https://developer.android.com/static/identity/digital-credentials/images/signup_ux.png) Email verification during sign up
+
+#### Account recovery
+
+To eliminate the frustration of users searching for recovery codes in their spam
+folders, allow them to recover their account using the verified email securely
+stored on their device. Additionally, suggest that they create a passkey for
+future use.
+![Using email verification during account recovery](https://developer.android.com/static/identity/digital-credentials/images/account_recovery_ux.png) Email verification during account recovery
+
+#### Reauthentication for sensitive actions
+
+Protect sensitive user actions, such as changing settings or updating profile
+details, by requiring a quick reauthentication step.
+![Using email verification during reauthentication](https://developer.android.com/static/identity/digital-credentials/images/reauthentication_ux.png) Email verification during reauthentication
+
+## Accounts supported
+
+Email verification through Credential Manager only supports verification of
+consumer Google Accounts. [Workspace accounts](https://knowledge.workspace.google.com/admin/getting-started/set-up-google-workspace-for-your-organization) and [supervised
+accounts](https://support.google.com/families/answer/9499054) are not supported.
+
+A consumer Google Account can be created with an email address from any
+provider, not necessarily @gmail.com. However, Google verifies these accounts
+differently:
+
+- For @gmail.com accounts: Google is the authoritative source, and the email is known to be verified.
+- For non-@gmail.com accounts: Google is not the authoritative source for these email addresses in the long term. While Google verifies the email when the account is created, the ownership of that email address might change over time. Therefore, for non-@gmail.com addresses, you should consider an additional verification step, such as sending an OTP, to ensure that the user still has access to the email account.
+
+For more information about what verification implies, see [Digital
+Credentials](https://developer.android.com/identity/digital-credentials#verified).
+
+> [!NOTE]
+> **Note:** Apart from a user's email information, you can request other unverified fields, such as the user's given name, family name, name, and the profile picture of their Google Account. However, only the email is verified by Google.   
+> For phone number verification, see [Firebase Phone Number Verification](https://firebase.google.com/docs/phone-number-verification). Note that you can't request a phone number and email in the same invocation as these are separate capabilities.
+
+## Validity and freshness
+
+The system issues [verifiable credentials](https://developer.android.com/identity/digital-credentials#verified) (VCs) based on the user's current
+email from the active Google Accounts on the device. These credentials are
+issued to the device in advance, typically while the device is idle. While these
+credentials might remain valid for multiple days, the system performs a check at
+the moment of sharing the credentials to ensure that the account still exists,
+is on the device, and that the email address is valid---effectively prioritizing
+the account's immediate status over the credential's validity window.
+
+To help ensure authenticity, a Key Binding (kb) signature is generated at the
+time of sharing, incorporating the nonce.
+
+If a device is offline or the account is removed, the process fails rather than
+providing an expired VC or a VC for an inactive Google Account.
+
+### Email deliverability
+
+While the process confirms the account's legitimacy, it does not guarantee inbox
+delivery (for instance, the email might be diverted to spam). An OTP remains the
+definitive method for confirming email deliverability.
+
+## Comparison with Sign in with Google
+
+While both Digital Credentials and [Sign in with Google](https://developer.android.com/identity/sign-in/credential-manager-siwg) solutions provide a
+verified email, the user flows and use cases are different:
+
+- **Use cases**: The Credential Manager email verification flow is not exclusively used in sign up or sign in use cases, but rather can be used in any use case involving the retrieval of verified email. This could include account recovery as well.
+- **Registration**: The Credential Manager flow does not require Google registration, unlike Sign in with Google.
+- **Platform support**: The Credential Manager flow is an Android-only solution.
+- **Scopes** : Unlike Sign in with Google, which can use OAuth 2.0 to request access to user data (such as Calendar or Drive through scopes), the Digital Credentials API is strictly for retrieving verified identity attributes. It cannot be used to request additional [authorization scopes](https://developers.google.com/identity/protocols/oauth2/scopes).
+
+## Next steps
+
+To implement this feature in your app, see the [Implementation guide](https://developer.android.com/identity/digital-credentials/email-verification-implementation).
+
+## references/android/identity/digital-credentials/index.md
+
+Digital credentials are cryptographically verifiable documents that can be used
+to authenticate, authorize, or otherwise provide information about a user. These
+are typically things such as mobile driver's licenses, digital passports,
+boarding passes, etc. They reside in virtual containers called digital wallets,
+and are part of a W3C standard that specifies how to access and retrieve them.
+This standard is implemented for web use cases with the [W3C Credential
+Management API](https://www.w3.org/TR/credential-management-1/) and on Android, with Credential Manager's
+[DigitalCredential API](https://developer.android.com/reference/kotlin/androidx/credentials/DigitalCredential).
+
+## Understand digital credentials
+
+In the physical world, a person might keep their identity in their wallet, and
+present it to a requesting party when asked:
+![Image showing the flow of a normal wallet interaction](https://developer.android.com/static/identity/digital-credentials/images/normal_wallet_flowchart.svg) **Figure 1.** The process of fulfilling a physical-world credential request. The requestor asks the user for a specific credential. Then, the user selects and retrieves it from their physical wallet. Finally, the user provides the credential to the requestor.
+
+In this case, a user generally has a single wallet, and retrieves the requested
+credentials from the wallet to present to the requestor. Wallets are mostly
+interchangeable, and can generally store the same things.
+
+Digital credentials have the following differences from credentials in the
+physical world:
+
+1. Users are expected to have multiple wallets - also known as **holders** - which can contain various different credentials. Wallets determine which credentials may be stored inside of them.
+2. The app or service asking for the credential to grant access or verify an identity is called the **verifier**.
+3. The entity that creates the credential and asserts claims about the subject (such as, a university, a government, or a tech company) is referred to as the **issuer**.
+4. The credential presentation happens in software, which means an API surface retrieves and presents the credentials - in Android, this is Credential Manager.
+
+As such, Credential Manager takes on several roles that were formerly handled by
+the user:
+
+1. On Android, wallets must register their credentials metadata with Credential Manager to be listed in the Credential Manager UI.
+2. Credential Manager matches credentials across wallets based on the request and presents a list for the user to select.
+3. When the user selects a credential in the list, Credential Manager then invokes the wallet, which will handle the remainder of the transaction (showing UIs, etc.) and return the credential to the application.
+
+This flow is shown here:
+![Image showing the flow of a digital credential interaction](https://developer.android.com/static/identity/digital-credentials/images/digital_credentials_flowchart.svg) **Figure 2.** Interaction model for digital credential verification. Credential Manager uses pre-registered credentials metadata across user wallet(s) to match a verifier's request and prompts the user to select a credential. Credential Manager then directs the activity flow to the corresponding wallet which handles the remainder of the transaction and returns the credential to the verifier. Note: The verifier needs to handle and verify the credential response once it is returned.
+
+## Verifiable credentials
+
+Verifiable credentials are a subset of digital credentials governed by strict
+standards (like the W3C Verifiable Credentials Data Model). These credentials
+contain claims that are cryptographically secured, making them tamper-evident
+and proving exactly who issued them.
+
+Not all digital credentials are verifiable credentials, but all verifiable
+credentials are digital credentials.
+
+## What it means for a claim to be verified
+
+When a credential arrives through the Android Credential Manager API and a claim
+within it is marked as "verified," it implies that the issuer is asserting that
+they performed a check on that specific piece of data. However, it does not mean
+the data is an absolute, universal truth. "Verified" is an assertion of process,
+not an automatic guarantee of trust.
+
+The core philosophy of this ecosystem is that trust is always resolved at the
+verifier. When the verifier (your app) receives the cryptographically secure
+data, and sees that the issuer marked it as "verified," it must determine
+whether it trusts the issuer to have verified the claim to its standards.
+
+### User experience
+
+As shown in the Android flow, the user only needs to interact once with the
+Credential Manager UI to select the appropriate credential. Here is an example
+of how the selector looks:
+![Image showing the digital credentials UI in Credential Manager](https://developer.android.com/static/identity/digital-credentials/images/digital_credentials_ui.png) **Figure 3.** The digital credentials UI.
+
+### Standards
+
+Digital credentials requests are created using the [OpenID4VP
+standard](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-introduction). You can see example requests at the [Digital
+Credentials Demo site](https://digital-credentials.dev/).
+
+Digital credential responses are typically returned in a standardized credential
+format. These are maintained by different standards bodies, and include [W3C
+Verifiable Credentials](https://www.w3.org/TR/vc-data-model-2.0/), [sd-jwt](https://datatracker.ietf.org/doc/draft-ietf-oauth-selective-disclosure-jwt/), and
+[mdoc](https://www.iso.org/standard/69084.html).
+
+Custom protocols are also feasible, though we recommend using one of the
+standard protocols in your application.
+
+### Try it out
+
+You can test out the digital credentials flow across platforms with an Android
+wallet and web-based verifier:
+
+1. Install the [CMWallet public sample](https://github.com/digitalcredentialsdev/CMWallet) on your Android phone. You can do this by pulling from the repository and installing directly from Android Studio or navigating to <https://github.com/digitalcredentialsdev/CMWallet/actions> and selecting the latest build to access the latest `app-debug.apk` file.
+2. Open the CMWallet to register the metadata with Credential Manager. Make sure Bluetooth is enabled to allow your devices to connect to each other.
+3. Navigate to <https://digital-credentials.dev/> and select `Request Credentials (OpenID4VP)`.
+4. Accept the warning prompts and scan the QR Code with your phone, then select "Use passkey" and tap through the confirmation to show the available credentials.
+5. Select the credential from CMWallet to return to the browser. The browser should show the returned credential.
+
+### See also
+
+- To learn more about using Credential Manager to request digital credentials in your app, read the [Credential Manager - Verifier API](https://developer.android.com/identity/digital-credentials/credential-verifier) page.
+- To learn more about building a digital wallet using Credential Manager, read the [Credential Manager - Holder API](https://developer.android.com/identity/digital-credentials/credential-holder) page.
+
+## references/android/identity/passkeys/create-passkeys.md
+
+Before your users can authenticate with passkeys, your app must first register
+or create the passkey for their account.
+
+To create the passkey, obtain details required to create the passkey from your
+app server, and then call the Credential Manager API, which returns a public and
+private key pair. The returned private key is stored in a credential provider,
+such as Google Password Manager, as a passkey. The public key is stored on your
+app server.
+
+> [!TIP]
+> **Tip:** While designing authentication flows with passkeys, make sure that you follow the [UX guidelines for passkeys](https://developer.android.com/design/ui/mobile/guides/patterns/passkeys).
+
+![Passkeys are stored in a credential provider and public keys are stored on the app server](https://developer.android.com/static/identity/passkeys/images/create-passkeys.png) **Figure 1:**Creation of passkeys
+
+## Prerequisites
+
+Make sure that you have set up [Digital Asset Links](https://developer.android.com/identity/credential-manager/prerequisites) and that you target
+devices running Android 9 (API level 28) or higher.
+
+## Overview
+
+This guide focuses on the changes required in your [relying party client app](https://developer.android.com/identity/credential-manager#authentication-terminology)
+to create a passkey, and gives a brief overview of the [relying party app
+server](https://developer.android.com/identity/credential-manager#authentication-terminology) implementation. To learn more about the server-side integration, see
+[Server-side passkey registration](https://developers.google.com/identity/passkeys/developer-guides/server-registration).
+
+1. [**Add dependencies to your app**](https://developer.android.com/identity/passkeys/create-passkeys#add-dependencies): Add the required Credential Manager libraries.
+2. [**Instantiate Credential Manager**](https://developer.android.com/identity/passkeys/create-passkeys#instantiate): Create a Credential Manager instance.
+3. [**Get credential creation options from the app server**](https://developer.android.com/identity/passkeys/create-passkeys#get-options): From your app server, send the client app the details required to create the passkey, such as information about the app, the user, as well as a `challenge` and other fields.
+4. [**Request a passkey**](https://developer.android.com/identity/passkeys/create-passkeys#request-passkey): In your app, use the details received from the app server to create a [`GetPublicKeyCredentialOption`](https://developer.android.com/reference/androidx/credentials/GetPublicKeyCredentialOption) object and use this object to invoke the `credentialManager.getCredential()` method to create a passkey.
+5. [**Handle the passkey creation response**](https://developer.android.com/identity/passkeys/create-passkeys#handle-response): When you receive the credentials on your client app, you must encode, serialize and then send the public key to the app server. You must also handle each of the exceptions that can occur in case of passkey creation.
+6. [**Verify and save the public key on the server**](https://developer.android.com/identity/passkeys/create-passkeys#verify): Complete the server-side steps to verify the origin of the credential and then save the public key.
+7. [**Notify the user**](https://developer.android.com/identity/passkeys/create-passkeys#notify): Notify the user that their passkey has been created.
+
+> [!TIP]
+> **Tip:** To enhance the user experience during sign up, add functionality to [restore credentials](https://developer.android.com/identity/sign-in/restore-credentials) on a new device to let users seamlessly set up their existing accounts on new Android devices, and [suppressing autofill dialogs on
+> credential fields](https://developer.android.com/identity/passkeys/create-passkeys#suppress-autofill).
+
+## Add dependencies to your app
+
+Add the following dependencies to your app module's `build.gradle` file:
+
+### Kotlin
+
+```kotlin
+dependencies {
+    implementation("androidx.credentials:credentials:1.7.0-alpha02")
+    implementation("androidx.credentials:credentials-play-services-auth:1.7.0-alpha02")
+}
+```
+
+### Groovy
+
+```groovy
+dependencies {
+    implementation "androidx.credentials:credentials:1.7.0-alpha02"
+    implementation "androidx.credentials:credentials-play-services-auth:1.7.0-alpha02"
+}
+```
+
+> [!NOTE]
+> **Note:** Use the latest available versions of the dependencies. Versions of [`androidx.credentials`](https://developer.android.com/identity/passkeys/create-passkeys#automatic-upgrade) earlier than version 1.2 throw an `UnsupportedOperationException("Post-U not supported yet")` exception on Android 14.
+
+## Instantiate Credential Manager
+
+Use your app or activity context to create a `CredentialManager` object.
+
+    // Use your app or activity context to instantiate a client instance of
+    // CredentialManager.
+    private val credentialManager = CredentialManager.create(context)
+
+## Get credential creation options from your app server
+
+When the user clicks a "Create Passkey" button or when a new user signs up, make
+a request from your app to your app server to obtain the information required to
+start the passkey registration process.
+
+Use a FIDO-compliant library in your app server to send your client app the
+information required to create a passkey, such as information about the user,
+the app, and additional configuration properties. To learn more, see [Server
+side passkey registration](https://developers.google.com/identity/passkeys/developer-guides/server-registration).
+
+In the client app, decode the public key creation options sent by the app
+server. These are usually represented in JSON format. To learn more about how
+this decoding is done for web clients, see [Encoding and
+Decoding](https://developers.google.com/identity/passkeys/developer-guides/server-registration#encoding_and_decoding). For Android client apps, you must handle the decoding
+separately.
+
+> [!NOTE]
+> **Note:** On your app server, securely store the `challenge` so that you can later verify the origin of the credential.
+
+The following snippet shows the structure the public key creation options sent
+by the app server:
+
+    {
+      "challenge": "<base64url-encoded challenge>",
+      "rp": {
+        "name": "<relying party name>",
+        "id": "<relying party host name>"
+      },
+      "user": {
+        "id": "<base64url-encoded user ID>",
+        "name": "<user name>",
+        "displayName": "<user display name>"
+      },
+      "pubKeyCredParams": [
+        {
+          "type": "public-key",
+          "alg": -7
+        }
+      ],
+      "attestation": "none",
+      "excludeCredentials": [
+        {
+            "id": "<base64url-encoded credential ID to exclude>", 
+            "type": "public-key"
+        }
+      ],
+      "authenticatorSelection": {
+        "requireResidentKey": true,
+        "residentKey": "required",
+        "userVerification": "required"
+      }
+    }
+
+Key fields in the public key creation options include:
+
+- `challenge`: A server-generated random string that is used to prevent replay attacks.
+- `rp`: Details about the app.
+  - `rp.name`: The app's name.
+  - `rp.id`: The app's domain or subdomain.
+- `user`: Details about the user.
+  - `id`: The user's unique ID. This value must not include personally identifying information, for example, email addresses or usernames. You can use a random, 16-byte value.
+  - `name`: A unique identifier for the account that the user will recognise, such as their email address or username. This will be displayed in the account selector. If using a username, use the same value as in password authentication.
+  - `displayName`: An optional, user-friendly name for the account intended for display in the account selector.
+- `authenticatorSelection`: Details about the device that will be used for
+  authentication.
+
+  - `authenticatorAttachment`: Indicates the preferred [authenticator](https://www.w3.org/TR/webauthn/#authenticator). The possible values are as follows: - `platform`: This value is used for an authenticator built into the user's device, such as a fingerprint sensor. - `cross-platform`: This value is used for roaming devices such as security keys. It is not typically used in the passkey context. - Unspecified (recommended): Leaving this value unspecified provides users with the flexibility to create passkeys on their preferred devices. In most cases, leaving the parameter unspecified is the best option.
+    - `requireResidentKey`: To create a passkey, set the value of this `Boolean` field to `true`.
+    - `residentKey`: To create a passkey, set the value to `required`.
+    - `userVerification`: Used to specify the requirements for user verification during a passkey registration. The possible values are as follows: - `preferred`: Use this value if you prioritize user experience over protection, such as in environments where user verification causes more friction than protection. - `required`: Use this value if invoking a user verification method available on the device is required. - `discouraged`: Use this value if using a user verification method is discouraged.   
+      To learn more about `userVerification`, see [userVerification deep dive](https://web.dev/articles/webauthn-user-verification).
+- `excludeCredentials`: List credential IDs in an [array](https://w3c.github.io/webauthn/#dom-publickeycredentialcreationoptions-excludecredentials) to
+  prevent the creation of a duplicate passkey if one already exists with the
+  same credential provider.
+
+## Create a passkey
+
+After you have parsed the server-side public key creation options, create a
+passkey by wrapping these options in a `CreatePublicKeyCredentialRequest` object
+and calling `createCredential()`.
+
+The `createPublicKeyCredentialRequest` includes the following:
+
+- `requestJson`: The credential creation options sent by the app server.
+- `preferImmediatelyAvailableCredentials`: This is an optional Boolean field that defines whether to only use locally-available or credential provider-synced credentials to fulfill the request, instead of credentials from security keys or [hybrid](https://w3c.github.io/webauthn/#dom-authenticatortransport-hybrid) key flows. The possible usages are as follows:
+  - `false` (default): Use this value if the call to Credential Manager was triggered by an explicit user action.
+  - `true`: Use this value if Credential Manager is opportunistically called, such as when first opening the app.   
+    If you set the value to `true` and there are no immediately available credentials, Credential Manager won't show any UI and the request will fail immediately, returning NoCredentialException for get requests and [`CreateCredentialNoCreateOptionException`](https://developer.android.com/reference/kotlin/androidx/credentials/exceptions/CreateCredentialNoCreateOptionException) for create requests.
+- `origin`: This field is automatically set for Android apps. For browsers and similarly privileged apps that need to set `origin`, see [Make Credential
+  Manager calls on behalf of other parties for privileged apps](https://developer.android.com/training/sign-in/privileged-apps).
+- `isConditional`: This is an optional field that defaults to `false`. For more information, see [Automatically create a passkey](https://developer.android.com/identity/passkeys/create-passkeys#automatic-upgrade).
+
+Calling the `createCredential()` function launches Credential Manager's built-in
+bottom sheet UI that prompts the user to use a passkey and to select a
+credential provider and account for storage. However, if `isConditional` is set
+to `true`, the bottom sheet UI does not display, and the passkey is
+automatically created.
+
+### Automatically create a passkey
+
+You can automatically create a passkey for a user after a successful password
+login by setting the `isConditional` parameter to
+`true` in your `CreatePublicKeyCredentialRequest` while creating a passkey. If
+the user doesn't already have a passkey, your app will automatically attempt to
+create one in the background and store it in the user's credential provider,
+such as Google Password Manager. For an example of how this is implemented, see
+the [public sample](https://github.com/android/identity-samples/blob/main/Shrine/app/src/main/java/com/authentication/shrine/ui/AuthenticationScreen.kt#L98).
+![An example of the notification Google Password Manager shows after passkey creation](https://developer.android.com/static/identity/passkeys/images/conditional-create-gpm.svg) **Figure 2:**Google Password Manager notification
+
+> [!NOTE]
+> **Note:** If a passkey is created automatically, credential providers are responsible for notifying users about a newly created passkey. Google Password Manager notifies users when a passkey is automatically created. However, other credential providers might have their own conditions and notifications for this feature.
+
+## Handle the response
+
+After the user is verified using the device's screen lock, a passkey is created
+and stored in the user's selected credential provider.
+
+The response after you successfully call `createCredential()` is a
+[PublicKeyCredential](https://developer.android.com/jetpack/androidx/releases/credentials) object.
+
+The `PublicKeyCredential` looks as follows:
+
+    {
+      "id": "<identifier>",
+      "type": "public-key",
+      "rawId": "<identifier>",
+      "response": {
+        "clientDataJSON": "<ArrayBuffer encoded object with the origin and signed challenge>",
+        "attestationObject": "<ArrayBuffer encoded object with the public key and other information.>"
+      },
+      "authenticatorAttachment": "platform"
+    }
+
+In the client app, serialize the object and send it to the app server.
+
+Add code to handle failures as shown in the following snippet:
+
+    fun handleFailure(e: CreateCredentialException) {
+        when (e) {
+            is CreatePublicKeyCredentialDomException -> {
+                // Handle the passkey DOM errors thrown according to the
+                // WebAuthn spec.
+            }
+            is CreateCredentialCancellationException -> {
+                // The user intentionally canceled the operation and chose not
+                // to register the credential.
+            }
+            is CreateCredentialInterruptedException -> {
+                // Retry-able error. Consider retrying the call.
+            }
+            is CreateCredentialProviderConfigurationException -> {
+                // Your app is missing the provider configuration dependency.
+                // Most likely, you're missing the
+                // "credentials-play-services-auth" module.
+            }
+            is CreateCredentialCustomException -> {
+                // You have encountered an error from a 3rd-party SDK. If you
+                // make the API call with a request object that's a subclass of
+                // CreateCustomCredentialRequest using a 3rd-party SDK, then you
+                // should check for any custom exception type constants within
+                // that SDK to match with e.type. Otherwise, drop or log the
+                // exception.
+            }
+            else -> Log.w(TAG, "Unexpected exception type ${e::class.java.name}")
+        }
+    }
+
+## Verify and save the public key on the app server
+
+On the app server, you must verify the public key credential and then [save the
+public key](https://web.dev/articles/passkey-registration#save-credential).
+
+To verify the public key credential's origin, compare it against an allow list
+of approved apps. If a key has an unrecognized origin, reject it.
+
+> [!NOTE]
+> **Note:** An app's origin is based on its unique identity, which is the SHA-256 fingerprint of its signing certificate.
+
+To obtain the app's SHA 256 fingerprint:
+
+1. Print your release app's signing certificate by running the following
+   command in a terminal:
+
+       keytool -list -keystore <path-to-apk-signing-keystore>
+
+   In the response, identify the signing certificate's SHA 256 fingerprint,
+   mentioned as `Certificate fingerprints block` : `SHA256`.
+2. Encode the SHA256 fingerprint with base64url encoding. This Python example
+   demonstrates how to properly encode the fingerprint:
+
+       import binascii
+       import base64
+       fingerprint = '<SHA256 finerprint>' # your app's SHA256 fingerprint
+       print(base64.urlsafe_b64encode(binascii.a2b_hex(fingerprint.replace(':', ''))).decode('utf8').replace('=', ''))
+
+3. Append `android:apk-key-hash`: to the start of the output from the previous
+   step so that you get something that is similar to the following:
+
+       android:apk-key-hash:<encoded SHA 256 fingerprint>
+
+   The result should match with an allowed origin on your app server. If you
+   have multiple signing certificates, such as certificates for debugging and
+   release, or multiple apps, then repeat the process and accept all the
+   origins as valid on the app server.
+
+> [!NOTE]
+> **Note:** When you save the passkey on the app server, make sure that you save the Authenticator Attestation Globally Unique Identifier ([AAGUID](https://web.dev/articles/webauthn-aaguid)) from the client data. The AAGUID is a unique number that identifies the model of the authenticator. For more information, see [Manage passkeys](https://developer.android.com/identity/passkeys/manage-passkeys).
+
+## Notify the user
+
+After the passkey is successfully created, notify your users about the passkey
+and inform them that they can manage their passkeys from their credential
+provider app or from [within the app settings](https://developer.android.com/identity/passkeys/manage-passkeys). Notify users by using a
+custom dialog, notification, or snackbar. Since an unexpected passkey creation
+by a malicious entity requires an immediate security alert, consider
+supplementing these in-app methods with external communication, such as an
+email.
+
+## Enhance the user experience
+
+To enhance the user experience while implementing sign up with Credential
+Manager, consider adding functionality for restore credentials and suppress
+autofill dialogs.
+
+### Add functionality to restore credentials on a new device
+
+To allow users to seamlessly log into their accounts on a new device, implement
+the [Restore Credentials](https://developer.android.com/identity/sign-in/restore-credentials) functionality. Adding restore credentials with
+`BackupAgent` logs users in when they open your restored app on a new device,
+letting them use your app right away.
+
+### Suppress autofill on credential fields (optional)
+
+For app screens where users are expected to use Credential Manager's bottom
+sheet UI for authentication, add the `isCredential` attribute to the username
+and password fields. This suppresses autofill dialogs (`FillDialog` and
+`SaveDialog`) from overlapping with Credential Manager's bottom sheet UI.
+
+The `isCredential` attribute is supported on Android 14 and higher.
+
+The following example demonstrates how you can add the `isCredential` attribute
+to the relevant username and password fields in the relevant views for your app:
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+    android:isCredential="true" /\>
+
+## Next steps
+
+- [Sign in with passkeys](https://developer.android.com/identity/passkeys/sign-in-with-passkeys)
+- [Manage passkeys](https://developer.android.com/identity/passkeys/manage-passkeys)
+- [Understand passkey user experience flows](https://developer.android.com/design/ui/mobile/guides/patterns/passkeys)
+
+## references/android/identity/sign-in/credential-manager-webview.md
+
+This document describes how to integrate the Credential Manager API with an
+Android app that uses WebView. Credential Manager is supported natively in the
+`android.webkit.WebView` library in [version 1.12.0](https://developer.android.com/jetpack/androidx/releases/webkit#1.12.0) and later.
+
+## Prerequisites
+
+To use Credential Manager in WebView, add the following dependencies to your app
+module's build script:
+
+    dependencies {
+      implementation("androidx.credentials:credentials:1.6.0-beta02")   
+      implementation("androidx.credentials:credentials-play-services-auth:1.6.0-beta02")
+      implementation("androidx.webkit:webkit:1.14.0")
+    }
+
+You will also need to associate your app with a website that your app owns using
+digital asset linking. For more information, see
+[adding digital asset linking](https://developer.android.com/identity/credential-manager/prerequisites).
+
+## Use the WebKit library
+
+To use the WebKit library, check for feature support, and then enable support by
+calling `setWebAuthenticationSupport()`:
+
+    class WebViewActivity : ComponentActivity() {
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            setContent {
+                // Put your webview link here.
+                val url = "https://project-sesame-426206.appspot.com/passkey-signup"
+                AndroidView(
+                    factory = { context ->
+                        WebView(context).apply {
+                            settings.javaScriptEnabled = true
+
+                            webViewClient = WebViewClientImpl()
+                        }
+                    },
+                    update = { webView ->
+                        run {
+                            webView.loadUrl(url)
+                            if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
+                                WebSettingsCompat.setWebAuthenticationSupport(
+                                    webView.settings,
+                                    WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP,
+                                )
+                                // Check if getWebauthenticationSupport may have been disabled by the WebView.
+                                Log.e(
+                                    "WebViewPasskeyDemo",
+                                    "getWebAuthenticationSupport result: " + WebSettingsCompat.getWebAuthenticationSupport(
+                                        webView.settings
+                                    ),
+                                )
+                            } else {
+                                Log.e("WebViewPasskeyDemo", "WebView does not support passkeys.")
+                            }
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+> [!NOTE]
+> **Note:** The WebKit library doesn't support `mediation:"conditional"` requests.
+
+## Web integration
+
+To learn how to build Web integration see
+[Create a passkey for passwordless logins](https://web.dev/passkey-registration/).
+You can also reference the [demo site source](https://github.com/deephand/webauthn-in-webview).
+
+## Testing and deployment
+
+Test the entire flow thoroughly in a controlled environment to verify proper
+communication between the Android app, the web page, and the backend.
+
+Deploy the integrated solution to production, verifying that the backend can
+handle incoming registration and authentication requests. The backend code
+should generate initial JSON for registration (create) and authentication (get)
+processes. It should also handle validation and verification of the responses
+received from the web page.
+
+Verify the implementation corresponds to the [UX recommendations](https://developer.android.com/design/ui/mobile/guides/patterns/passkeys).
+

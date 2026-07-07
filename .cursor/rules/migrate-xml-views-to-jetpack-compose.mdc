@@ -1,0 +1,1233 @@
+---
+description: |-
+  Provides a structured workflow for migrating an Android XML View to Jetpack Compose. This skill details the step-by-step process, from planning and dependency setup, to theming and layout migration, validation and XML cleanup. Use this skill when you need to migrate an XML View to Jetpack Compose in an Android project. It solves the problem of converting the UI of a legacy XML View into modern, declarative Compose components while maintaining interoperability.
+alwaysApply: false
+---
+
+
+This skill guides through the process of migrating an existing Android XML View
+to Jetpack Compose. It performs a stable, safe and visually consistent
+transition by following a structured, 10-step methodology. This skill migrates
+UI (XML to Jetpack Compose) only.
+
+## Objective
+
+To systematically convert a single legacy XML layout into modern, declarative
+Jetpack Compose UI while maintaining pixel-perfect visual parity and functional
+integrity.
+
+## Summary of the 10-step migration process
+
+1. **Identify the optimal XML candidate for migration**
+2. **Analyze the project and layout**
+3. **Create a plan**
+4. **Capture the XML View UI**
+5. **Set up Compose dependencies and compiler**
+6. **Set up Compose theming**
+7. **Migrate the XML layout to Compose**
+8. **Validate the migration**
+9. **Replace usages**
+10. **XML code removal**
+
+## Detailed steps
+
+### Step 1: Identify the optimal XML candidate for migration
+
+If the user has explicitly specified a target XML layout, proceed to Step 2.
+Otherwise, analyze the codebase to identify the best candidate for migration by
+following the logic in [references/identify-optimal-xml-candidate.md](references/identify-optimal-xml-candidate.md).
+
+### Step 2: Analyze the project and layout
+
+Analyze the identified XML View's structure, hierarchy, and implementation
+details.
+Use [references/analysis-of-the-project-and-layout.md](references/analysis-of-the-project-and-layout.md) to
+guide your technical audit of the layout and surrounding project context.
+
+### Step 3: Create a plan
+
+Using the outputs and analysis done in the Step 1 and 2, generate a
+step-by-step plan for the migration. If you support user interaction, present
+to the user and ask for approval before proceeding. If user interaction is not
+supported, proceed to Step 4 following the generated plan.
+
+### Step 4: Capture the XML View UI
+
+**IF** you support user interaction, ask the user to upload a screenshot of the
+XML View UI or provide an absolute path to a file. Use this image as a visual
+reference for the layout migration in Step 7.
+**ELSE IF** you are able to run an Android emulator, locate an existing
+screenshot test for the XML candidate. If none exists, create one using the
+existing project testing framework. If no framework exists,
+use **UI Automator** or **Espresso** to create a screenshot test with minimum
+required setup. Run the test and take a baseline screenshot of the XML UI.
+**ELSE** proceed to Step 5.
+
+### Step 5: Set up Compose dependencies and compiler
+
+Check `build.gradle` or `libs.versions.toml` for Compose dependencies and
+compiler setup. If missing, use
+[Setup Compose Dependencies and Compiler](references/android/develop/ui/compose/setup-compose-dependencies-and-compiler.md).
+Run a sync to ensure dependencies resolve without errors.
+
+### Step 6: Set up Compose theming
+
+If the project already has Compose theming set up, proceed to Step 7. If Compose
+theming is missing, initialize it. For Material-based projects, follow
+[Material 3 migration guidelines](references/android/develop/ui/compose/designsystems/migrate-xml-theme-to-compose.md).
+For custom design systems, apply expert judgment to migrate XML theming and
+match existing styles.
+**Constraints:** Do not migrate the entire theme. Implement only the minimum
+theming required for the specific XML candidate. Maintain original XML themes
+for interoperability. Maintain existing project code conventions, patterns,
+names and values.
+
+### Step 7: Migrate the XML View to Compose
+
+Convert the XML candidate to Jetpack Compose code, referencing
+[references/xml-layout-migration.md](references/xml-layout-migration.md) and the image from Step 4.
+You must include a **Compose Preview** for the newly created composable to
+facilitate visual verification.
+
+### Step 8: Replace usages
+
+Replace the usages of the migrated XML layout to use the new Compose component.
+
+- To add Compose in Views, use [Compose in Views](references/android/develop/ui/compose/migrate/interoperability-apis/compose-in-views.md).
+- To add Views in Compose, use [Views in Compose](references/android/develop/ui/compose/migrate/interoperability-apis/views-in-compose.md).
+
+### Step 9: Validate the migration
+
+Compare the baseline screenshot image from Step 4 with the rendered Compose
+Preview of the new composable. Ignore string content; focus on layout and
+styling. Iterate on the Compose code until visual parity is achieved. Once
+verified, write a Compose UI test for the new composable.
+
+### Step 10: XML code removal
+
+Delete the migrated XML file and its associated legacy tests. **Caution:** Only
+remove code and resources that are not referenced by other parts of the project.
+
+---
+
+# Inlined references
+
+## references/analysis-of-the-project-and-layout.md
+
+## 1. Project health \& build validation
+
+Before performing any analysis, you must confirm the project is in a functional state.
+\* **Integrity check:** Verify the project syncs (Gradle) and builds successfully.
+\* **Error resolution:** If there are pre-existing build errors or sync failures, you must report these immediately and attempt to fix. **Do not proceed** with migration until a stable baseline is established.
+
+## 2. Compose pattern \& consistency analysis
+
+If Jetpack Compose is already present, you must align with the established implementation style.
+\* **Pattern identification:** Scan the codebase for `@Composable` functions. Identify the project's "Best Practices" regarding state hoisting, composable construction and naming conventions, and file organization.
+\* **Theming review:** Determine how `MaterialTheme` or custom theme systems are implemented.
+\* Identify if the project uses a custom design system theme.
+\* Map how attributes, styles, and other theme components are accessed in Compose.
+
+## 3. Design system \& infrastructure audit
+
+Understand the design system classification (e.g. Material 2, Material 3, or custom design system).
+\* **Resource mapping:** Locate central XML definitions:
+\* `colors.xml` (Light/Dark variants)
+\* `dimens.xml`
+\* `styles.xml` / `themes.xml`
+\* **Hybrid analysis:** Determine if the project is **XML-only** , **Compose-only** , or **Hybrid** .
+\* **Reuse constraint:** If a Compose theming layer (e.g., `AppTheme.kt`) already exists, **DO NOT** generate a new one. You must reuse the existing infrastructure and contribute to it by following its existing implementation pattern.
+
+## 4. Candidate layout decomposition
+
+Analyze the specific XML layout targeted for migration. You must extract and document the following requirements for the new composable:
+\* **Inputs:** UI State objects, primitive parameters, and click listeners.
+\* **Styling:** Specific color constants, typography styles, and shape definitions referenced in the XML.
+\* **Resources:** Identifying string resources, drawables, and dimensions.
+\* **Layout logic:** Modifiers required to replicate the XML constraints (padding, alignment, weight).
+
+## 5. Architectural \& non-UI analysis
+
+Understand the environment in which the UI resides to ensure proper integration.
+\* **State management:** Identify the usage of `ViewModel`, `Flow`, or `LiveData`.
+\* **Dependency Injection:** Check for Hilt, Koin, or manual DI to understand how dependencies are provided to the UI layer.
+\* **Testing \& architecture:** Note the architectural pattern (MVI, MVVM, or custom architecture setup.) and existing UI testing frameworks to ensure the migrated code remains testable. Unless the user explicitly requests, **DO NOT** make any changes to any non-UI code that aren't strictly required for the migration of the XML View.
+
+*** ** * ** ***
+
+> **Pro-tip:** Always prioritize the "Existing infrastructure" over "Default templates." If the project has a custom way of handling spacing or colors, composable code, or any other project layer, your generated Compose code must reflect that specific implementation.
+
+## references/android/develop/ui/compose/designsystems/migrate-xml-theme-to-compose.md
+
+When you introduce Compose in an existing app, you need to migrate your Material
+XML themes to use `MaterialTheme` for Compose components. This means your app's
+theming will have two sources of truth: the View-based theme and the Compose
+theme. Any changes to your styling need to be made in multiple places. Once
+your app is fully migrated to Compose, remove your XML theming.
+
+You can use the [Material Theme Builder](https://m3.material.io/theme-builder)
+tool for migrating colors.
+
+When you start the migration from XML to Compose, migrate the theming to
+Material 3 Compose theming.
+
+## Glossary
+
+| Term | Definition |
+|---|---|
+| `MaterialTheme` | The composable function that provides theming (colors, typography, shapes) to Compose UI components. |
+| `Shapes` | A Compose object used to define custom component shapes for a `MaterialTheme`. |
+| `Typography` | A Compose object used to define custom text styles (font families, sizes, weights) for a `MaterialTheme`. |
+| `ColorScheme` | A Compose object used to define custom color schemes for `MaterialTheme`. |
+| XML Theme | The Android theming system defined in XML files, used by the View system. |
+
+## Limitations
+
+Before migrating, be aware of the following limitations:
+
+- This guide focuses on migrating to Material 3 only. For migrating from alternative design systems, see [Material 2](https://developer.android.com/develop/ui/compose/designsystems/material) or [Custom design systems in Compose](https://developer.android.com/develop/ui/compose/designsystems/custom).
+- The ultimate goal is a complete migration to Compose, which allows for the removal of XML theming. This guide explains how to migrate, but it doesn't explain how to finally remove XML theming.
+
+## Step 1: Evaluate the design system
+
+Identify which design system is used in the XML View project.
+Analyze the migration path and necessary steps to migrate the existing design
+system to Material 3 in Compose.
+
+## Step 2: Identify theme source files
+
+In XML you write `?attr/colorPrimary`. In Compose, you access theme values
+with `MaterialTheme.*`:
+
+Identify and locate all XML resources and files necessary for theming:
+light and dark color schemes and qualifiers, themes, shapes, dimensions,
+typography, styles and other relevant files.
+
+Resources such as strings can be reused as is and don't need to be migrated.
+
+## Step 3: Migrate colors
+
+**Key principle:** XML uses named hex colors.
+Material 3 uses *semantic roles* (e.g., `primary`, `onPrimary`, `surface`).
+Stop naming colors by their hex; name them by their role.
+
+Examples:
+
+| XML color name | Material 3 role |
+|---|---|
+| `colorPrimary` | `primary` |
+| `colorPrimaryDark` / `colorPrimaryVariant` | `primaryContainer` or `secondary` |
+| `colorAccent` | `secondary` or `tertiary` |
+| `colorOnPrimary` | `onPrimary` |
+| `android:colorBackground` | `background` |
+| `colorSurface` | `surface` |
+| `colorOnSurface` | `onSurface` |
+| `colorError` | `error` |
+| `colorOnError` | `onError` |
+| `colorOutline` | `outline` |
+| `colorSurfaceVariant` | `surfaceVariant` |
+| `colorOnSurfaceVariant` | `onSurfaceVariant` |
+
+*** ** * ** ***
+
+Migrate the dark and light color schemes from XML to their equivalents in
+Material 3 Compose.
+
+> [!NOTE]
+> **Note:** Material 3 naming differs from Material 2 color naming.
+
+## Step 4: Migrate custom shapes and typography
+
+- If your app uses custom shapes:
+
+  1. In your Compose code, define a `Shapes` object to replicate your XML shape definitions.
+  2. Provide this `Shapes` object to your `MaterialTheme`.
+
+     For more details, see [shapes](https://developer.android.com/develop/ui/compose/designsystems/material3#shapes).
+- If your app uses custom typography:
+
+  1. In your Compose code, define a `Typography` object in your Compose code to replicate your XML text styles and font definitions.
+  2. Provide this `Typography` object to your `MaterialTheme`.
+
+     For more details, see [typography](https://developer.android.com/develop/ui/compose/designsystems/material3#typography).
+
+| Compose role | XML name |
+|---|---|
+| `displayLarge` | `TextAppearance.Material3.DisplayLarge` |
+| `displayMedium` | `TextAppearance.Material3.DisplayMedium` |
+| `displaySmall` | `TextAppearance.Material3.DisplaySmall` |
+| `headlineLarge` | `TextAppearance.Material3.HeadlineLarge` |
+| `headlineMedium` | `TextAppearance.Material3.HeadlineMedium` |
+| `headlineSmall` | `TextAppearance.Material3.HeadlineSmall` |
+| `titleLarge` | `TextAppearance.Material3.TitleLarge` |
+| `titleMedium` | `TextAppearance.Material3.TitleMedium` |
+| `titleSmall` | `TextAppearance.Material3.TitleSmall` |
+| `bodyLarge` | `TextAppearance.Material3.BodyLarge` |
+| `bodyMedium` | `TextAppearance.Material3.BodyMedium` |
+| `bodySmall` | `TextAppearance.Material3.BodySmall` |
+| `labelLarge` | `TextAppearance.Material3.LabelLarge` |
+| `labelMedium` | `TextAppearance.Material3.LabelMedium` |
+| `labelSmall` | `TextAppearance.Material3.LabelSmall` |
+
+## Step 5: Migrate styles (styles.xml)
+
+XML styles (styles.xml) system defines styles and appearance of:
+
+1. Widgets, components, themes for windows and dialogs
+2. Typography
+3. Themes and overlays
+4. Shapes
+
+XML Views and components combine multiple attributes to create a style.
+They set their styles from styles.xml in two different ways:
+
+1. Setting "style="@style/..." directly and explicitly in the XML View
+2. Setting the style indirectly and implicitly for a component as part of a larger Theme (theme.xml)
+
+Styles have no **direct** equivalent in Compose - instead styles are passed as:
+parameters or modifiers to composables, using the
+[new, experimental Styles API](https://developer.android.com/develop/ui/compose/styles) defined in the AppTheme, or by creating
+layered, reusable composable variations with the defined style.
+
+Provide separate @Composable functions named according to the style and the
+base component, to signify the difference in styling and use cases for those
+components.
+
+- **Pattern:** If an XML element uses a custom style (e.g., `style="@style/MyPrimaryButton"`), don't try to replicate the style inline. Instead, suggest creating a specific composable.
+- **Example:**
+  - *XML:* `<Button style="@style/MyPrimaryButton" ... />`
+  - *Compose:* `MyPrimaryButton(onClick = { ... })`
+- **Common Attribute Groups:** If a style sets common modifiers (like padding + height), extract them into a readable extension property or a shared Modifier variable.
+
+### Common examples
+
+| XML | Compose |
+|---|---|
+| `Theme.Material3.*` | `MaterialTheme(colorScheme, typography, shapes) { }` |
+| `TextAppearance.Material3.BodyMedium` | `TextStyle(...)` defined in `Typography(bodyMedium = ...)` |
+| `ShapeAppearance.*.SmallComponent` | `Shapes(small = RoundedCornerShape(X.dp))` |
+| `Widget.Material3.Button` | `Button(colors = ButtonDefaults.buttonColors(...))` |
+| `Widget.Material3.CardView` | `Card(shape=..., elevation=..., colors=...)` |
+| `Widget.*.TextInputLayout.OutlinedBox` | `OutlinedTextField(colors = OutlinedTextFieldDefaults.colors(...))` |
+| `Widget.*.Chip.Filter` | `FilterChip(colors = FilterChipDefaults.filterChipColors(...))` |
+| `Widget.*.Toolbar.Primary` | `TopAppBar(colors = TopAppBarDefaults.topAppBarColors(...))` |
+| `Widget.*.FloatingActionButton` | `FloatingActionButton(containerColor = ...)` |
+| `backgroundTint` | `containerColor` in `ComponentDefaults.ComponentColors()` |
+| `android:textColor` | `contentColor` in `ComponentDefaults.ComponentColors()` |
+| `cornerRadius` | `shape = RoundedCornerShape(X.dp)` |
+| `android:elevation` | `elevation = ComponentDefaults.elevation(defaultElevation = X.dp)` |
+| `android:padding` | `contentPadding = PaddingValues(...)` or `Modifier.padding()` |
+| `android:minHeight` | `Modifier.heightIn(min = X.dp)` |
+| `strokeColor` + `strokeWidth` | `border = BorderStroke(width, color)` |
+| `android:textSize` | `fontSize = X.sp` in `TextStyle` |
+
+## Step 6: Validate the theme migration
+
+Always use the existing theme values from the original XML theme as the source
+of truth for the new Material Theme in Compose.
+Never invent new theme values during migration, to maintain brand consistency
+and avoid visual regressions.
+
+Verify all new Compose theme values match the existing XML values.
+Don't hardcode any migrated values.
+
+## references/android/develop/ui/compose/migrate/interoperability-apis/compose-in-views.md
+
+> [!NOTE]
+> **Note:** Interoperability is supported for hybrid apps that use Compose and Views. For apps that are only in Compose, use the recommended Compose-only architecture with a single Activity and latest navigation libraries, like Navigation 3.
+
+You can add Compose-based UI into an existing app that uses a View-based design.
+
+To create a new, entirely Compose-based screen, have your
+activity call the `setContent()` method, and pass whatever composable functions
+you like.
+
+
+```kotlin
+class ExampleActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        setContent { // In here, we can call composables!
+            MaterialTheme {
+                Greeting(name = "compose")
+            }
+        }
+    }
+}
+
+@Composable
+fun Greeting(name: String) {
+    Text(text = "Hello $name!")
+}
+```
+
+<br />
+
+This code looks just like what you'd find in a Compose-only app.
+
+> [!CAUTION]
+> **Caution:** To use the `ComponentActivity.setContent`
+> method, add the `androidx.activity:activity-compose:$latestVersion`
+> dependency to your `build.gradle` file.
+>
+> See the [Activity releases page](https://developer.android.com/jetpack/androidx/releases/activity)
+> to find out the latest version.
+
+## `ViewCompositionStrategy` for `ComposeView`
+
+[`ViewCompositionStrategy`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ViewCompositionStrategy)
+defines when the Composition should be disposed. The default,
+[`ViewCompositionStrategy.Default`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ViewCompositionStrategy#Default()),
+disposes the Composition when the underlying
+[`ComposeView`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ComposeView)
+detaches from the window, unless it is part of a pooling container such as a
+`RecyclerView`. In a single-Activity Compose-only app, this default behavior is
+what you would want, however, if you are incrementally adding Compose in your
+codebase, this behavior may cause state loss in some scenarios.
+
+To change the `ViewCompositionStrategy`, call the [`setViewCompositionStrategy()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/AbstractComposeView#setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy))
+method and provide a different strategy.
+
+The table below summarizes the different scenarios you can use
+`ViewCompositionStrategy` in:
+
+| `ViewCompositionStrategy` | Description and Interop Scenario |
+|---|---|
+| [`DisposeOnDetachedFromWindow`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ViewCompositionStrategy.DisposeOnDetachedFromWindow) | The Composition will be disposed when the underlying `ComposeView` is detached from the window. Has since been superseded by `DisposeOnDetachedFromWindowOrReleasedFromPool`. Interop scenario: \* `ComposeView` whether it's the sole element in the View hierarchy, or in the context of a mixed View/Compose screen (not in Fragment). |
+| [`DisposeOnDetachedFromWindowOrReleasedFromPool`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool) (**Default**) | Similar to `DisposeOnDetachedFromWindow`, when the Composition is not in a pooling container, such as a `RecyclerView`. If it is in a pooling container, it will dispose when either the pooling container itself detaches from the window, or when the item is being discarded (i.e. when the pool is full). Interop scenario: \* `ComposeView` whether it's the sole element in the View hierarchy, or in the context of a mixed View/Compose screen (not in Fragment). \* `ComposeView` as an item in a pooling container such as `RecyclerView`. |
+| [`DisposeOnLifecycleDestroyed`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ViewCompositionStrategy.DisposeOnLifecycleDestroyed) | The Composition will be disposed when the provided [`Lifecycle`](https://developer.android.com/reference/androidx/lifecycle/Lifecycle) is destroyed. Interop scenario \* `ComposeView` in a Fragment's View. |
+| [`DisposeOnViewTreeLifecycleDestroyed`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed) | The Composition will be disposed when the `Lifecycle` owned by the `LifecycleOwner` returned by `ViewTreeLifecycleOwner.get` of the next window the View is attached to is destroyed. Interop scenario: \* `ComposeView` in a Fragment's View. \* `ComposeView` in a View wherein the Lifecycle is not known yet. |
+
+## `ComposeView` in Fragments (Transitionary Step)
+
+> [!NOTE]
+> **Note:** For hybrid apps with Views and Compose, that use Fragments, use `ComposeView` to wrap composables content and add to a Fragment during migration. For Compose-only apps, do not use Fragments and instead use the recommended Compose-only architecture with a single Activity and latest navigation libraries, like Navigation 3.
+
+If you want to incorporate Compose UI content in a fragment or an existing View
+layout, use [`ComposeView`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ComposeView)
+and call its
+[`setContent()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/ComposeView#setContent(kotlin.Function0))
+method. `ComposeView` is an Android [`View`](https://developer.android.com/reference/android/view/View).
+
+You can put the `ComposeView` in your XML layout just like any other `View`:
+
+```xml
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <TextView
+      android:id="@+id/text"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content" />
+
+  <androidx.compose.ui.platform.ComposeView
+      android:id="@+id/compose_view"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent" />
+</LinearLayout>
+```
+
+In the Kotlin source code, inflate the layout from the [layout
+resource](https://developer.android.com/guide/topics/resources/layout-resource) defined in XML. Then get the
+`ComposeView` using the XML ID, set a Composition strategy that works best for
+the host `View`, and call `setContent()` to use Compose.
+
+
+```kotlin
+class ExampleFragmentXml : Fragment() {
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        val view = inflater.inflate(R.layout.fragment_example, container, false)
+        val composeView = view.findViewById<ComposeView>(R.id.compose_view)
+        composeView.apply {
+            // Dispose of the Composition when the view's LifecycleOwner
+            // is destroyed
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                // In Compose world
+                MaterialTheme {
+                    Text("Hello Compose!")
+                }
+            }
+        }
+        return view
+    }
+}
+```
+
+<br />
+
+Alternatively, you can also use view binding to obtain references to the
+`ComposeView` by referencing the generated binding class for your XML layout file:
+
+
+```kotlin
+class ExampleFragment : Fragment() {
+
+    private var _binding: FragmentExampleBinding? = null
+
+    // This property is only valid between onCreateView and onDestroyView.
+    private val binding get() = _binding!!
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentExampleBinding.inflate(inflater, container, false)
+        val view = binding.root
+        binding.composeView.apply {
+            // Dispose of the Composition when the view's LifecycleOwner
+            // is destroyed
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                // In Compose world
+                MaterialTheme {
+                    Text("Hello Compose!")
+                }
+            }
+        }
+        return view
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}
+```
+
+<br />
+
+![Two slightly different text elements, one above the other](https://developer.android.com/static/develop/ui/compose/images/interop-hellos.png)
+
+**Figure 1.** This shows the output of the code that adds Compose elements in a
+View UI hierarchy. The "Hello Android!" text is displayed by a
+`TextView` widget. The "Hello Compose!" text is displayed by a
+Compose text element.
+
+You can also include a `ComposeView` directly in a fragment if your full screen
+is built with Compose, which lets you avoid using an XML layout file entirely.
+
+
+```kotlin
+class ExampleFragmentNoXml : Fragment() {
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        return ComposeView(requireContext()).apply {
+            // Dispose of the Composition when the view's LifecycleOwner
+            // is destroyed
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                MaterialTheme {
+                    // In Compose world
+                    Text("Hello Compose!")
+                }
+            }
+        }
+    }
+}
+```
+
+<br />
+
+## Multiple `ComposeView` instances in the same layout
+
+If there are multiple `ComposeView` elements in the same layout, each one must
+have a unique ID for `savedInstanceState` to work.
+
+
+```kotlin
+class ExampleFragmentMultipleComposeView : Fragment() {
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View = LinearLayout(requireContext()).apply {
+        addView(
+            ComposeView(requireContext()).apply {
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                )
+                id = R.id.compose_view_x
+                // ...
+            }
+        )
+        addView(TextView(requireContext()))
+        addView(
+            ComposeView(requireContext()).apply {
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                )
+                id = R.id.compose_view_y
+                // ...
+            }
+        )
+    }
+}
+```
+
+<br />
+
+The `ComposeView` IDs are defined in the `res/values/ids.xml` file:
+
+```xml
+<resources>
+  <item name="compose_view_x" type="id" />
+  <item name="compose_view_y" type="id" />
+</resources>
+```
+
+## Preview composables in Layout Editor
+
+You can also preview composables within the Layout Editor for your XML layout
+containing a `ComposeView`. Doing so lets you see how your composables look
+within a mixed Views and Compose layout.
+
+Say you want to display the following composable in the Layout Editor. Note
+that composables annotated with `@Preview` are good candidates to preview in the
+Layout Editor.
+
+
+```kotlin
+@Preview
+@Composable
+fun GreetingPreview() {
+    Greeting(name = "Android")
+}
+```
+
+<br />
+
+To display this composable, use the `tools:composableName` tools attribute and
+set its value to the fully qualified name of the composable to preview in the
+layout.
+
+```xml
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <androidx.compose.ui.platform.ComposeView
+      android:id="@+id/my_compose_view"
+      tools:composableName="com.example.compose.snippets.interop.InteroperabilityAPIsSnippetsKt.GreetingPreview"
+      android:layout_height="match_parent"
+      android:layout_width="match_parent"/>
+
+</LinearLayout>
+```
+
+![Composable displayed within layout editor](https://developer.android.com/static/develop/ui/compose/images/layout-editor-composable-preview.png)
+
+## references/android/develop/ui/compose/migrate/interoperability-apis/views-in-compose.md
+
+You can include an Android View hierarchy in a Compose UI. This approach is
+particularly useful if you want to use UI elements that are not yet available in
+Compose, like
+[`AdView`](https://developers.google.com/android/reference/com/google/android/gms/ads/AdView).
+This approach also lets you reuse custom views you may have designed.
+
+> [!NOTE]
+> **Note:** Use `AndroidView` as a wrapper only for missing SDK components without Compose support. Rewrite your custom Views in Compose wherever possible, starting the migration with the simplest custom Views and scaling to more complex ones.
+
+<br />
+
+To include a view element or hierarchy, use the [`AndroidView`](https://developer.android.com/reference/kotlin/androidx/compose/ui/viewinterop/AndroidView.composable#AndroidView(kotlin.Function1,androidx.compose.ui.Modifier,kotlin.Function1))
+composable. `AndroidView` is passed a lambda that returns a
+[`View`](https://developer.android.com/reference/android/view/View). `AndroidView` also provides an `update`
+callback that is called when the view is inflated. The `AndroidView` recomposes
+whenever a `State` read within the callback changes. `AndroidView`, like many
+other built-in composables, takes a `Modifier` parameter that can be used, for
+example, to set its position in the parent composable.
+
+
+```kotlin
+@Composable
+fun CustomView() {
+    var selectedItem by remember { mutableIntStateOf(0) }
+
+    // Adds view to Compose
+    AndroidView(
+        modifier = Modifier.fillMaxSize(), // Occupy the max size in the Compose UI tree
+        factory = { context ->
+            // Creates view
+            MyView(context).apply {
+                // Sets up listeners for View -> Compose communication
+                setOnClickListener {
+                    selectedItem = 1
+                }
+            }
+        },
+        update = { view ->
+            // View's been inflated or state read in this block has been updated
+            // Add logic here if necessary
+
+            // As selectedItem is read here, AndroidView will recompose
+            // whenever the state changes
+            // Example of Compose -> View communication
+            view.selectedItem = selectedItem
+        }
+    )
+}
+
+@Composable
+fun ContentExample() {
+    Column(Modifier.fillMaxSize()) {
+        Text("Look at this CustomView!")
+        CustomView()
+    }
+}
+```
+
+<br />
+
+> [!NOTE]
+> **Note:** Prefer to construct a View in the `AndroidView` `factory` lambda instead of using `remember` to hold a View reference outside of `AndroidView`.
+
+## `AndroidView` with view binding
+
+To embed an XML layout, use the
+[`AndroidViewBinding`](https://developer.android.com/reference/kotlin/androidx/compose/ui/viewinterop/package-summary#AndroidViewBinding(kotlin.Function3,%20androidx.compose.ui.Modifier,%20kotlin.Function1))
+API, which is provided by the `androidx.compose.ui:ui-viewbinding` library. To
+do this, your project must enable [view binding](https://developer.android.com/topic/libraries/view-binding#setup).
+
+> [!NOTE]
+> **Note:** For Compose-only apps, don't use `AndroidViewBinding` to inflate full screen-level XML layouts, and instead use it only for smaller, legacy XML layouts during the incremental migration process.
+
+
+```kotlin
+@Composable
+fun AndroidViewBindingExample() {
+    AndroidViewBinding(ExampleLayoutBinding::inflate) {
+        exampleView.setBackgroundColor(Color.GRAY)
+    }
+}
+```
+
+<br />
+
+## `AndroidView` in Lazy lists
+
+If you are using an `AndroidView` in a Lazy list (`LazyColumn`, `LazyRow`,
+`Pager`, etc.), consider using the [`AndroidView`](https://developer.android.com/reference/kotlin/androidx/compose/ui/viewinterop/package-summary#AndroidView(kotlin.Function1,kotlin.Function1,androidx.compose.ui.Modifier,kotlin.Function1,kotlin.Function1))
+overload introduced in version 1.4.0-rc01. This overload allows Compose to reuse
+the underlying `View` instance when the containing composition is reused as is
+the case for Lazy lists.
+
+This overload of `AndroidView` adds 2 additional parameters:
+
+- `onReset` - A callback invoked to signal that the `View` is about to be reused. This must be non-null to enable View reuse.
+- `onRelease` (optional) - A callback invoked to signal that the `View` has exited the composition and will not be reused again.
+
+
+```kotlin
+@Composable
+fun AndroidViewInLazyList() {
+    LazyColumn {
+        items(100) { index ->
+            AndroidView(
+                modifier = Modifier.fillMaxSize(), // Occupy the max size in the Compose UI tree
+                factory = { context ->
+                    MyView(context)
+                },
+                update = { view ->
+                    view.selectedItem = index
+                },
+                onReset = { view ->
+                    view.clear()
+                }
+            )
+        }
+    }
+}
+```
+
+<br />
+
+## Fragments in Compose (Transitionary Step)
+
+Use the `AndroidFragment` composable to add a `Fragment` in Compose.
+`AndroidFragment` has fragment-specific handling such as removing the
+fragment when the composable leaves the composition.
+
+> [!NOTE]
+> **Note:** Wrap existing Fragments in Compose only during incremental migration. For Compose-only apps, do not use Fragments and instead use the recommended Compose-only architecture with a single Activity and latest navigation libraries, like Navigation 3.
+
+To include a fragment, use the [`AndroidFragment`](https://developer.android.com/reference/kotlin/androidx/fragment/compose/package-summary#AndroidFragment)
+composable. You pass a `Fragment` class to `AndroidFragment`, which then adds
+an instance of that class directly into the composition. `AndroidFragment` also
+provides a `fragmentState` object to create the `AndroidFragment` with a given
+state, `arguments` to pass into the new fragment, and an `onUpdate` callback
+that provides the fragment from the composition. Like many
+other built-in composables, `AndroidFragment` accepts a `Modifier` parameter
+that you can use, for
+example, to set its position in the parent composable.
+
+Call `AndroidFragment` in Compose as follows:
+
+
+```kotlin
+@Composable
+fun FragmentInComposeExample() {
+    AndroidFragment<MyFragment>()
+}
+```
+
+<br />
+
+## Calling the Android framework from Compose
+
+Compose operates within the Android framework classes. For example, it's hosted
+on Android View classes, like `Activity` or `Fragment`, and might use Android
+framework classes like the `Context`, system resources,
+`Service`, or `BroadcastReceiver`.
+
+To learn more about system resources, see [Resources in Compose](https://developer.android.com/develop/ui/compose/resources).
+
+### Composition Locals
+
+[`CompositionLocal`](https://developer.android.com/reference/kotlin/androidx/compose/runtime/CompositionLocal)
+classes allow passing data implicitly through composable functions. They're
+usually provided with a value in a certain node of the UI tree. That value can
+be used by its composable descendants without declaring the `CompositionLocal`
+as a parameter in the composable function.
+
+`CompositionLocal` is used to propagate values for Android framework types in
+Compose such as `Context`, `Configuration` or the `View` in which the Compose
+code is hosted with the corresponding
+[`LocalContext`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/package-summary#LocalContext()),
+[`LocalConfiguration`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/package-summary#LocalConfiguration()),
+or
+[`LocalView`](https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/package-summary#LocalView()).
+Note that `CompositionLocal` classes are prefixed with `Local` for better
+discoverability with auto-complete in the IDE.
+
+Access the current value of a `CompositionLocal` by using its `current`
+property. For example, the code below shows a toast message by providing
+`LocalContext.current` into the `Toast.makeToast` method.
+
+
+```kotlin
+@Composable
+fun ToastGreetingButton(greeting: String) {
+    val context = LocalContext.current
+    Button(onClick = {
+        Toast.makeText(context, greeting, Toast.LENGTH_SHORT).show()
+    }) {
+        Text("Greet")
+    }
+}
+```
+
+<br />
+
+### Broadcast receivers
+
+To showcase `CompositionLocal` and [side
+effects](https://developer.android.com/develop/ui/compose/side-effects), if a
+[`BroadcastReceiver`](https://developer.android.com/guide/components/broadcasts) needs to be registered from
+a composable function, use of `LocalContext` to use the current context, and
+`rememberUpdatedState` and `DisposableEffect` side effects.
+
+
+```kotlin
+@Composable
+fun SystemBroadcastReceiver(
+    systemAction: String,
+    onSystemEvent: (intent: Intent?) -> Unit
+) {
+    // Grab the current context in this part of the UI tree
+    val context = LocalContext.current
+
+    // Safely use the latest onSystemEvent lambda passed to the function
+    val currentOnSystemEvent by rememberUpdatedState(onSystemEvent)
+
+    // If either context or systemAction changes, unregister and register again
+    DisposableEffect(context, systemAction) {
+        val intentFilter = IntentFilter(systemAction)
+        val broadcast = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                currentOnSystemEvent(intent)
+            }
+        }
+
+        context.registerReceiver(broadcast, intentFilter)
+
+        // When the effect leaves the Composition, remove the callback
+        onDispose {
+            context.unregisterReceiver(broadcast)
+        }
+    }
+}
+
+@Composable
+fun HomeScreen() {
+
+    SystemBroadcastReceiver(Intent.ACTION_BATTERY_CHANGED) { batteryStatus ->
+        val isCharging = /* Get from batteryStatus ... */ true
+        /* Do something if the device is charging */
+    }
+
+    /* Rest of the HomeScreen */
+}
+```
+
+<br />
+
+## Other interactions
+
+If there isn't a utility defined for the interaction you need, the best practice
+is to follow the general Compose guideline,
+*data flows down, events flow up* (discussed at more length in [Thinking
+in Compose](https://developer.android.com/develop/ui/compose/mental-model)). For example, this composable
+launches a different activity:
+
+
+```kotlin
+class OtherInteractionsActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // get data from savedInstanceState
+        setContent {
+            MaterialTheme {
+                ExampleComposable(data, onButtonClick = {
+                    startActivity(Intent(this, MyActivity::class.java))
+                })
+            }
+        }
+    }
+}
+
+@Composable
+fun ExampleComposable(data: DataExample, onButtonClick: () -> Unit) {
+    Button(onClick = onButtonClick) {
+        Text(data.title)
+    }
+}
+```
+
+<br />
+
+## references/android/develop/ui/compose/setup-compose-dependencies-and-compiler.md
+
+## Set up the Compose Compiler Gradle plugin
+
+For Gradle, use the Compose Compiler Gradle plugin to set
+up and configure Compose.
+
+> [!NOTE]
+> **Note:** The Compose Compiler Gradle Plugin is only available from Kotlin 2.0+. For migration instructions, see ["Jetpack Compose compiler moving to the Kotlin
+> repository"](https://android-developers.googleblog.com/2024/04/jetpack-compose-compiler-moving-to-kotlin-repository.html).
+
+### Set up with Gradle version catalogs
+
+Set up the Compose Compiler Gradle plugin:
+
+1. In the `libs.versions.toml` file, remove any reference to the Compose Compiler.
+2. In the `versions` and `plugins` sections, add the new dependency:
+
+    [versions]
+    kotlin = "2.3.21"
+
+    [plugins]
+    org-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+
+    // Add this line
+    compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+
+1. In the project's root `build.gradle.kts` file, add the following to the `plugins` section.
+
+    plugins {
+       // Existing plugins
+       alias(libs.plugins.compose.compiler) apply false
+    }
+
+1. In each module that uses Compose, apply the plugin:
+
+    plugins {
+       // Existing plugins
+       alias(libs.plugins.compose.compiler)
+    }
+
+The project should now build and compile if it was using the default set up. If
+it had configured custom options on the Compose compiler, follow the next
+section.
+
+### Set up the Compose Compiler without Gradle version catalogs
+
+Add the plugin to `build.gradle.kts` files associated with modules where Compose
+is used:
+
+    plugins {
+        id("org.jetbrains.kotlin.plugin.compose") version "2.3.21" // this version matches your Kotlin version
+    }
+
+Add the classpath to your top-level project `build.gradle.kts` file:
+
+    buildscript {
+        dependencies {
+            classpath("org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:2.3.21")
+        }
+    }
+
+### Configuration options with the Compose Compiler Gradle Plugin
+
+To configure the Compose compiler using the Gradle plugin, add the
+`composeCompiler` block to the module's `build.gradle.kts` file at the top
+level:
+
+    android { ... }
+
+    composeCompiler {
+        reportsDestination = layout.buildDirectory.dir("compose_compiler")
+        stabilityConfigurationFile = rootProject.layout.projectDirectory.file("stability_config.conf")
+    }
+
+For the full list of available options, see the [documentation](https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-compiler.html#compose-compiler-options-dsl).
+
+## Set up Compose dependencies
+
+Always use the latest Compose BOM version: `2026.05.00`.
+
+Set the `compose` flag to `true` inside the Android [`BuildFeatures`](https://developer.android.com/reference/tools/gradle-api/7.0/com/android/build/api/dsl/BuildFeatures)
+to enable [Compose functionality](https://developer.android.com/develop/ui/compose/tooling) in Android Studio.
+
+Add the following definition to your app's `build.gradle` file:
+
+### Groovy
+
+    android {
+        buildFeatures {
+            compose true
+        }
+    }
+
+### Kotlin
+
+    android {
+        buildFeatures {
+            compose = true
+        }
+    }
+
+Add the Compose BOM and the subset of Compose library dependencies:
+
+### Groovy
+
+    dependencies {
+
+        def composeBom = platform('androidx.compose:compose-bom:2026.05.00')
+        implementation composeBom
+        androidTestImplementation composeBom
+
+        // Choose one of the following:
+        // Material Design 3
+        implementation 'androidx.compose.material3:material3'
+        // or skip Material Design and build directly on top of foundational components
+        implementation 'androidx.compose.foundation:foundation'
+        // or only import the main APIs for the underlying toolkit systems,
+        // such as input and measurement/layout
+        implementation 'androidx.compose.ui:ui'
+
+        // Android Studio Preview support
+        implementation 'androidx.compose.ui:ui-tooling-preview'
+        debugImplementation 'androidx.compose.ui:ui-tooling'
+
+        // UI Tests
+        androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+        debugImplementation 'androidx.compose.ui:ui-test-manifest'
+
+        // Optional - Add window size utils
+        implementation 'androidx.compose.material3.adaptive:adaptive'
+
+        // Optional - Integration with activities
+        implementation 'androidx.activity:activity-compose:1.13.0'
+        // Optional - Integration with ViewModels
+        implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0'
+        // Optional - Integration with LiveData
+        implementation 'androidx.compose.runtime:runtime-livedata'
+        // Optional - Integration with RxJava
+        implementation 'androidx.compose.runtime:runtime-rxjava2'
+
+    }
+
+### Kotlin
+
+    dependencies {
+
+        val composeBom = platform("androidx.compose:compose-bom:2026.05.00")
+        implementation(composeBom)
+        androidTestImplementation(composeBom)
+
+        // Choose one of the following:
+        // Material Design 3
+        implementation("androidx.compose.material3:material3")
+        // or skip Material Design and build directly on top of foundational components
+        implementation("androidx.compose.foundation:foundation")
+        // or only import the main APIs for the underlying toolkit systems,
+        // such as input and measurement/layout
+        implementation("androidx.compose.ui:ui")
+
+        // Android Studio Preview support
+        implementation("androidx.compose.ui:ui-tooling-preview")
+        debugImplementation("androidx.compose.ui:ui-tooling")
+
+        // UI Tests
+        androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+        debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+        // Optional - Add window size utils
+        implementation("androidx.compose.material3.adaptive:adaptive")
+
+        // Optional - Integration with activities
+        implementation("androidx.activity:activity-compose:1.13.0")
+        // Optional - Integration with ViewModels
+        implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+        // Optional - Integration with LiveData
+        implementation("androidx.compose.runtime:runtime-livedata")
+        // Optional - Integration with RxJava
+        implementation("androidx.compose.runtime:runtime-rxjava2")
+
+    }
+
+> [!NOTE]
+> **Note:** Jetpack Compose is shipped using a Bill of Materials (BOM), to keep the versions of all library groups in sync. Read more about it in the [Bill of
+> Materials page](https://developer.android.com/develop/ui/compose/bom/bom).
+
+## references/identify-optimal-xml-candidate.md
+
+### 1. Analysis scope
+
+**Action:** Use find files and examine all XML layout files within the project (typically located in `res`directories). For each file, parse the view hierarchy and metadata.
+
+### 2. Selection criteria
+
+Prioritize layouts that meet the following criteria:
+
+- **Hierarchy depth:** Target **leaf nodes** or components at the bottom of the UI tree.
+- **Complexity:** Select layouts with the **smallest number of nested children** and minimal logic.
+- **State management:** Prioritize **stateless** components or those with the fewest UI state variables.
+- **Dependency footprint:** Identify layouts with **zero to minimal external UI dependencies**.
+- **Isolation:** Focus on **self-contained** components that do not rely heavily on parent context or complex data binding.
+
+### 3. Risk assessment
+
+Evaluate the migration risk based on:
+\* **Reusability:** Find layouts with **minimum reuse** across the project to limit regression impact.
+\* **Accessibility:** Ensure the layout has an **easily accessible entry point** (e.g., used in a simple Activity, Fragment, or as a standalone include).
+
+*** ** * ** ***
+
+## Output requirements
+
+Provide a ranked list of the top 3-5 candidates. For each candidate, include:
+1. **File path:** (e.g., `res/layout/item_user_profile.xml`)
+2. **Rationale:** Why this is a good candidate based on the provided criteria.
+3. **Complexity score:** A rating from 1-5 (1 being simplest).
+4. **Dependency count:** List of custom/external views found within.
+
+**Action:** If you support user interaction, ask the user to choose which XML to proceed with. Else proceed with the best option, based on the previous criteria.
+
+## references/xml-layout-migration.md
+
+## 1. Structural analysis \& mapping
+
+**Identify the precise mapping** between XML elements and Compose equivalents.
+You must determine:
+
+- The exact `@Composable` functions (e.g., `ConstraintLayout`, `Column`, `LazyColumn`) that replace the XML tag hierarchy.
+- The specific parameters and `Modifier` extensions required to replicate XML attributes (e.g., `layout_width`, `padding`, `elevation`).
+- The appropriate state management strategy for interactive elements.
+
+## 2. Migration execution
+
+**Convert the XML layout code to Jetpack Compose**, ensuring the visual
+hierarchy and layout logic are preserved while leveraging Compose's declarative
+nature.
+
+## 3. Theming \& design system integrity
+
+**Do not use hard-coded values.** Follow these rules for styling:
+
+- **Token Alignment:** Cross-reference XML dimensions, colors, and style attributes with the existing Compose `Theme` (e.g., `MaterialTheme.colorScheme` or custom design system tokens).
+- **Reuse over Creation:** If matching values exist in the current Compose theme, reuse them. If a value is missing but required for the design, define it within the theme structure rather than hard-coding it in the Composable.
+- **Project Consistency:** You **MUST** strictly adhere to existing code conventions, naming standards, and implementation patterns found in the project. **Prioritize** project-specific reusable components over generic Material defaults.
+
+## 4. Component layering \& reusability
+
+Evaluate if the XML layout serves as a foundation-level design system component
+(reused across the app with a distinct role). If it is:
+
+- **Create a reusable composable:** Do not just inline the code. Define a new standalone `@Composable`.
+- **Parameterization:** Expose specific parameters for variable data (text, colors, styles) and use `Modifier` for layout-specific customizations.
+- **Feature parity \& restriction:** Ensure the new composable enforces the same UI constraints as the original XML component, preventing unauthorized style overrides while maintaining the intended flexibility.
+
+Example before migration:
+
+    <style
+        name="Widget.Rounded.Button"
+        parent="Widget.Button.Borderless">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:minWidth">@dimen/min_width</item>
+        <item name="android:paddingStart">@dimen/padding_2</item>
+        <item name="android:paddingEnd">@dimen/padding_2</item>
+        <item name="cornerRadius">8dp</item>
+    </style>
+
+Example after migration:
+
+
+```kotlin
+@Composable
+fun RoundedBorderlessButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    TextButton(
+        onClick, modifier
+            .defaultMinSize(minWidth = dimensionResource(R.dimen.min_width))
+            .padding(
+                start = dimensionResource(R.dimen.padding_2),
+                end = dimensionResource(R.dimen.padding_2)
+            ), enabled, shape = RoundedCornerShape(8.dp),
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = MaterialTheme.colorScheme.primary
+        )
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Medium
+            )
+        )
+    }
+}
+```
+
+<br />
+
+*** ** * ** ***
+
+## 5. Output requirements
+
+- Provide the full Kotlin file content.
+- Include necessary imports.
+- Add documentation comments (`/** ... */`) explaining the mapping logic for complex transformations.
+

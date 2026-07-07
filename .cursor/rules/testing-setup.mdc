@@ -1,0 +1,1057 @@
+---
+description: |-
+  Analyze and create a testing strategy for native Android apps - install testing libraries, set up test infrastructure, create harnesses for unit tests, UI tests, screenshot tests, and end-to-end tests.
+alwaysApply: false
+---
+
+
+## Step 1: analyze the current testing setup
+
+To understand the testing setup of an existing project, look for these
+dependencies in the libs.versions.toml file, or build files:
+
+1. Dependency Injection framework used. Examples: Hilt, Koin, Anvil, vanilla Dagger...
+2. Unit (local) testing framework this project uses, Example JUnit4, JUnit5...
+3. Mocking framework (if any) used for unit tests, and for Instrumented and UI tests. Examples: Mockito, Mockk...
+4. Robolectric. It can be used in 3 ways:
+   1. Used in unit tests to have fakes for platform entities
+   2. To run behavior UI tests without a device or emulator. For example, used to run Espresso or Compose tests.
+   3. To do screenshot testing with Roborazzi
+5. Is the app 100% Compose, Views or hybrid?
+6. Behavior UI tests:
+   1. Compose Tests (`androidx.compose.ui:ui-test-*`)
+   2. Espresso Tests for Views. Might use wrappers like Kaspresso. Dependencies: `androidx.test.espresso:espresso-core`, `androidx.test:runner`, `androidx.test:rules`.
+7. Screenshot tests can be:
+   1. Instrumented (device-based). For example, using Dropshots.
+   2. Based on Robolectric, so they run locally. For example, using Roborazzi.
+   3. Based on LayoutLib, so they run locally. For example, Paparazzi, or the Compose Preview Screenshot Testing tool.
+8. End to end tests (also known as Release Candidate tests) always run on device and use high-level frameworks such as UIAutomator, Appium, or Robotium.
+9. Generate a Markdown report with the analysis
+
+## Step 2: Set up Dependency Injection frameworks for testing
+
+If there is no Dependency Injection framework, install one: if it's a
+multiplatform application, ask the user whether they want to install Koin, or
+kotlin-inject. If it's not multiplatform, install Hilt.
+
+Install the testing dependencies (for example `com.google.dagger:hilt-compiler`
+that should be applied with a `kspAndroidTest` configuration).
+
+> [!IMPORTANT]
+> **Important:** Always consult the documentation of the applicable framework to learn about testing (for example: [Hilt testing guide](references/android/training/dependency-injection/hilt-testing.md), [Koin Instrumented tests](https://insert-koin.io/docs/reference/koin-android/instrumented-testing)).
+
+For instrumented tests, create and configure (by adding
+`testInstrumentationRunner` to the build gradle files) a new test runner and
+apply the testing rules required by the framework (for example in Hilt, annotate
+your test classes with `@HiltAndroidTest` and apply the `HiltAndroidRule`).
+Other frameworks use other mechanisms, consult their documentation.
+
+## Step 3: Install frameworks
+
+Unless otherwise specified, respect the current stack of testing frameworks.
+
+If there are no testing frameworks, and the user didn't specify any preference,
+install the following:
+
+- JUnit4 for local and instrumented tests
+- Jacoco for test coverage
+- For UI tests: if the project has views, Espresso. If it's fully Compose, use the Compose Testing APIs.
+- Robolectric to run UI Tests
+- Compose Preview Screenshot Testing tool for screenshot tests - check [setup
+  documentation](references/android/studio/preview/compose-screenshot-testing.md) and follow it strictly.
+- Dropshots for device screenshot tests
+- If a mocking framework is necessary, install Mockk (`io.mockk:mockk`). Do not install it unless it is clearly necessary.
+
+If instrumented screenshot tests are requested, install Dropshots.
+
+If end-to-end testing is requested, install UI Automator.
+
+## Step 4: Refactor and create fakes for testing
+
+### **Refactor for unit tests**
+
+In the next sections you'll be asked to create tests. If you have dependencies
+on Android framework classes, or entities that are not part of the codebase:
+
+- First, use a fake. If it doesn't exist, create an interface for the class
+  and a "Default" implementation with the existing code. Add the Fake version
+  to the test sourceset (test or androidTest).
+
+- If not possible to use a fake (example: no access to the class or
+  interface), mock the dependencies.
+
+### **Refactor for UI tests**
+
+If you need to fake components to make testing easier and faster and more
+reliable, replace slow and problematic dependencies with fakes. Use runtime
+fakes using the Dependency Injection framework installed to:
+
+- **Simulate** different scenarios with the user (wrong credentials, reset password flow...), with a server (no connection, server down, bad JSON from server...) or with a platform component (insufficient permissions, no disk space, no front camera available)
+- **Improve** speed and reliability (replacing a database with an in-memory database, replacing a repository with an in-memory fake to avoid hitting the network)
+
+## Step 5: Unit testing
+
+Create a task to add or review unit tests in every file that contains business
+logic (ViewModels, Repositories, database-related classes such as DAOs, etc.).
+Don't create unit tests for Activities, Compose layouts, or dependency injection
+configuration files.
+
+## Step 6: UI testing
+
+Espresso or Compose UI tests live in the `test` sourceset because they will be
+run with Robolectric. If instrumented (emulator or device) tests are requested,
+put them in the `androidTest` sourceset.
+
+## Step 7: Test databases
+
+If the database is using SQLite (using Room, SQLDelight, etc.), create
+instrumented tests using an in-memory database to make sure that they work with
+the SQLite engine on device.
+
+## Step 8: Screenshot tests
+
+Irrespective of the framework used, screenshot tests focus on 2 types of tests:
+
+- Screen-level screenshot tests, where each screen is tested in 9 different sizes, combining compact, medium and expanded widths (400, 610, 900 dp) and heights (400, 500 and 1000 dp).
+- Screen-level variations. Add a mobile (400x500) screenshot of:
+  - All the alternative themes, if used.
+  - Font scale set to 1.5.
+- Component-level screenshot tests, where each component is tested in different themes and font scales.
+
+Behavior isn't tested with screenshots, but do test different common scenarios
+if their UIs change a lot depending on the state. For example, test loading
+screens by injecting a loading state to the UI or simulating it with a fake.
+
+## Step 9: UI Behavior tests
+
+Test the UI logic using behavior tests, which ensures that the UIs react as
+expected when different states are passed, and when user actions are performed.
+
+### **Compose UI behavior tests**
+
+- Use the ComposeTestRule with a `ComponentActivity` to access resources such as strings.
+- Always try to match with semantic matchers first. If the matcher is too complicated to write (using more than 3 matchers to find a single element), use `testTag`.
+- Always verify state restoration
+
+### **Views (XML) UI behavior tests**
+
+Use Espresso to match views and interact with them.
+
+## Step 10: Navigation tests
+
+Create a test suite to verify navigation logic. Include:
+
+- Back handling
+- Deeplinks
+- Special patterns like "exit through home" with multiple backstacks.
+
+## Step 11: Simulate different window sizes and settings
+
+For Compose layouts, use `DeviceConfigurationOverride` described in "[UI testing
+common patterns](references/android/develop/ui/compose/testing/common-patterns.md)" to simulate different window sizes, font scales
+
+## Step 12: End-to-end tests
+
+Create a low number (about 5% of all tests) of end-to-end tests that cover big
+user journeys. Use Compose Test APIs or Espresso for that. If you have to access
+platform features (notifications, system UI...), use UI Automator.
+
+If you need to take screenshots of the app running in a device, use
+[Dropshots](https://raw.githubusercontent.com/dropbox/dropshots/refs/heads/main/README.md). You need a device for screenshot tests when verifying
+interaction with the system UI (examples: edge-to-edge rendering, notifications,
+picture-in-picture)
+
+### Step 13: Instrumented Screenshot tests
+
+Install the `com.dropbox.dropshots` plugin in the module and a `Dropshots()`
+JUnit Rule. Create a new instrumented screenshot test for one of the app's
+features.
+
+### Step 14: Install jacoco
+
+Install jacoco for local testing code coverage.
+
+- Add the `jacoco` plugin to each module that contains tests.
+
+## Final touches
+
+- Ask whether to document the findings of the analysis and the changes applied
+  to the testing strategy. If the user agrees:
+
+  - If there is an AGENTS.md file present in the project, update it with any
+    changes you've made to the testing strategy.
+
+  - If there is no AGENTS.md file, create a new file (docs/testing.md) with
+    a description of the testing strategy, including the commands needed to
+    run every type of test, where the screenshot reference files live, etc.
+    Also create a new AGENTS.md file in the root and create a link to
+    docs/testing.md.
+
+---
+
+# Inlined references
+
+## references/android/develop/ui/compose/testing/common-patterns.md
+
+[Video](https://www.youtube.com/watch?v=Y9GWnwi9D0I)
+
+You can test your Compose app with well-established approaches and patterns.
+
+### Test in isolation
+
+[`ComposeTestRule`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/junit4/ComposeTestRule) lets you start an activity displaying any composable:
+your full application, a single screen, or a small element. It's also a good
+practice to check that your composables are correctly encapsulated and they work
+independently, allowing for easier and more focused UI testing.
+
+This doesn't mean you should *only* create unit UI tests. UI tests scoping
+larger parts of your UI are also very important.
+
+### Access the activity and resources after setting your own content
+
+Oftentimes you need to set the content under test using
+`composeTestRule.setContent` and you also need to access activity resources, for
+example to assert that a displayed text matches a string resource. However, you
+can't call `setContent` on a rule created with `createAndroidComposeRule()` if
+the activity already calls it.
+
+A common pattern to achieve this is to create an `AndroidComposeTestRule` using
+an empty activity such as [`ComponentActivity`](https://developer.android.com/reference/androidx/activity/ComponentActivity)).
+
+    class MyComposeTest {
+
+        @get:Rule
+        val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+        @Test
+        fun myTest() {
+            // Start the app
+            composeTestRule.setContent {
+                MyAppTheme {
+                    MainScreen(uiState = exampleUiState, /*...*/)
+                }
+            }
+            val continueLabel = composeTestRule.activity.getString(R.string.next)
+            composeTestRule.onNodeWithText(continueLabel).performClick()
+        }
+    }
+
+Note that `ComponentActivity` needs to be added to your app's
+`AndroidManifest.xml` file. Enable that by adding this dependency to your
+module:
+
+    debugImplementation("androidx.compose.ui:ui-test-manifest:$compose_version")
+
+### Custom semantics properties
+
+You can create custom [semantics](https://developer.android.com/develop/ui/compose/testing/semantics) properties to expose information to tests.
+To do this, define a new `SemanticsPropertyKey` and make it available using the
+`SemanticsPropertyReceiver`.
+
+    // Creates a semantics property of type Long.
+    val PickedDateKey = SemanticsPropertyKey<Long>("PickedDate")
+    var SemanticsPropertyReceiver.pickedDate by PickedDateKey
+
+Now use that property in the `semantics` modifier:
+
+    val datePickerValue by remember { mutableStateOf(0L) }
+    MyCustomDatePicker(
+        modifier = Modifier.semantics { pickedDate = datePickerValue }
+    )
+
+From tests, use `SemanticsMatcher.expectValue` to assert the value of the
+property:
+
+    composeTestRule
+        .onNode(SemanticsMatcher.expectValue(PickedDateKey, 1445378400)) // 2015-10-21
+        .assertExists()
+
+> [!WARNING]
+> **Warning:** You should only use custom Semantics properties when it's hard to match a specific item using the given finders and matchers. Using custom Semantics properties to expose visual properties such as colors, font size or rounded corner radius is not recommended, as it can pollute production code and wrong implementations can lead to bugs that are hard to find.
+
+### Verify state restoration
+
+Verify that the state of your Compose elements is correctly restored when the
+activity or process is recreated. Perform such checks without relying on
+activity recreation with the [`StateRestorationTester`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/junit4/StateRestorationTester) class.
+
+This class lets you simulate the recreation of a composable. It's especially
+useful to verify the implementation of [`rememberSaveable`](https://developer.android.com/reference/kotlin/androidx/compose/runtime/saveable/rememberSaveable.composable#rememberSaveable(kotlin.Array,androidx.compose.runtime.saveable.Saver,kotlin.String,kotlin.Function0)).
+
+
+    class MyStateRestorationTests {
+
+        @get:Rule
+        val composeTestRule = createComposeRule()
+
+        @Test
+        fun onRecreation_stateIsRestored() {
+            val restorationTester = StateRestorationTester(composeTestRule)
+
+            restorationTester.setContent { MainScreen() }
+
+            // TODO: Run actions that modify the state
+
+            // Trigger a recreation
+            restorationTester.emulateSavedInstanceStateRestore()
+
+            // TODO: Verify that state has been correctly restored.
+        }
+    }
+
+### Test different device configurations
+
+Android apps need to adapt to many changing conditions: window sizes, locales,
+font sizes, dark and light themes, and more. Most of these conditions are
+derived from device-level values controlled by the user and exposed with the
+current [`Configuration`](https://developer.android.com/reference/android/content/res/Configuration) instance. Testing different configurations
+directly in a test is difficult since the test must configure device-level
+properties.
+
+[`DeviceConfigurationOverride`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride) is a test-only API that lets you simulate
+different device configurations in a localized way for the `@Composable` content
+under test.
+
+The companion object of `DeviceConfigurationOverride` has the following
+extension functions, which override device-level configuration properties:
+
+- [`DeviceConfigurationOverride.DarkMode()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.Companion#(androidx.compose.ui.test.DeviceConfigurationOverride.Companion).DarkMode(kotlin.Boolean)): Overrides the system to dark theme or light theme.
+- [`DeviceConfigurationOverride.FontScale()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.Companion#(androidx.compose.ui.test.DeviceConfigurationOverride.Companion).FontScale(kotlin.Float)): Overrides the [system font
+  scale](https://developer.android.com/training/multiscreen/screendensities#TaskUseDP).
+- [`DeviceConfigurationOverride.FontWeightAdjustment()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.Companion#(androidx.compose.ui.test.DeviceConfigurationOverride.Companion).FontWeightAdjustment(kotlin.Int)): Overrides the system font weight adjustment.
+- [`DeviceConfigurationOverride.ForcedSize()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.Companion#(androidx.compose.ui.test.DeviceConfigurationOverride.Companion).ForcedSize(androidx.compose.ui.unit.DpSize)): Forces a specific amount of space regardless of device size.
+- [`DeviceConfigurationOverride.LayoutDirection()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.Companion#(androidx.compose.ui.test.DeviceConfigurationOverride.Companion).LayoutDirection(androidx.compose.ui.unit.LayoutDirection)): Overrides the [layout
+  direction](https://developer.android.com/training/basics/supporting-devices/languages#SupportLayoutMirroring) (left-to-right or right-to-left).
+- [`DeviceConfigurationOverride.Locales()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.Companion#(androidx.compose.ui.test.DeviceConfigurationOverride.Companion).Locales(androidx.compose.ui.text.intl.LocaleList)): Overrides the [locale](https://developer.android.com/guide/topics/resources/localization).
+- [`DeviceConfigurationOverride.RoundScreen()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.Companion#(androidx.compose.ui.test.DeviceConfigurationOverride.Companion).RoundScreen(kotlin.Boolean)): Overrides if the screen is [round](https://developer.android.com/design/ui/wear/guides/foundations/getting-started#design-for-round).
+
+To apply a specific override, wrap the content under test in a call to the
+[`DeviceConfigurationOverride()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride.composable#DeviceConfigurationOverride(androidx.compose.ui.test.DeviceConfigurationOverride,kotlin.Function0)) top-level function, passing the override
+to apply as a parameter.
+
+For example, the following code applies the
+`DeviceConfigurationOverride.ForcedSize()` override to change the density
+locally, forcing the `MyScreen` composable to be rendered in a large landscape
+window, even if the device the test is running on doesn't support that window
+size directly:
+
+
+```kotlin
+composeTestRule.setContent {
+    DeviceConfigurationOverride(
+        DeviceConfigurationOverride.ForcedSize(DpSize(1280.dp, 800.dp))
+    ) {
+        MyScreen() // Will be rendered in the space for 1280dp by 800dp without clipping.
+    }
+}
+```
+
+<br />
+
+To apply multiple overrides together, use
+[`DeviceConfigurationOverride.then()`](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/DeviceConfigurationOverride#(androidx.compose.ui.test.DeviceConfigurationOverride).then(androidx.compose.ui.test.DeviceConfigurationOverride)):
+
+
+```kotlin
+composeTestRule.setContent {
+    DeviceConfigurationOverride(
+        DeviceConfigurationOverride.FontScale(1.5f) then
+            DeviceConfigurationOverride.FontWeightAdjustment(200)
+    ) {
+        Text(text = "text with increased scale and weight")
+    }
+}
+```
+
+<br />
+
+## Additional Resources
+
+- **[Test apps on Android](https://developer.android.com/training/testing)**: The main Android testing landing page provides a broader view of testing fundamentals and techniques.
+- **[Fundamentals of testing](https://developer.android.com/training/testing/fundamentals):** Learn more about the core concepts behind testing an Android app.
+- **[Local tests](https://developer.android.com/training/testing/local-tests):** You can run some tests locally, on your own workstation.
+- **[Instrumented tests](https://developer.android.com/training/testing/instrumented-tests):** It is good practice to also run instrumented tests. That is, tests that run directly on-device.
+- **[Continuous integration](https://developer.android.com/training/testing/continuous-integration):** Continuous integration lets you integrate your tests into your deployment pipeline.
+- **[Test different screen sizes](https://developer.android.com/training/testing/different-screens):** With some many devices available to users, you should test for different screen sizes.
+- **[Espresso](https://developer.android.com/training/testing/espresso)**: While intended for View-based UIs, Espresso knowledge can still be helpful for some aspects of Compose testing.
+
+## references/android/studio/preview/compose-screenshot-testing.md
+
+> [!WARNING]
+> **Experimental:** Compose Preview Screenshot Testing is still in development. Its features and APIs are subject to change substantially during the alpha phase. Report any feedback and issues through the [issue tracker](https://issuetracker.google.com/issues/new?component=192708&template=840533).
+
+Screenshot testing is an effective way to verify how your UI looks to users.
+The Compose Preview Screenshot Testing tool combines the simplicity and
+features of [composable previews](https://developer.android.com/develop/ui/compose/tooling/previews) with the productivity
+gains of running host-side screenshot tests. Compose Preview Screenshot Testing
+is designed to be as straightforward to use as composable previews.
+
+A screenshot test is an automated test that takes a screenshot of a piece of UI
+and then compares it against a previously approved reference image. If the
+images don't match, the test fails and produces an HTML report to help you
+compare and find the differences.
+
+With the Compose Preview Screenshot Testing tool, you can:
+
+- Use `@PreviewTest` to create screenshot tests for existing or new composable previews.
+- Generate reference images from those composable previews.
+- Generate an HTML report that identifies changes to those previews after you make code changes.
+- Use `@Preview` parameters, such as `uiMode` or `fontScale`, and multi-previews to help you scale your tests.
+- Modularize your tests with the new `screenshotTest` source set.
+
+![](https://developer.android.com/static/studio/images/compose-screenshot-testing.png) **Figure 1.** Example HTML report.
+
+## IDE integration
+
+While you can use the Compose Preview Screenshot Testing tool by running the
+underlying Gradle tasks (`updateScreenshotTest` and `validateScreenshotTest`)
+manually, Android Studio Otter 3 Feature Drop Canary 4 introduces a full IDE
+integration. This lets you generate reference images, run tests, and analyze
+validation failures entirely within the IDE. Here are some of the key features:
+
+- **In-editor gutter icons.** You can now run tests or update reference images directly from the source code. Green run icons appear in the gutter next to composables and classes annotated with `@PreviewTest`.
+  - **Run screenshot tests.** Execute tests specifically for a single function or for an entire class.
+  - **Add or update reference images.** Trigger the update flow specifically for the selected scope.
+
+- **Interactive reference management.** Updating reference images is now safer and more granular.
+  - **New reference image generation dialog.** Instead of running a bulk Gradle task, a new dialog lets you visualize and select exactly which previews to generate or update.
+  - **Preview variations.** The dialog lists all preview variations (such as light theme or dark theme, or different devices) individually, allowing you to select or clear specific items before generating images.
+
+- **Integrated test results and diff viewer.** View results without leaving the IDE.
+  - **Unified run panel.** Screenshot test results appear in the standard **Run** tool window. Tests are grouped by class and function, with pass or fail status clearly marked.
+  - **Visual diff tool.** When a test fails, the **Screenshot** tab lets you compare the *Reference* , *Actual* , and *Diff* images side-by-side.
+  - **Detailed attributes.** An **Attributes** tab provides metadata on failed tests, including match percentage, image dimensions, and the specific preview configuration used (for example, `uiMode` or `fontScale`).
+
+- **Flexible test scoping.** You can now execute screenshot tests with various scopes directly from the Project View. Right-click a module, directory, file, or class to run screenshot tests specifically for that selection.
+
+## Requirements
+
+To use Compose Preview Screenshot Testing through the full IDE integration, your
+project must meet the following requirements:
+
+- Android Studio Panda 1 Canary 4 or higher.
+- Android Gradle Plugin (AGP) version 9.0 or higher.
+- Compose Preview Screenshot Testing plugin version [0.0.1-alpha14](https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes#alpha14) or higher.
+- Kotlin version 2.2.10 or higher.
+- JDK version 17 or higher.
+- Compose enabled for your project. We recommend enabling Compose using the [Compose Compiler Gradle plugin](https://developer.android.com/develop/ui/compose/compiler).
+
+If you only want to use the underlying Gradle tasks without the IDE integration,
+the requirements are as follows:
+
+- Android Gradle Plugin (AGP) version 8.5.0 or higher.
+- Compose Preview Screenshot Testing plugin version [0.0.1-alpha14](https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes#alpha14) or higher.
+- Kotlin version 1.9.20 or higher. We recommend using Kotlin 2.0 or higher so you can use the Compose Compiler Gradle plugin.
+- JDK version 17 or higher.
+- Compose enabled for your project. We recommend enabling Compose using the [Compose Compiler Gradle plugin](https://developer.android.com/develop/ui/compose/compiler).
+
+> [!NOTE]
+> **Note:** If you can't use the Compose Compiler Gradle plugin, you can enable Compose by [declaring a dependency on the Compose Compiler directly](https://developer.android.com/jetpack/androidx/releases/compose-kotlin#kts). Make sure you use `kotlinCompilerExtensionVersion` version 1.5.4 or higher.
+
+## Setup
+
+Both the integrated tool and the underlying Gradle tasks rely on the Compose
+Preview Screenshot Testing plugin. To set up the plugin, follow these steps:
+
+1. Enable the experimental property in your project's `gradle.properties` file.
+
+       android.experimental.enableScreenshotTest=true
+
+2. In the `android {}` block of your module-level `build.gradle.kts` file,
+   enable the experimental flag to use the `screenshotTest` source set.
+
+       android {
+           experimentalProperties["android.experimental.enableScreenshotTest"] = true
+       }
+
+3. Add the `com.android.compose.screenshot` plugin, version `0.0.1-alpha14` to
+   your project.
+
+   1. Add the plugin to your version catalogs file:
+
+          [versions]
+          agp = "9.0.0-rc03"
+          kotlin = "2.1.20"
+          screenshot = "0.0.1-alpha14"
+
+          [plugins]
+          screenshot = { id = "com.android.compose.screenshot", version.ref = "screenshot"}
+
+   2. In your module-level `build.gradle.kts` file, add the plugin in the
+      `plugins {}` block:
+
+          plugins {
+              alias(libs.plugins.screenshot)
+          }
+
+4. Add the [`screenshot-validation-api`](https://maven.google.com/web/index.html?q=screenshot-validation-api#com.android.tools.screenshot:screenshot-validation-api)
+   and [`ui-tooling`](https://maven.google.com/web/index.html?q=tooling#androidx.compose.ui:ui-tooling)
+   dependencies.
+
+   1. Add them to your version catalogs:
+
+          [libraries]
+          screenshot-validation-api = { group = "com.android.tools.screenshot", name = "screenshot-validation-api", version.ref = "screenshot"}
+          androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling"}
+
+   2. Add them to your module-level `build.gradle.kts` file:
+
+          dependencies {
+            screenshotTestImplementation(libs.screenshot.validation.api)
+            screenshotTestImplementation(libs.androidx.ui.tooling)
+          }
+
+## Designate composable previews to use for screenshot tests
+
+To designate the composable previews you want to use for screenshot tests, mark
+the previews with the `@PreviewTest` annotation. The previews must be located in
+the new `screenshotTest` source set, for example:
+
+`app/src/screenshotTest/kotlin/com/example/yourapp/`
+`ExamplePreviewScreenshotTest.kt`
+
+You can add more composables or previews, including multi-previews, in
+this file or other files created in the same source set.
+
+    package com.example.yourapp
+
+    import androidx.compose.runtime.Composable
+    import androidx.compose.ui.tooling.preview.Preview
+    import com.android.tools.screenshot.PreviewTest
+    import com.example.yourapp.ui.theme.MyApplicationTheme
+
+    @PreviewTest
+    @Preview(showBackground = true)
+    @Composable
+    fun GreetingPreview() {
+        MyApplicationTheme {
+            Greeting("Android!")
+        }
+    }
+
+## Generate reference images
+
+After you set up a test class, you need to generate reference images for each
+preview. These reference images are used to identify changes later, after you
+make code changes. To generate reference images for your composable preview
+screenshot tests, follow the instructions in this section for the IDE
+integration or for the Gradle tasks.
+
+### In the IDE
+
+Click the gutter icon next to a `@PreviewTest` function and select **Add/Update
+Reference Images** . Select the previews in the dialog and click **Add**.
+
+### With the Gradle tasks
+
+Run the following Gradle task:
+
+- Linux and macOS: `./gradlew updateDebugScreenshotTest` (`./gradlew :{module}:update{Variant}ScreenshotTest`)
+- Windows: `gradlew updateDebugScreenshotTest` (`gradlew :{module}:update{Variant}ScreenshotTest`)
+
+After the task completes, find the reference images in
+`app/src/screenshotTestDebug/reference`
+(`{module}/src/screenshotTest{Variant}/reference`).
+
+> [!NOTE]
+> **Note:** The reference images are named with a concatenation of the fully-qualified name of the test function and a hash of the preview parameters, for example `com.sample.screenshottests.test1_da39a3ee_c2200e98_0.png`.
+
+## Generate a test report
+
+Once the reference images exist, generate a test report by following the
+instructions in this section for the IDE integration or for the Gradle tasks.
+
+### In the IDE
+
+Click the gutter icon next to a `@PreviewTest` function and select **Run
+'ScreenshotTests'**.
+
+If a test fails, click the test name in the **Run** panel. Select the
+**Screenshot** tab to inspect the image diff using the integrated zoom and pan
+controls.
+
+> [!NOTE]
+> **Note:** Renaming a function annotated with `@PreviewTest` breaks the association with existing reference images. In that case, you must [regenerate reference images](https://developer.android.com/studio/preview/compose-screenshot-testing#generate-reference-images) for the new function name.
+
+### With the Gradle tasks
+
+Run the validate task to take a new screenshot and compare it with the
+reference image:
+
+- Linux and macOS: `./gradlew validateDebugScreenshotTest` (`./gradlew :{module}:validate{Variant}ScreenshotTest`)
+- Windows: `gradlew validateDebugScreenshotTest` (`gradlew :{module}:validate{Variant}ScreenshotTest`)
+
+The verification task creates an HTML report at
+`{module}/build/reports/screenshotTest/preview/{variant}/index.html`.
+
+## Troubleshooting
+
+Compose Preview Screenshot Testing runs host-side tests, which can be
+memory-intensive. You can increase the maximum heap size for the test JVM by
+adding the following property to your `gradle.properties` file:
+
+    android.compose.screenshot.maxHeapSize=4g
+
+## Known issues
+
+- **Kotlin Multiplatform (KMP):** Both the IDE and the underlying plugin are engineered exclusively for Android projects. They don't support non-Android targets in KMP projects.
+
+You can find the complete list of current known issues in the tool's
+[issue tracker component](https://issuetracker.google.com/issues?q=status:open+componentid:1581441&s=created_time:desc). Report any other feedback and issues
+through the [issue tracker](https://issuetracker.google.com/issues/new?component=192708&template=840533).
+
+## Release updates
+
+For a full list of release updates, see the
+[release notes](https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes).
+
+## references/android/training/dependency-injection/hilt-testing.md
+
+One of the benefits of using dependency injection frameworks like Hilt is that
+it makes testing your code easier.
+
+## Unit tests
+
+Hilt isn't necessary for unit tests, since when testing a class that uses
+constructor injection, you don't need to use Hilt to instantiate that class.
+Instead, you can directly call a class constructor by passing in fake or mock
+dependencies, just as you would if the constructor weren't annotated:
+
+```kotlin
+@ActivityScoped
+class AnalyticsAdapter @Inject constructor(
+  private val service: AnalyticsService
+) { ... }
+
+class AnalyticsAdapterTest {
+
+  @Test
+  fun `Happy path`() {
+    // You don't need Hilt to create an instance of AnalyticsAdapter.
+    // You can pass a fake or mock AnalyticsService.
+    val adapter = AnalyticsAdapter(fakeAnalyticsService)
+    assertEquals(...)
+  }
+}
+```
+
+The same applies to ViewModel classes obtained by calling `hiltViewModel()` in
+your composables. In unit tests, construct the ViewModel directly with fakes.
+For information on how state flows from a ViewModel into composables, see
+[State and Jetpack Compose](https://developer.android.com/develop/ui/compose/state) and [Where to hoist state](https://developer.android.com/develop/ui/compose/state-hoisting).
+
+## End-to-end tests
+
+For integration tests, Hilt injects dependencies as it would in your production
+code. Testing with Hilt requires no maintenance because Hilt automatically
+generates a new set of components for each test.
+
+### Adding testing dependencies
+
+To use Hilt in your tests, include the `hilt-android-testing` dependency in your
+project:
+
+```kotlin
+dependencies {
+    // For Robolectric tests.
+    testImplementation("com.google.dagger:hilt-android-testing:2.57.1")
+    kspTest("com.google.dagger:hilt-android-compiler:2.57.1")
+
+    // For instrumented tests.
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.57.1")
+    kspAndroidTest("com.google.dagger:hilt-android-compiler:2.57.1")
+
+    // Compose UI test rule.
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+}
+```
+
+> [!NOTE]
+> **Note:** If you use [Jetpack integrations](https://developer.android.com/training/dependency-injection/hilt-jetpack) (like `hilt-navigation-compose` to obtain a ViewModel through `hiltViewModel()`), you must also add their annotation processors to your test dependencies.
+
+### UI test setup
+
+You must annotate any UI test that uses Hilt with `@HiltAndroidTest`. This
+annotation is responsible for generating the Hilt components for each test.
+
+Also, you need to add the `HiltAndroidRule` to the test class. It manages the
+components' state and is used to perform injection on your test:
+
+```kotlin
+@HiltAndroidTest
+class SettingsScreenTest {
+
+    @get:Rule(order = 0)
+    val hiltRule = HiltAndroidRule(this)
+
+    @get:Rule(order = 1)
+    val composeRule = createAndroidComposeRule<HiltTestActivity>()
+
+    // Compose UI tests here.
+}
+```
+
+> [!NOTE]
+> **Note:** If you have other rules in your test, see [Multiple TestRule objects in
+> your instrumented test](https://developer.android.com/training/dependency-injection/hilt-testing#multiple-testrules).
+
+Next, your test needs to know about the `Application` class that Hilt
+automatically generates for you.
+
+To let Hilt inject dependencies, you must create an empty activity named
+`HiltTestActivity` in your `androidTest` source set and annotate it with
+`@AndroidEntryPoint`. `createAndroidComposeRule` then uses this activity as the
+host for your composable content.
+
+#### Test application
+
+You must execute instrumented tests that use Hilt in an `Application` object
+that supports Hilt. The library provides `HiltTestApplication` for use in tests.
+If your tests need a different base application, see [Custom application for
+tests](https://developer.android.com/training/dependency-injection/hilt-testing#custom-application).
+
+You must set your test application to run in your [instrumented
+tests](https://developer.android.com/training/testing/ui-testing) or [Robolectric
+tests](http://robolectric.org/). The following instructions aren't
+specific to Hilt, but are general guidelines on how to specify a custom
+application to run in tests.
+
+##### Set the test application in instrumented tests
+
+To use the Hilt test application in [instrumented
+tests](https://developer.android.com/training/testing/ui-testing), you need to configure a new test runner.
+This makes Hilt work for all of the instrumented tests in your project. Perform
+the following steps:
+
+1. Create a custom class that extends [`AndroidJUnitRunner`](https://developer.android.com/reference/kotlin/androidx/test/runner/AndroidJUnitRunner) in the `androidTest` folder.
+2. Override the `newApplication` function and pass in the name of the generated Hilt test application.
+
+```kotlin
+// A custom runner to set up the instrumented application class for tests.
+class CustomTestRunner : AndroidJUnitRunner() {
+
+    override fun newApplication(cl: ClassLoader?, name: String?, context: Context?): Application {
+        return super.newApplication(cl, HiltTestApplication::class.java.name, context)
+    }
+}
+```
+
+Next, configure this test runner in your Gradle file as described in the
+[instrumented unit test
+guide](https://developer.android.com/training/testing/unit-testing/instrumented-unit-tests#setup). Make sure
+you use the full classpath:
+
+```kotlin
+android {
+    defaultConfig {
+        // Replace com.example.android.dagger with your class path.
+        testInstrumentationRunner = "com.example.android.dagger.CustomTestRunner"
+    }
+}
+```
+
+##### Set the test application in Robolectric tests
+
+If you use Robolectric to test your UI layer, you can specify which application
+to use in the `robolectric.properties` file:
+
+`application = dagger.hilt.android.testing.HiltTestApplication`
+
+Alternatively, you can configure the application on each test individually by
+using Robolectric's `@Config` annotation:
+
+```kotlin
+@HiltAndroidTest
+@Config(application = HiltTestApplication::class)
+class SettingsScreenTest {
+
+  @get:Rule
+  var hiltRule = HiltAndroidRule(this)
+
+  // Robolectric tests here.
+}
+```
+
+### Testing features
+
+Once Hilt is ready to use in your tests, you can use several features to
+customize the testing process.
+
+#### Inject types in tests
+
+To inject types into a test, use `@Inject` for field injection. To tell Hilt to
+populate the `@Inject` fields, call `hiltRule.inject()`.
+
+See the following example of an instrumented test:
+
+```kotlin
+@HiltAndroidTest
+class SettingsScreenTest {
+
+    @get:Rule(order = 0)
+    val hiltRule = HiltAndroidRule(this)
+
+    @get:Rule(order = 1)
+    val composeRule = createAndroidComposeRule<HiltTestActivity>()
+
+    @Inject
+    lateinit var analyticsAdapter: AnalyticsAdapter
+
+    @Before
+    fun init() {
+        hiltRule.inject()
+    }
+
+    @Test
+    fun settingsScreen_showsTitle() {
+        composeRule.setContent {
+            SettingsScreen()
+        }
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        // analyticsRepository is available here.
+    }
+}
+```
+
+#### Replace a binding
+
+If you need to inject a fake or mock instance of a dependency, you need to tell
+Hilt not to use the binding that it used in production code and to use a
+different one instead. To replace a binding, you need to replace the module that
+contains the binding with a test module that contains the bindings that you want
+to use in the test.
+
+For example, suppose your production code declares a binding for
+`AnalyticsService` as follows:
+
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class AnalyticsModule {
+
+  @Singleton
+  @Binds
+  abstract fun bindAnalyticsService(
+    analyticsServiceImpl: AnalyticsServiceImpl
+  ): AnalyticsService
+}
+```
+
+To replace the `AnalyticsService` binding in tests, create a new Hilt module in
+the `test` or `androidTest` folder with the fake dependency and annotate it
+with `@TestInstallIn`. All the tests in that folder are injected with the fake
+dependency instead.
+
+```kotlin
+@Module
+@TestInstallIn(
+    components = [SingletonComponent::class],
+    replaces = [AnalyticsModule::class]
+)
+abstract class FakeAnalyticsModule {
+
+  @Singleton
+  @Binds
+  abstract fun bindAnalyticsService(
+    fakeAnalyticsService: FakeAnalyticsService
+  ): AnalyticsService
+}
+```
+
+Because composables typically consume these dependencies indirectly through a
+ViewModel obtained with `hiltViewModel()`, replacing the binding in Hilt is
+enough. The composable under test picks up the fake automatically.
+
+#### Replace a binding in a single test
+
+To replace a binding in a single test instead of all tests, uninstall a Hilt
+module from a test using the `@UninstallModules` annotation and create a new
+test module inside the test.
+
+Following the `AnalyticsService` example from the previous version, begin by
+telling Hilt to ignore the production module by using the `@UninstallModules`
+annotation in the test class:
+
+```kotlin
+@UninstallModules(AnalyticsModule::class)
+@HiltAndroidTest
+class SettingsScreenTest { ... }
+```
+
+Next, you must replace the binding. Create a new module within the test class
+that defines the test binding:
+
+```kotlin
+@UninstallModules(AnalyticsModule::class)
+@HiltAndroidTest
+class SettingsScreenTest {
+
+  @Module
+  @InstallIn(SingletonComponent::class)
+  abstract class TestModule {
+
+    @Singleton
+    @Binds
+    abstract fun bindAnalyticsService(
+      fakeAnalyticsService: FakeAnalyticsService
+    ): AnalyticsService
+  }
+
+  // ...
+}
+```
+
+This only replaces the binding for a single test class. If you want to replace
+the binding for all test classes, use the `@TestInstallIn` annotation from the
+section above. Alternatively, you can put the test binding in the `test` module
+for Robolectric tests, or in the `androidTest` module for instrumented tests.
+The recommendation is to use `@TestInstallIn` whenever possible.
+
+> [!WARNING]
+> **Warning:** You cannot uninstall modules that are not annotated with `@InstallIn`. Attempting to do so causes a compilation error.
+
+> [!WARNING]
+> **Warning:** `@UninstallModules` can only uninstall `@InstallIn` modules, not `@TestInstallIn` modules. Attempting to do so causes a compilation error.
+
+> [!NOTE]
+> **Note:** As Hilt creates new components for tests that use `@UninstallModules`, it can significantly impact unit test build times. Use it when necessary and prefer using `@TestInstallIn` when the bindings need to be replaced in all test classes.
+
+#### Binding new values
+
+Use the `@BindValue` annotation to easily bind fields in your test into the Hilt
+dependency graph. Annotate a field with `@BindValue` and it will be bound under
+the declared field type with any qualifiers that are present for that field.
+
+In the `AnalyticsService` example, you can replace `AnalyticsService` with a
+fake by using `@BindValue`:
+
+```kotlin
+@UninstallModules(AnalyticsModule::class)
+@HiltAndroidTest
+class SettingsScreenTest {
+
+  @BindValue @JvmField
+  val analyticsService: AnalyticsService = FakeAnalyticsService()
+
+  ...
+}
+```
+
+This simplifies both replacing a binding and referencing a binding in your test
+by allowing you to do both at the same time.
+
+`@BindValue` works with qualifiers and other testing annotations. For example,
+if you use testing libraries such as
+[Mockito](https://site.mockito.org/), you could use it in a
+Robolectric test as follows:
+
+```kotlin
+...
+class SettingsScreenTest {
+  ...
+
+  @BindValue @ExampleQualifier @Mock
+  lateinit var qualifiedVariable: ExampleCustomType
+
+  // Robolectric tests here
+}
+```
+
+If you need to add a [multibinding](https://dagger.dev/dev-guide/multibindings),
+you can use the `@BindValueIntoSet` and `@BindValueIntoMap` annotations in place
+of `@BindValue`. `@BindValueIntoMap` requires you to also annotate the field
+with a map key annotation.
+
+## Special cases
+
+Hilt also provides features to support nonstandard use cases.
+
+### Custom application for tests
+
+If you cannot use `HiltTestApplication` because your test application needs to
+extend another application, annotate a new class or interface with
+`@CustomTestApplication`, passing in the value of the base class you want the
+generated Hilt application to extend.
+
+`@CustomTestApplication` will generate an `Application` class ready for testing
+with Hilt that extends the application you passed as a parameter.
+
+```kotlin
+@CustomTestApplication(BaseApplication::class)
+interface HiltTestApplication
+```
+
+In the example, Hilt generates an `Application` named
+`HiltTestApplication_Application` that extends the `BaseApplication` class. In
+general, the name of the generated application is the name of the annotated
+class appended with `_Application`. You must set the generated Hilt test
+application to run in your [instrumented tests](https://developer.android.com/training/testing/ui-testing) or
+[Robolectric tests](http://robolectric.org/) as described in [Test
+application](https://developer.android.com/training/dependency-injection/hilt-testing#test-application).
+
+> [!NOTE]
+> **Note:** Because `HiltTestApplication_Application` is code that Hilt generates at runtime, the IDE might highlight it in red until you run your tests.
+
+### Multiple TestRule objects in your instrumented test
+
+Compose UI tests already combine `HiltAndroidRule` with a Compose test rule
+such as `createAndroidComposeRule`. If you have additional `TestRule` objects,
+make sure `HiltAndroidRule` runs first. Declare the execution order with the
+`order` attribute on `@Rule`:
+
+```kotlin
+@HiltAndroidTest
+class SettingsScreenTest {
+
+  @get:Rule(order = 0)
+  var hiltRule = HiltAndroidRule(this)
+
+  @get:Rule(order = 1)
+  val composeRule = createAndroidComposeRule<HiltTestActivity>()
+
+  @get:Rule(order = 2)
+  val otherRule = SomeOtherRule()
+
+  // UI tests here.
+}
+```
+
+Alternatively, you can wrap the rules with `RuleChain`, placing
+`HiltAndroidRule` as the outer rule.
+
+```kotlin
+@HiltAndroidTest
+class SettingsScreenTest {
+
+  @get:Rule
+  var rule = RuleChain.outerRule(HiltAndroidRule(this)).
+        around(SettingsScreenTestRule(...))
+
+  // UI tests here.
+}
+```
+
+### Use an entry point before the singleton component is available
+
+The `@EarlyEntryPoint` annotation provides an escape hatch when a Hilt entry
+point needs to be created before the singleton component is available in a
+Hilt test.
+
+More information about `@EarlyEntryPoint` in the
+[Hilt documentation](https://dagger.dev/hilt/early-entry-point).
+
+## Additional resources
+
+To learn more about testing, see the following additional resources:
+
+### Documentation
+
+- [Test your Compose layout](https://developer.android.com/develop/ui/compose/testing)
+- [Testing cheatsheet](https://developer.android.com/develop/ui/compose/testing/testing-cheatsheet)
+
+### Views content
+
+- [Hilt testing guide (Views)](https://developer.android.com/topic/architecture/views/dependency-injection/hilt-testing-views)
+
