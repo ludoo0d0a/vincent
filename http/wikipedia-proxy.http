@@ -1,0 +1,44 @@
+### Wikipedia regions — via Cloudflare Worker proxy only
+#
+# Mirrors WikipediaProvider in ProductLookup.android.kt.
+# No direct client call — Worker scrapes fr.wikipedia.org server-side.
+# Pair: none (proxy-only route).
+#
+# Environment: wikipedia — firebaseIdToken + appCheckToken in private env.
+
+### Scrape French wine regions
+GET {{proxyBaseUrl}}/v1/scrape/wikipedia/regions
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401 (stale tokens)", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("regions array returned", function () {
+            client.assert(Array.isArray(response.body.regions), "regions is not an array");
+            client.assert(response.body.regions.length > 0, "expected at least one region");
+        });
+        client.test("regions are sorted", function () {
+            var regions = response.body.regions;
+            for (var i = 1; i < regions.length; i++) {
+                client.assert(regions[i - 1].localeCompare(regions[i]) <= 0,
+                    "not sorted at index " + i);
+            }
+        });
+    }
+%}
+
+### Auth guard — missing tokens rejected
+GET {{proxyBaseUrl}}/v1/scrape/wikipedia/regions
+Accept: application/json
+
+> {%
+    client.test("rejected without auth", function () {
+        client.assert([401, 403].indexOf(response.status) >= 0,
+            "expected 401/403, got " + response.status);
+    });
+%}

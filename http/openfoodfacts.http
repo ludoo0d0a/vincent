@@ -1,0 +1,53 @@
+### Open Food Facts API v2 — direct only (no proxy)
+#
+# Mirrors OpenFoodFactsProvider in ProductLookup.android.kt.
+# No proxy variant — public open API.
+#
+# Environment: openfoodfacts
+
+### Lookup product by EAN — sample barcode (override {{sampleEan}} with any known code)
+GET {{baseUrl}}/product/{{sampleEan}}.json?fields=product_name,brands,categories,countries,image_front_url,image_front_small_url,selected_images
+User-Agent: {{userAgent}}
+Accept: application/json
+
+> {%
+    client.test("200 OK", function () {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+    });
+    client.test("OFF status=1 means product found", function () {
+        client.assert(response.body.status === 1, "product not found (status != 1)");
+    });
+    client.test("product has name or brand", function () {
+        var p = response.body.product;
+        client.assert(p != null, "missing product object");
+        var name = (p.product_name || "").trim();
+        var brand = (p.brands || "").trim();
+        client.assert(name.length > 0 || brand.length > 0, "empty product_name and brands");
+    });
+%}
+
+### Unknown barcode — OFF returns status=0 (product not found)
+GET {{baseUrl}}/product/0000000000000.json?fields=product_name,brands
+User-Agent: {{userAgent}}
+Accept: application/json
+
+> {%
+    client.test("200 OK (OFF always returns 200)", function () {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+    });
+    client.test("status=0 for unknown product", function () {
+        client.assert(response.body.status === 0, "expected status 0 for unknown barcode");
+    });
+%}
+
+### Short EAN guard — client rejects codes shorter than 6 digits (no network call in app)
+# This request is only to document OFF behaviour for very short codes.
+GET {{baseUrl}}/product/12345.json?fields=product_name
+User-Agent: {{userAgent}}
+Accept: application/json
+
+> {%
+    client.test("reachable", function () {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+    });
+%}

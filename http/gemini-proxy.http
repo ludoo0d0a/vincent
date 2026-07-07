@@ -1,0 +1,69 @@
+### Gemini API — via Cloudflare Worker proxy
+#
+# Mirrors generateViaProxy() in WineAi.android.kt (production path).
+# Pair: gemini.http (direct REST with apiKey).
+#
+# Environment: gemini — firebaseIdToken + appCheckToken in private env.
+
+### Worker health check
+GET {{proxyBaseUrl}}/health
+Accept: application/json
+
+> {%
+    client.test("200 OK", function () {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+    });
+    client.test("reports ok + model", function () {
+        client.assert(response.body.ok === true, "health not ok");
+        client.assert(typeof response.body.model === "string", "missing model");
+    });
+%}
+
+### Generate (text-only) — POST /v1/generate
+POST {{generateUrl}}
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompt": "Réponds uniquement en JSON : {\"ok\": true, \"route\": \"proxy\"}",
+  "responseMimeType": "application/json",
+  "cacheable": true
+}
+
+> {%
+    client.test("200, 401 or 429", function () {
+        client.assert([200, 401, 429].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("Gemini response envelope", function () {
+            client.assert(response.body.candidates != null, "missing candidates");
+        });
+        client.test("quota headers on success", function () {
+            client.assert(
+                response.headers.valueOf("X-AI-Quota-Limit") != null ||
+                response.headers.valueOf("x-ai-quota-limit") != null,
+                "missing quota headers"
+            );
+        });
+    }
+%}
+
+### Auth guard — missing tokens rejected
+POST {{generateUrl}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompt": "test",
+  "responseMimeType": "application/json"
+}
+
+> {%
+    client.test("rejected without auth", function () {
+        client.assert([401, 403].indexOf(response.status) >= 0,
+            "expected 401/403, got " + response.status);
+    });
+%}

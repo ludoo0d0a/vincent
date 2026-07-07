@@ -1,14 +1,9 @@
-### grapeminds Public API v1 — IntelliJ HTTP Client tests
+### grapeminds Public API v1 — direct (no Worker proxy)
 #
-# Mirrors GrapeMindsClient.kt (androidMain/.../data/GrapeMindsClient.kt).
-# Base + language come from http-client.env.json; the API key lives in the
-# gitignored http-client.private.env.json ({{apiKey}}).
+# Mirrors GrapeMindsClient.kt direct paths (Bearer apiKey).
+# Pair: grapeminds-proxy.http (catalogue lists via Worker in production).
 #
-# Run: select the "grapeminds" environment (top-right run gutter), then run a
-# request or "Run All Requests in File". Requests are chained — running top to
-# bottom captures a wineId / producerId / regionId for the follow-up calls.
-#
-# Auth: Authorization: Bearer {{apiKey}} + Accept-Language: {{language}}.
+# Environment: grapeminds — http-client.env.json + http-client.private.env.json
 
 ### List wines (first page) — captures {{wineId}}
 GET {{baseUrl}}/wines?page=1&per_page=5
@@ -33,7 +28,7 @@ Accept: application/json
     }
 %}
 
-### List wines filtered by color=red — every row is red
+### List wines filtered by color=red
 GET {{baseUrl}}/wines?per_page=10&color=red
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -50,7 +45,7 @@ Accept: application/json
     });
 %}
 
-### Search wines — q must be >= 3 chars (client-side guard in searchWines)
+### Search wines — q must be >= 3 chars
 GET {{baseUrl}}/wines/search?q=margaux&limit=20
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -65,7 +60,7 @@ Accept: application/json
     });
 %}
 
-### Get wine detail by id (uses {{wineId}} from the first request)
+### Get wine detail — uses {{wineId}}
 GET {{baseUrl}}/wines/{{wineId}}
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -75,22 +70,20 @@ Accept: application/json
     client.test("200 OK", function () {
         client.assert(response.status === 200, "Expected 200, got " + response.status);
     });
-    client.test("detail id matches requested wineId", function () {
+    client.test("detail id matches wineId", function () {
         client.assert(response.body.data != null, "missing data envelope");
         client.assert(String(response.body.data.id) === client.global.get("wineId"),
             "detail id does not match wineId");
     });
     if (response.body.data && response.body.data.region) {
         client.global.set("regionId", response.body.data.region.id);
-        client.log("captured regionId=" + response.body.data.region.id);
     }
     if (response.body.data && response.body.data.producer) {
         client.global.set("producerId", response.body.data.producer.id);
-        client.log("captured producerId=" + response.body.data.producer.id);
     }
 %}
 
-### List producers — captures {{producerId}} (fallback if none from wine detail)
+### List producers — captures {{producerId}}
 GET {{baseUrl}}/producers?page=1&per_page=15
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -108,7 +101,7 @@ Accept: application/json
     }
 %}
 
-### Search producers — search param requires >= 2 chars
+### Search producers — search >= 2 chars
 GET {{baseUrl}}/producers?per_page=15&search=ch
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -135,7 +128,7 @@ Accept: application/json
     });
 %}
 
-### List regions — captures {{regionId}} (fallback if none from wine detail)
+### List regions — captures {{regionId}}
 GET {{baseUrl}}/regions?page=1&per_page=15
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -180,7 +173,7 @@ Accept: application/json
     });
 %}
 
-### Region insights (AI generated; may return generating=true on first hit)
+### Region insights (may return generating=true)
 GET {{baseUrl}}/region-insights/{{regionId}}?lang={{language}}
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -199,7 +192,7 @@ Accept: application/json
     });
 %}
 
-### Drinking period for a wine (AI generated; may return generating=true)
+### Drinking period (may return generating=true)
 GET {{baseUrl}}/drinking-periods/{{wineId}}?lang={{language}}
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -218,9 +211,7 @@ Accept: application/json
     });
 %}
 
-### Photo analysis (Enterprise plan only) — expects a base64 data URI
-# Replace the tiny 1x1 pixel below with a real label photo data URI to exercise
-# detection. Without an Enterprise key this is expected to 401/403.
+### Photo analysis (Enterprise plan only)
 POST {{baseUrl}}/photo/analyze
 Authorization: Bearer {{apiKey}}
 Accept-Language: {{language}}
@@ -239,7 +230,7 @@ Accept: application/json
     });
 %}
 
-### Auth guard — a bogus key must be rejected (401/403)
+### Auth guard — bogus key rejected
 GET {{baseUrl}}/wines?per_page=1
 Authorization: Bearer not-a-real-key
 Accept-Language: {{language}}

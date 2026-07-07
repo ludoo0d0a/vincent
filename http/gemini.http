@@ -1,0 +1,60 @@
+### Gemini API — direct (no Worker proxy)
+#
+# Mirrors generateDirect() in WineAi.android.kt (debug builds when AI_PROXY_URL is blank).
+# Pair: gemini-proxy.http (production Worker path).
+#
+# Environment: gemini — apiKey in http-client.private.env.json
+
+### Text-only generateContent
+POST {{baseUrl}}/models/{{model}}:generateContent?key={{apiKey}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Réponds uniquement en JSON : {\"ok\": true, \"route\": \"direct\"}"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "responseMimeType": "application/json"
+  }
+}
+
+> {%
+    client.test("200 OK", function () {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+    });
+    client.test("Gemini response envelope", function () {
+        client.assert(response.body.candidates != null, "missing candidates");
+        client.assert(response.body.candidates.length > 0, "empty candidates");
+    });
+%}
+
+### Auth guard — bogus key rejected
+POST {{baseUrl}}/models/{{model}}:generateContent?key=not-a-real-key
+Content-Type: application/json
+Accept: application/json
+
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "test"
+        }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("rejected without a valid key", function () {
+        client.assert([400, 401, 403].indexOf(response.status) >= 0,
+            "expected 400/401/403, got " + response.status);
+    });
+%}

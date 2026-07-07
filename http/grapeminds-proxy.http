@@ -1,30 +1,12 @@
-### grapeminds via the Cloudflare Worker proxy (/v1/grapeminds/*)
+### grapeminds Public API v1 — via Cloudflare Worker proxy
 #
-# The app routes catalogue lists (/wines, /producers, /regions) through the
-# Worker so GRAPEMINDS_API_KEY never ships in the APK (worker/src/index.ts →
-# handleGrapemindsGet). The Worker authenticates the *caller* with Firebase
-# App Check + a Firebase ID token instead of the grapeminds key.
+# Worker forwards GET /v1/grapeminds/* → grapeminds API (worker/src/index.ts).
+# Production app path for catalogue lists; search/detail also work through proxy.
+# Pair: grapeminds.http (direct Bearer apiKey).
 #
-# Requires:
-#   - proxyBaseUrl in http-client.env.json (e.g. https://vin-cent-ai.<acct>.workers.dev)
-#   - firebaseIdToken + appCheckToken in http-client.private.env.json
-#     (short-lived; grab fresh tokens from a debug build / HttpDebug logs).
-# When ENFORCE_APP_CHECK / ENFORCE_AUTH are true, missing tokens return 401.
+# Environment: grapeminds — proxyBaseUrl + firebaseIdToken + appCheckToken in private env.
 
-### Worker health check (no auth)
-GET {{proxyBaseUrl}}/health
-Accept: application/json
-
-> {%
-    client.test("200 OK", function () {
-        client.assert(response.status === 200, "Expected 200, got " + response.status);
-    });
-    client.test("reports ok", function () {
-        client.assert(response.body.ok === true, "health not ok");
-    });
-%}
-
-### Proxied wines list — Firebase-authenticated, no grapeminds key sent
+### List wines — captures {{wineId}}
 GET {{proxyBaseUrl}}/v1/grapeminds/wines?page=1&per_page=5
 Authorization: Bearer {{firebaseIdToken}}
 X-Firebase-AppCheck: {{appCheckToken}}
@@ -32,41 +14,254 @@ Accept-Language: {{language}}
 Accept: application/json
 
 > {%
-    client.test("authenticated (200) — 401 means stale/absent tokens", function () {
+    client.test("200 or 401 (stale tokens)", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("paginated envelope", function () {
+            client.assert(Array.isArray(response.body.data), "data is not an array");
+            client.assert(response.body.meta != null, "missing meta");
+        });
+        if (response.body.data.length > 0) {
+            client.global.set("wineId", response.body.data[0].id);
+        }
+    }
+%}
+
+### List wines filtered by color=red
+GET {{proxyBaseUrl}}/v1/grapeminds/wines?per_page=10&color=red
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("all rows are red", function () {
+            (response.body.data || []).forEach(function (w) {
+                client.assert(w.color === "red", "found non-red color: " + w.color);
+            });
+        });
+    }
+%}
+
+### Search wines
+GET {{proxyBaseUrl}}/v1/grapeminds/wines/search?q=margaux&limit=20
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("has data array", function () {
+            client.assert(Array.isArray(response.body.data), "data is not an array");
+        });
+    }
+%}
+
+### Get wine detail — uses {{wineId}}
+GET {{proxyBaseUrl}}/v1/grapeminds/wines/{{wineId}}
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("detail id matches wineId", function () {
+            client.assert(response.body.data != null, "missing data");
+            client.assert(String(response.body.data.id) === client.global.get("wineId"),
+                "id mismatch");
+        });
+        if (response.body.data.region) {
+            client.global.set("regionId", response.body.data.region.id);
+        }
+        if (response.body.data.producer) {
+            client.global.set("producerId", response.body.data.producer.id);
+        }
+    }
+%}
+
+### List producers — captures {{producerId}}
+GET {{proxyBaseUrl}}/v1/grapeminds/producers?page=1&per_page=15
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
         client.assert([200, 401].indexOf(response.status) >= 0,
             "unexpected status " + response.status);
     });
     if (response.status === 200) {
         client.test("data is an array", function () {
-            client.assert(Array.isArray(response.body.data), "response.data is not an array");
+            client.assert(Array.isArray(response.body.data), "data is not an array");
         });
+        if (!client.global.get("producerId") && response.body.data.length > 0) {
+            client.global.set("producerId", response.body.data[0].id);
+        }
     }
 %}
 
-### Proxied producers list
-GET {{proxyBaseUrl}}/v1/grapeminds/producers?page=1&per_page=5
+### Search producers
+GET {{proxyBaseUrl}}/v1/grapeminds/producers?per_page=15&search=ch
 Authorization: Bearer {{firebaseIdToken}}
 X-Firebase-AppCheck: {{appCheckToken}}
 Accept-Language: {{language}}
 Accept: application/json
 
 > {%
-    client.test("authenticated (200) or 401 on stale tokens", function () {
+    client.test("200 or 401", function () {
         client.assert([200, 401].indexOf(response.status) >= 0,
             "unexpected status " + response.status);
     });
 %}
 
-### Proxied regions list
-GET {{proxyBaseUrl}}/v1/grapeminds/regions?page=1&per_page=5
+### Get producer detail with wines
+GET {{proxyBaseUrl}}/v1/grapeminds/producers/{{producerId}}?include_wines=1
 Authorization: Bearer {{firebaseIdToken}}
 X-Firebase-AppCheck: {{appCheckToken}}
 Accept-Language: {{language}}
 Accept: application/json
 
 > {%
-    client.test("authenticated (200) or 401 on stale tokens", function () {
+    client.test("200 or 401", function () {
         client.assert([200, 401].indexOf(response.status) >= 0,
             "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("producer detail has id", function () {
+            client.assert(response.body.data != null && response.body.data.id != null,
+                "missing producer id");
+        });
+    }
+%}
+
+### List regions — captures {{regionId}}
+GET {{proxyBaseUrl}}/v1/grapeminds/regions?page=1&per_page=15
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("data is an array", function () {
+            client.assert(Array.isArray(response.body.data), "data is not an array");
+        });
+        if (!client.global.get("regionId") && response.body.data.length > 0) {
+            client.global.set("regionId", response.body.data[0].id);
+        }
+    }
+%}
+
+### List regions filtered by country
+GET {{proxyBaseUrl}}/v1/grapeminds/regions?per_page=15&country=FR
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+%}
+
+### Get region detail with wines
+GET {{proxyBaseUrl}}/v1/grapeminds/regions/{{regionId}}?include_wines=1
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("region detail has id", function () {
+            client.assert(response.body.data != null && response.body.data.id != null,
+                "missing region id");
+        });
+    }
+%}
+
+### Region insights
+GET {{proxyBaseUrl}}/v1/grapeminds/region-insights/{{regionId}}?lang={{language}}
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("has summary or is generating", function () {
+            var b = response.body;
+            client.assert(
+                (typeof b.summary === "string" && b.summary.length > 0) || b.generating === true,
+                "expected summary or generating"
+            );
+        });
+    }
+%}
+
+### Drinking period
+GET {{proxyBaseUrl}}/v1/grapeminds/drinking-periods/{{wineId}}?lang={{language}}
+Authorization: Bearer {{firebaseIdToken}}
+X-Firebase-AppCheck: {{appCheckToken}}
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("200 or 401", function () {
+        client.assert([200, 401].indexOf(response.status) >= 0,
+            "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("has drink window or is generating", function () {
+            var b = response.body;
+            client.assert(
+                (b.from != null && b.to != null) || b.generating === true,
+                "expected from/to or generating"
+            );
+        });
+    }
+%}
+
+### Auth guard — missing Firebase tokens rejected
+GET {{proxyBaseUrl}}/v1/grapeminds/wines?per_page=1
+Accept-Language: {{language}}
+Accept: application/json
+
+> {%
+    client.test("rejected without auth", function () {
+        client.assert([401, 403].indexOf(response.status) >= 0,
+            "expected 401/403 without tokens, got " + response.status);
     });
 %}
