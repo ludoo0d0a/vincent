@@ -28,13 +28,10 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalBar
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,6 +49,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -87,7 +85,10 @@ import fr.geoking.vincent.model.emptyRack
 import fr.geoking.vincent.model.rowLabel
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.BottleThumb
+import fr.geoking.vincent.ui.ColorTag
 import fr.geoking.vincent.ui.ScreenHeader
+import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
 import fr.geoking.vincent.ui.WineBottle
 import fr.geoking.vincent.ui.XBinGrid
@@ -668,62 +669,103 @@ private fun PeekCard(
     }
     // Best-effort link to a real bottle (colour + vintage + price); else info only.
     val match = cell.matchingBottle(Cellar.bottles)
+    if (match != null) {
+        // Rich "hero-style" preview of the actual bottle — same look as the bottle
+        // detail/edit hero card (thumbnail, colour tag, title, rating, badges) rather
+        // than the rack position, plus a direct "drink" action instead of the menu.
+        val qty = match.quantity
+        val title = listOfNotNull(
+            match.domain.takeIf { it.isNotBlank() },
+            match.vintage.takeIf { it != "NM" && it.isNotBlank() },
+        ).joinToString(" ").ifBlank { stringResource(Res.string.add_default_domain) }
+        val subtitle = listOfNotNull(
+            match.appellation.takeIf { it.isNotBlank() && it.trim() != match.domain.trim() },
+            match.provenance.takeIf { it.isNotBlank() },
+        ).joinToString(" · ")
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFFF6EAEA), Color(0xFFEFD9DC))))
+                .padding(12.dp),
+        ) {
+            Column {
+                Row(verticalAlignment = Alignment.Top) {
+                    BottleThumb(match, Modifier.size(width = 46.dp, height = 92.dp).clip(RoundedCornerShape(10.dp)))
+                    Spacer(Modifier.width(13.dp))
+                    Column(Modifier.weight(1f).clickable { onOpenBottle(match) }) {
+                        ColorTag(match.color, label = "${stringResource(match.color.label)} · ${stringResource(match.category.label)}")
+                        Spacer(Modifier.height(6.dp))
+                        Text(title, fontSize = 16.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (subtitle.isNotBlank()) {
+                            Text(subtitle, fontSize = 11.5.sp, color = VincentColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 7.dp)) {
+                            Stars(match.rating)
+                        }
+                        if (qty > 1 || match.price > 0) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 9.dp)) {
+                                if (qty > 1) HeroBadge(stringResource(Res.string.detail_qty), "×$qty")
+                                if (match.price > 0) HeroBadge(stringResource(Res.string.detail_value), "${match.price * qty} €")
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        PeekIconButton(Icons.Filled.LocalBar, stringResource(Res.string.cellar_action_drink), onConsume)
+                        PeekIconButton(Icons.Filled.Close, stringResource(Res.string.cellar_dismiss), onDismiss)
+                    }
+                }
+                if (moving) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(Res.string.cellar_move_target_hint),
+                            fontSize = 12.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
+                            modifier = Modifier.weight(1f),
+                        )
+                        PeekAction(stringResource(Res.string.cellar_action_cancel), null, onMove)
+                    }
+                } else if (clipboard != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (clipboard.mode == RackClipboardMode.CUT) stringResource(Res.string.cellar_cut_pending)
+                        else stringResource(Res.string.cellar_copy_pending),
+                        fontSize = 11.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
+                    )
+                } else {
+                    Spacer(Modifier.height(11.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PeekAction(stringResource(Res.string.edit_bottle), Icons.Filled.Edit, { onEditBottle(match) }, Modifier.weight(1f))
+                        PeekAction(stringResource(Res.string.cellar_action_move), Icons.Filled.SwapHoriz, onMove, Modifier.weight(1f))
+                        PeekAction(stringResource(Res.string.cellar_action_copy), Icons.Filled.ContentCopy, onCopy, Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        return
+    }
+    // No matching bottle in the cellar: show the cell's own info.
     val categoryLabel = cell.category?.let { stringResource(it.label) }
     val colorLabel = cell.color?.let { stringResource(it.label) }
-    val title = match?.domain ?: categoryLabel ?: colorLabel ?: stringResource(Res.string.cellar_spot_label, spot)
+    val title = categoryLabel ?: colorLabel ?: stringResource(Res.string.cellar_spot_label, spot)
     val subtitle = buildString {
-        append(spot)
-        cell.vintage?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
-        cell.price?.let { append(" · $it €") }
+        cell.vintage?.takeIf { it.isNotBlank() }?.let { append(it) }
+        cell.price?.let { if (isNotEmpty()) append(" · "); append("$it €") }
     }
-    var menuOpen by remember(selectedIdx) { mutableStateOf(false) }
     VCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 WineBottle(cell.color ?: WineColor.RED, Modifier.size(width = 26.dp, height = 40.dp))
                 Spacer(Modifier.width(11.dp))
-                val infoMod = if (match != null) Modifier.weight(1f).clickable { onOpenBottle(match) } else Modifier.weight(1f)
-                Column(infoMod) {
+                Column(Modifier.weight(1f)) {
                     Text(title, fontSize = 14.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(subtitle, fontSize = 11.sp, color = VincentColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Box {
-                    PeekIconButton(Icons.Filled.MoreVert, stringResource(Res.string.cellar_actions_menu)) { menuOpen = true }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.cellar_action_copy)) },
-                            leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            onClick = { menuOpen = false; onCopy() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.cellar_action_move)) },
-                            leadingIcon = { Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            onClick = { menuOpen = false; onMove() },
-                        )
-                        if (match != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.edit_bottle)) },
-                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                                onClick = { menuOpen = false; onEditBottle(match) },
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.cellar_action_drink)) },
-                            leadingIcon = { Icon(Icons.Filled.LocalBar, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            onClick = { menuOpen = false; onConsume() },
-                        )
+                    if (subtitle.isNotBlank()) {
+                        Text(subtitle, fontSize = 11.sp, color = VincentColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                PeekIconButton(Icons.Filled.LocalBar, stringResource(Res.string.cellar_action_drink), onConsume)
                 PeekIconButton(Icons.Filled.Close, stringResource(Res.string.cellar_dismiss), onDismiss)
-            }
-            if (match != null && !moving && clipboard == null) {
-                Spacer(Modifier.height(11.dp))
-                PeekAction(
-                    stringResource(Res.string.edit_bottle),
-                    Icons.Filled.Edit,
-                    { onEditBottle(match) },
-                    Modifier.fillMaxWidth()
-                )
             }
             if (moving) {
                 Spacer(Modifier.height(10.dp))
@@ -742,6 +784,12 @@ private fun PeekCard(
                     else stringResource(Res.string.cellar_copy_pending),
                     fontSize = 11.sp, fontWeight = FontWeight.W600, color = VincentColors.Accent,
                 )
+            } else {
+                Spacer(Modifier.height(11.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PeekAction(stringResource(Res.string.cellar_action_move), Icons.Filled.SwapHoriz, onMove, Modifier.weight(1f))
+                    PeekAction(stringResource(Res.string.cellar_action_copy), Icons.Filled.ContentCopy, onCopy, Modifier.weight(1f))
+                }
             }
         }
     }
