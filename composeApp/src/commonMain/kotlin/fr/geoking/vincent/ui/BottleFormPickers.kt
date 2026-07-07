@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,10 +21,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,6 +54,7 @@ import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.Res
 import vincent.composeapp.generated.resources.add_field_vintage
 import vincent.composeapp.generated.resources.add_field_vintage_label
+import vincent.composeapp.generated.resources.add_voice_field_done
 import vincent.composeapp.generated.resources.edit_region_search
 
 /** French regions shown as quick chips; the rest appear behind "…". */
@@ -112,7 +120,8 @@ fun <T> QuickChipPicker(
     equals: (T, T) -> Boolean = { a, b -> a == b },
     onSelect: (T) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(!quickOptions.any { equals(it, selected) }) }
+    val isCustom = !quickOptions.any { equals(it, selected) }
+    var showSheet by remember { mutableStateOf(false) }
 
     Column {
         Text(
@@ -126,22 +135,28 @@ fun <T> QuickChipPicker(
             quickOptions.forEach { opt ->
                 Chip(
                     text = labelOf(opt),
-                    selected = equals(opt, selected) && !expanded,
-                    onClick = { expanded = false; onSelect(opt) },
+                    selected = equals(opt, selected),
+                    onClick = { onSelect(opt) },
                 )
             }
-            Chip(text = "…", selected = expanded, onClick = { expanded = !expanded })
-        }
-        if (expanded) {
-            Spacer(Modifier.height(8.dp))
-            SearchableOptionList(
-                options = allOptions,
-                selected = selected,
-                labelOf = labelOf,
-                equals = equals,
-                onSelect = { onSelect(it); expanded = false },
+            Chip(
+                text = if (isCustom) labelOf(selected) else "…",
+                selected = isCustom,
+                onClick = { showSheet = true },
             )
         }
+    }
+
+    if (showSheet) {
+        OptionPickerSheet(
+            title = label,
+            options = allOptions,
+            selected = selected,
+            labelOf = labelOf,
+            equals = equals,
+            onSelect = { onSelect(it); showSheet = false },
+            onDismiss = { showSheet = false },
+        )
     }
 }
 
@@ -165,10 +180,8 @@ fun QuickRegionPicker(
         catLabel
     }
 
-    var expanded by remember(selectedCategory, selectedProvenance) {
-        mutableStateOf(!PopularWineCategories.contains(selectedCategory) || selectedProvenance.isNotBlank())
-    }
-    var query by remember { mutableStateOf("") }
+    val isCustom = !PopularWineCategories.contains(selectedCategory) || selectedProvenance.isNotBlank()
+    var showSheet by remember { mutableStateOf(false) }
 
     Column {
         Text(
@@ -183,96 +196,129 @@ fun QuickRegionPicker(
                 val text = categoryLabelOf(cat)
                 Chip(
                     text = text,
-                    selected = categoryLabelOf(selectedCategory) == text && selectedProvenance.isBlank() && !expanded,
-                    onClick = {
-                        expanded = false
-                        onSelectCategory(cat)
-                    },
+                    selected = categoryLabelOf(selectedCategory) == text && selectedProvenance.isBlank(),
+                    onClick = { onSelectCategory(cat) },
                 )
             }
-            Chip(text = "…", selected = expanded, onClick = { expanded = !expanded })
-        }
-        if (expanded) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                placeholder = { Text(stringResource(Res.string.edit_region_search), fontSize = 12.sp) },
-                modifier = Modifier.fillMaxWidth(),
+            Chip(
+                text = if (isCustom) selectedLabel else "…",
+                selected = isCustom,
+                onClick = { showSheet = true },
             )
-            Spacer(Modifier.height(6.dp))
+        }
+    }
+
+    if (showSheet) {
+        PickerBottomSheet(title = label, onDismiss = { showSheet = false }) {
+            var query by remember { mutableStateOf("") }
+            SheetSearchField(query, onChange = { query = it })
+            Spacer(Modifier.height(10.dp))
             val filtered = allLabels.filter { it.contains(query, ignoreCase = true) }
             Column(
-                Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(VincentColors.Surface)
-                    .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
-                    .verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
             ) {
                 filtered.forEach { region ->
-                    val on = region == selectedLabel
-                    Text(
-                        region,
-                        fontSize = 13.sp,
-                        fontWeight = if (on) FontWeight.W700 else FontWeight.W500,
-                        color = if (on) VincentColors.Accent else VincentColors.Fg,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                val cat = categoryByLabel[region]
-                                if (cat != null) onSelectCategory(cat) else onSelectRegion(region)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                    )
+                    SheetOptionRow(text = region, selected = region == selectedLabel) {
+                        val cat = categoryByLabel[region]
+                        if (cat != null) onSelectCategory(cat) else onSelectRegion(region)
+                        showSheet = false
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * Material 3 modal bottom sheet used as the "advanced" step behind the "…" chips.
+ * Compact, rounded, and themed with the Vincent palette.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun <T> SearchableOptionList(
+private fun PickerBottomSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = VincentColors.Surface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = VincentColors.Border) },
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+            Spacer(Modifier.height(12.dp))
+            content()
+        }
+    }
+}
+
+/** Searchable option list rendered inside a [PickerBottomSheet]. */
+@Composable
+private fun <T> OptionPickerSheet(
+    title: String,
     options: List<T>,
     selected: T,
     labelOf: @Composable (T) -> String,
     equals: (T, T) -> Boolean,
     onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
+    PickerBottomSheet(title = title, onDismiss = onDismiss) {
+        var query by remember { mutableStateOf("") }
+        SheetSearchField(query, onChange = { query = it })
+        Spacer(Modifier.height(10.dp))
+        val filtered = options.filter { labelOf(it).contains(query, ignoreCase = true) }
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+        ) {
+            filtered.forEach { opt ->
+                SheetOptionRow(text = labelOf(opt), selected = equals(opt, selected)) { onSelect(opt) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetSearchField(value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
-        value = query,
-        onValueChange = { query = it },
+        value = value,
+        onValueChange = onChange,
         singleLine = true,
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = VincentColors.Muted, modifier = Modifier.size(18.dp)) },
+        placeholder = { Text(stringResource(Res.string.edit_region_search), fontSize = 13.sp) },
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(6.dp))
-    val filtered = options.filter { labelOf(it).contains(query, ignoreCase = true) }
-    Column(
+}
+
+/** A single, compact, tappable option row with a trailing check for the current value. */
+@Composable
+private fun SheetOptionRow(text: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
         Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .padding(vertical = 2.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(VincentColors.Surface)
-            .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
-            .verticalScroll(rememberScrollState()),
+            .background(if (selected) VincentColors.AccentSoft else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        filtered.forEach { opt ->
-            val on = equals(opt, selected)
-            Text(
-                labelOf(opt),
-                fontSize = 13.sp,
-                fontWeight = if (on) FontWeight.W700 else FontWeight.W500,
-                color = if (on) VincentColors.Accent else VincentColors.Fg,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelect(opt) }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            )
+        Text(
+            text,
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.W700 else FontWeight.W500,
+            color = if (selected) VincentColors.Accent else VincentColors.Fg,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(Icons.Filled.Check, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -287,10 +333,8 @@ fun VintageQuickPicker(
         val y = getCurrentYear()
         (y downTo y - 2).map { it.toString() }
     }
-    var expanded by remember(selected) { mutableStateOf(selected.isNotBlank() && selected !in quickYears && selected != "NM") }
-    var pickerYear by remember(selected) {
-        mutableIntStateOf(selected.toIntOrNull() ?: getCurrentYear())
-    }
+    val isCustom = selected.isNotBlank() && selected !in quickYears && selected != "NM"
+    var showSheet by remember { mutableStateOf(false) }
 
     Column {
         if (showLabel) {
@@ -305,59 +349,76 @@ fun VintageQuickPicker(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             quickYears.forEach { year ->
-                Chip(text = year, selected = year == selected && !expanded, onClick = { expanded = false; onSelect(year) })
+                Chip(text = year, selected = year == selected, onClick = { onSelect(year) })
             }
-            Chip(text = "NM", selected = selected == "NM" && !expanded, onClick = { expanded = false; onSelect("NM") })
-            Chip(text = "…", selected = expanded, onClick = { expanded = !expanded })
-        }
-        if (expanded) {
-            Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                StepButton(Icons.Filled.Remove) {
-                    pickerYear--
-                    onSelect(pickerYear.toString())
-                }
-                Text(
-                    pickerYear.toString(),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.W800,
-                    color = VincentColors.Fg,
-                    modifier = Modifier.weight(1f),
-                )
-                StepButton(Icons.Filled.Add) {
-                    pickerYear++
-                    onSelect(pickerYear.toString())
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .height(140.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(VincentColors.Surface)
-                    .border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                val y = getCurrentYear()
-                ((y + 1) downTo 1950).forEach { year ->
-                    val s = year.toString()
-                    ChipListRow(s, s == selected) { pickerYear = year; onSelect(s) }
-                }
-            }
-            OutlinedTextField(
-                value = if (selected !in quickYears && selected != "NM") selected else "",
-                onValueChange = onSelect,
-                singleLine = true,
-                label = { Text(stringResource(Res.string.add_field_vintage), fontSize = 12.sp) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            Chip(text = "NM", selected = selected == "NM", onClick = { onSelect("NM") })
+            Chip(
+                text = if (isCustom) selected else "…",
+                selected = isCustom,
+                onClick = { showSheet = true },
             )
         }
+    }
+
+    if (showSheet) {
+        VintagePickerSheet(
+            selected = selected,
+            onSelect = onSelect,
+            onDismiss = { showSheet = false },
+        )
+    }
+}
+
+@Composable
+private fun VintagePickerSheet(
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var pickerYear by remember { mutableIntStateOf(selected.toIntOrNull() ?: getCurrentYear()) }
+    var custom by remember { mutableStateOf(if (selected.toIntOrNull() != null) selected else "") }
+
+    PickerBottomSheet(title = stringResource(Res.string.add_field_vintage_label), onDismiss = onDismiss) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            StepButton(Icons.Filled.Remove) { pickerYear--; custom = pickerYear.toString() }
+            Text(
+                pickerYear.toString(),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.W800,
+                color = VincentColors.Fg,
+                modifier = Modifier.weight(1f),
+            )
+            StepButton(Icons.Filled.Add) { pickerYear++; custom = pickerYear.toString() }
+            Chip(text = stringResource(Res.string.add_voice_field_done), selected = true) {
+                onSelect(pickerYear.toString()); onDismiss()
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
+        ) {
+            val y = getCurrentYear()
+            ((y + 1) downTo 1950).forEach { year ->
+                val s = year.toString()
+                SheetOptionRow(text = s, selected = s == selected) {
+                    pickerYear = year; onSelect(s); onDismiss()
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = custom,
+            onValueChange = { custom = it; onSelect(it) },
+            singleLine = true,
+            label = { Text(stringResource(Res.string.add_field_vintage), fontSize = 12.sp) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -367,8 +428,8 @@ fun AlcoholQuickPicker(
     selected: Double,
     onSelect: (Double) -> Unit,
 ) {
-    val selectedLabel = if (selected > 0.0) formatAlcohol(selected) else ""
-    var expanded by remember { mutableStateOf(selected > 0.0 && selected !in CommonAlcoholLevels) }
+    val isCustom = selected > 0.0 && selected !in CommonAlcoholLevels
+    var showSheet by remember { mutableStateOf(false) }
 
     Column {
         Text(
@@ -383,25 +444,28 @@ fun AlcoholQuickPicker(
                 val text = formatAlcohol(level)
                 Chip(
                     text = text,
-                    selected = selected == level && !expanded,
-                    onClick = { expanded = false; onSelect(level) },
+                    selected = selected == level,
+                    onClick = { onSelect(level) },
                 )
             }
-            Chip(text = "…", selected = expanded, onClick = { expanded = !expanded })
-        }
-        if (expanded) {
-            Spacer(Modifier.height(8.dp))
-            SearchableOptionList(
-                options = AllAlcoholLevels,
-                selected = if (selected > 0.0) selected else CommonAlcoholLevels.first(),
-                labelOf = { formatAlcohol(it) },
-                equals = { a, b -> a == b },
-                onSelect = { onSelect(it); expanded = false },
+            Chip(
+                text = if (isCustom) formatAlcohol(selected) else "…",
+                selected = isCustom,
+                onClick = { showSheet = true },
             )
-        } else if (selectedLabel.isNotBlank() && selected !in CommonAlcoholLevels) {
-            Spacer(Modifier.height(4.dp))
-            Text(selectedLabel, fontSize = 12.sp, color = VincentColors.Muted, modifier = Modifier.padding(start = 2.dp))
         }
+    }
+
+    if (showSheet) {
+        OptionPickerSheet(
+            title = label,
+            options = AllAlcoholLevels,
+            selected = if (selected > 0.0) selected else CommonAlcoholLevels.first(),
+            labelOf = { formatAlcohol(it) },
+            equals = { a, b -> a == b },
+            onSelect = { onSelect(it); showSheet = false },
+            onDismiss = { showSheet = false },
+        )
     }
 }
 
@@ -472,20 +536,6 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
             color = if (selected) Color.White else VincentColors.Fg,
         )
     }
-}
-
-@Composable
-private fun ChipListRow(text: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        text,
-        fontSize = 13.sp,
-        fontWeight = if (selected) FontWeight.W700 else FontWeight.W500,
-        color = if (selected) VincentColors.Accent else VincentColors.Fg,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    )
 }
 
 @Composable
