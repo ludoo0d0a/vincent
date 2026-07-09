@@ -15,20 +15,30 @@ import kotlinx.coroutines.launch
 
 /** Reactive list of racks, seeded from [SampleData] and editable at runtime. */
 object Racks {
-    val all = mutableStateListOf<Rack>().also { it.addAll(SampleData.seedRacks()) }
+    val all = mutableStateListOf<Rack>()
 
     private var repo: RackRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** Wire a persistent store. If empty, the seed is persisted. */
-    suspend fun bootstrap(repository: RackRepository) {
+    suspend fun bootstrap(repository: RackRepository, shouldSeed: Boolean = false) {
         repo = repository
         val persisted = repository.loadAll()
-        if (persisted.isEmpty()) {
-            all.forEach { repository.upsert(it) }
+        if (persisted.isEmpty() && shouldSeed) {
+            val seed = SampleData.seedRacks()
+            seed.forEach { repository.upsert(it) }
+            all.clear(); all.addAll(seed)
         } else {
             all.clear(); all.addAll(persisted)
         }
+    }
+
+    suspend fun seedDemoData() {
+        val r = repo ?: return
+        val seed = SampleData.seedRacks()
+        seed.forEach { r.upsert(it) }
+        all.clear()
+        all.addAll(seed)
     }
 
     suspend fun reloadFromRepository() {

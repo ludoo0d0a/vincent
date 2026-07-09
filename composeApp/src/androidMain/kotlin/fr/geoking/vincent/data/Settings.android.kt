@@ -20,12 +20,16 @@ actual object Settings {
     private var _language by mutableStateOf("")
     actual val language: String get() = _language
 
+    private var _demoDataSeeded by mutableStateOf(false)
+    actual val demoDataSeeded: Boolean get() = _demoDataSeeded
+
     fun init(context: Context) {
         systemLocale = Locale.getDefault()
         val p = context.getSharedPreferences("vincent_settings", Context.MODE_PRIVATE)
         prefs = p
         _internalLogEnabled = p.getBoolean("internal_log_enabled", false)
         _language = p.getString("language", "").orEmpty()
+        _demoDataSeeded = p.getBoolean("demo_data_seeded", false)
         applyLocale()
     }
 
@@ -38,6 +42,11 @@ actual object Settings {
         _language = tag
         prefs?.edit()?.putString("language", tag)?.apply()
         applyLocale()
+    }
+
+    actual fun setDemoDataSeeded(seeded: Boolean) {
+        _demoDataSeeded = seeded
+        prefs?.edit()?.putBoolean("demo_data_seeded", seeded)?.apply()
     }
 
     /** The locale the app should currently use (forced choice or system default). */

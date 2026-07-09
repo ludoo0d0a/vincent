@@ -431,6 +431,11 @@
     <string name="update_error">Erreur lors de la vérification de la mise à jour.</string>
     <string name="update_ineligible">Mise à jour disponible mais non éligible.</string>
     <string name="settings_section_app">Application</string>
+    <string name="settings_insert_demo_data">Insérer les données de démo</string>
+    <string name="settings_insert_demo_data_confirm_title">Insérer les données de démo ?</string>
+    <string name="settings_insert_demo_data_confirm_message">Cette action va ajouter des casiers et des bouteilles d\'exemple à votre cave.</string>
+    <string name="settings_insert_demo_data_success_title">Données insérées</string>
+    <string name="settings_insert_demo_data_success_message">Les données de démo ont été insérées avec succès dans votre cave.</string>
 
     <string name="settings_section_data_sources">Sources de données</string>
 

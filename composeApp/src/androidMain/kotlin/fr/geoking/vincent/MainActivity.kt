@@ -165,12 +165,16 @@ class MainActivity : ComponentActivity() {
         )
         initCloudSync(applicationContext, syncRepos)
         MainScope().launch {
-            Cellar.bootstrap(repository)
-            Racks.bootstrap(rackRepo)
+            val shouldSeed = !Settings.demoDataSeeded && repository.loadAll().isEmpty() && rackRepo.loadAll().isEmpty()
+            Cellar.bootstrap(repository, shouldSeed)
+            Racks.bootstrap(rackRepo, shouldSeed)
             Tastings.bootstrap(tastingRepo)
             Producers.bootstrap(producerRepo)
             Suppliers.bootstrap(supplierRepo)
             Regions.bootstrap(regionRepo)
+            if (shouldSeed) {
+                Settings.setDemoDataSeeded(true)
+            }
             cloudSyncOnReady()
         }
 

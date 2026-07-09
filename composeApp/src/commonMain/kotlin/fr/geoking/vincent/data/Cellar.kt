@@ -24,12 +24,18 @@ import kotlinx.coroutines.launch
  * (Room) via [bootstrap]: persisted data replaces the seed on launch, and every
  * mutation is written through to disk. The UI never sees the persistence engine.
  */
+private fun calculateAddedThisMonth(bottles: List<Bottle>): Int {
+    val now = fr.geoking.vincent.getCurrentTimeMillis()
+    val thirtyDaysAgo = now - 2592000000L
+    return bottles.count { it.addedAt >= thirtyDaysAgo }
+}
+
 object Cellar {
 
-    val bottles = mutableStateListOf<Bottle>().also { it.addAll(SampleData.bottles) }
-    val recent = mutableStateListOf<Bottle>().also { it.addAll(SampleData.recent) }
+    val bottles = mutableStateListOf<Bottle>()
+    val recent = mutableStateListOf<Bottle>()
 
-    var addedThisMonth by mutableStateOf(SampleData.addedThisMonth)
+    var addedThisMonth by mutableStateOf(0)
 
     private var repo: CellarRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -39,15 +45,31 @@ object Cellar {
      * afterwards the persisted bottles replace the in-memory seed. Call once at
      * app start from a coroutine.
      */
-    suspend fun bootstrap(repository: CellarRepository) {
+    suspend fun bootstrap(repository: CellarRepository, shouldSeed: Boolean = false) {
         repo = repository
         val persisted = repository.loadAll()
-        if (persisted.isEmpty()) {
-            bottles.forEach { repository.upsert(it) }
+        if (persisted.isEmpty() && shouldSeed) {
+            val seed = SampleData.bottles
+            seed.forEach { repository.upsert(it) }
+            bottles.clear(); bottles.addAll(seed)
+            recent.clear(); recent.addAll(seed.take(6))
+            addedThisMonth = SampleData.addedThisMonth
         } else {
             bottles.clear(); bottles.addAll(persisted)
             recent.clear(); recent.addAll(persisted.take(6))
+            addedThisMonth = calculateAddedThisMonth(persisted)
         }
+    }
+
+    suspend fun seedDemoData() {
+        val r = repo ?: return
+        val seed = SampleData.bottles
+        seed.forEach { r.upsert(it) }
+        bottles.clear()
+        bottles.addAll(seed)
+        recent.clear()
+        recent.addAll(seed.take(6))
+        addedThisMonth = SampleData.addedThisMonth
     }
 
     /** Reload in-memory state from Room after a cloud merge (keeps photos local). */

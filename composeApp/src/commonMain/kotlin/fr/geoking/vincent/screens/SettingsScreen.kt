@@ -21,11 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +58,65 @@ fun SettingsScreen(
     onOpenLogcat: () -> Unit,
     onOpenDataManagement: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            title = { Text(stringResource(Res.string.settings_insert_demo_data_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(Res.string.settings_insert_demo_data_confirm_message),
+                    fontSize = 13.sp,
+                    color = VincentColors.Fg,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConfirmDialog = false
+                        scope.launch {
+                            fr.geoking.vincent.data.Cellar.seedDemoData()
+                            fr.geoking.vincent.data.Racks.seedDemoData()
+                            fr.geoking.vincent.data.Settings.setDemoDataSeeded(true)
+                            showSuccessDialog = true
+                        }
+                    },
+                ) {
+                    Text(stringResource(Res.string.cellar_action_add))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text(stringResource(Res.string.cellar_action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = { showSuccessDialog = false },
+            title = { Text(stringResource(Res.string.settings_insert_demo_data_success_title)) },
+            text = {
+                Text(
+                    stringResource(Res.string.settings_insert_demo_data_success_message),
+                    fontSize = 13.sp,
+                    color = VincentColors.Fg,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showSuccessDialog = false },
+                ) {
+                    Text(stringResource(Res.string.cellar_dismiss))
+                }
+            },
+        )
+    }
+
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -85,6 +146,10 @@ fun SettingsScreen(
 
             SectionHeader(stringResource(Res.string.settings_section_app))
             SettingsLink(stringResource(Res.string.settings_data_management), onOpenDataManagement)
+            Spacer(Modifier.height(8.dp))
+            SettingsLink(stringResource(Res.string.settings_insert_demo_data)) {
+                showConfirmDialog = true
+            }
             Spacer(Modifier.height(8.dp))
             SettingsLink(stringResource(Res.string.update_check)) { Updater.checkForUpdate(true) }
             Spacer(Modifier.height(8.dp))
