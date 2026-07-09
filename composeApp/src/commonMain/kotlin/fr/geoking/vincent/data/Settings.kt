@@ -17,6 +17,9 @@ expect object Settings {
     val language: String
     fun setLanguage(tag: String)
 
+    /** Primary language subtag (e.g. "fr", "en") for locale-aware network calls. */
+    val currentLanguageTag: String
+
     val demoDataSeeded: Boolean
     fun setDemoDataSeeded(seeded: Boolean)
 }

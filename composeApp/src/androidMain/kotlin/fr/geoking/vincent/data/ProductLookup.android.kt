@@ -258,7 +258,7 @@ private object GrapeMindsProvider : WineDataProvider {
 }
 
 /**
- * Wikipedia provider — fetches wine regions from the proxy.
+ * Wikipedia provider — fetches and parses French wine regions directly from Wikipedia.
  */
 private object WikipediaProvider : WineDataProvider {
     override val id = "wikipedia"
@@ -266,29 +266,22 @@ private object WikipediaProvider : WineDataProvider {
     override val capabilities = setOf(ProviderCapability.LIST_REGIONS)
 
     override suspend fun listRegions(): List<Region> = withContext(Dispatchers.IO) {
-        val urlStr = "${BuildConfig.AI_PROXY_URL}/v1/scrape/wikipedia/regions"
-        val started = System.currentTimeMillis()
+        val language = Settings.currentLanguageTag
         try {
-            val (idToken, appCheckToken) = proxyAuthHeaders()
-            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+            val conn = (URL(WikipediaRegionsParser.url(language)).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 10000
-                readTimeout = 15000
-                idToken?.let { setRequestProperty("Authorization", "Bearer $it") }
-                appCheckToken?.let { setRequestProperty("X-Firebase-AppCheck", it) }
-                setRequestProperty("Accept", "application/json")
+                connectTimeout = 10_000
+                readTimeout = 15_000
+                setRequestProperty("Accept", "text/html")
+                setRequestProperty("Accept-Language", language)
+                setRequestProperty("User-Agent", "Vincent/1.0 (Android wine cellar app)")
             }
-            val status = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            if (status !in 200..299) return@withContext emptyList()
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            val root = JSONObject(resp)
-            val arr = root.optJSONArray("regions") ?: return@withContext emptyList()
-            (0 until arr.length()).map { i ->
-                val name = arr.getString(i)
+            if (conn.responseCode !in 200..299) return@withContext emptyList()
+            val html = conn.inputStream.bufferedReader().use { it.readText() }
+            WikipediaRegionsParser.parse(html, language).map { name ->
                 Region(id = "wp-$name", name = name, country = "France")
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }

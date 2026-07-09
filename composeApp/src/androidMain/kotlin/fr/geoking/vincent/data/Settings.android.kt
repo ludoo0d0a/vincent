@@ -20,6 +20,9 @@ actual object Settings {
     private var _language by mutableStateOf("")
     actual val language: String get() = _language
 
+    actual val currentLanguageTag: String
+        get() = currentLocale().language.ifBlank { "fr" }
+
     private var _demoDataSeeded by mutableStateOf(false)
     actual val demoDataSeeded: Boolean get() = _demoDataSeeded
 

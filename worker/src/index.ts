@@ -44,11 +44,10 @@ export default {
     }
 
     const isGrapeminds = url.pathname.startsWith("/v1/grapeminds");
-    const isWikipedia = url.pathname === "/v1/scrape/wikipedia/regions";
 
     if (
       (request.method !== "POST" || (url.pathname !== "/v1/generate" && url.pathname !== "/v1/grapeminds")) &&
-      (request.method !== "GET" || (!isGrapeminds && !isWikipedia))
+      (request.method !== "GET" || !isGrapeminds)
     ) {
       return json({ error: { message: "Not found", status: "NOT_FOUND" } }, 404);
     }
@@ -84,11 +83,8 @@ export default {
       }
     }
 
-    // 3. Handle Wikipedia scraping or Grapeminds GET before parsing standard payload.
+    // 3. Handle Grapeminds GET before parsing standard payload.
     if (request.method === "GET") {
-      if (isWikipedia) {
-        return handleWikipediaScrape();
-      }
       if (isGrapeminds) {
         return handleGrapemindsGet(request, url, env, quotaHeadersFor);
       }
@@ -223,58 +219,6 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 // ---- handlers --------------------------------------------------------------
-
-async function handleWikipediaScrape(): Promise<Response> {
-  const url = "https://fr.wikipedia.org/wiki/Viticulture_en_France";
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return json({ error: "Wikipedia fetch failed" }, 502);
-    const html = await res.text();
-
-    // We look for the "Régions viticoles françaises" palette which is usually a table or a div at the end.
-    // In the text version it appeared clearly. In HTML it's often a .navbox.
-    // For simplicity and since we are "scraping", we'll use a regex to find links in the region list.
-    // The regions are listed after "Produisant du vin d'AOC" and "Ne produisant pas de vin d'AOC".
-
-    const regions: string[] = [];
-    const seen = new Set<string>();
-
-    // This regex looks for the specific structure of the French wine regions palette on Wikipedia.
-    // It's a bit brittle but that's scraping.
-    const paletteMatch = html.match(/Régions viticoles françaises.*?<\/table>/s);
-    if (paletteMatch) {
-      const links = paletteMatch[0].matchAll(/<a href="\/wiki\/.*?" title=".*?">(.*?)<\/a>/g);
-      for (const link of links) {
-        let name = link[1].replace(/Vignoble d[e']\s*/i, "").replace(/Vignoble du\s*/i, "").trim();
-        // Unescape some common HTML entities
-        name = name.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, "\"");
-        if (name && !name.includes("<") && !seen.has(name) && !name.match(/^(AOC|IGP|Vin|Eaux-de-vie|v · m|Modifier|Portail|Liste)$/i)) {
-          regions.push(name);
-          seen.add(name);
-        }
-      }
-    }
-
-    // Fallback if palette not found or empty: try to find the list in the main body.
-    if (regions.length === 0) {
-      const listMatch = html.match(/id="Principaux_vignobles".*?<\/table>/s);
-      if (listMatch) {
-        const rows = listMatch[0].matchAll(/<tr>.*?<td>.*?<a.*?>(.*?)<\/a>/gs);
-        for (const row of rows) {
-          const name = row[1].replace(/vignoble d[e']\s*/i, "").trim();
-          if (name && !seen.has(name)) {
-            regions.push(name);
-            seen.add(name);
-          }
-        }
-      }
-    }
-
-    return json({ regions: regions.sort() });
-  } catch (e) {
-    return json({ error: `Scraping failed: ${msg(e)}` }, 500);
-  }
-}
 
 async function handleGrapemindsGet(request: Request, url: URL, env: Env, quotaHeadersFor: Function): Promise<Response> {
   // Extract the subpath after /v1/grapeminds

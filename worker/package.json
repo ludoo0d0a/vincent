@@ -8,7 +8,8 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "node --test \"test/**/*.mjs\""
+    "test": "node --test test/wikipedia-parse.test.mjs",
+    "test:e2e": "node --test test/worker-e2e.mjs test/gemini-e2e.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250101.0",
