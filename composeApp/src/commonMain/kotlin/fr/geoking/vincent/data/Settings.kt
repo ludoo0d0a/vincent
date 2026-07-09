@@ -16,4 +16,7 @@ expect object Settings {
     /** BCP-47 tag of the forced language, or "" to follow the system locale. */
     val language: String
     fun setLanguage(tag: String)
+
+    val demoDataSeeded: Boolean
+    fun setDemoDataSeeded(seeded: Boolean)
 }

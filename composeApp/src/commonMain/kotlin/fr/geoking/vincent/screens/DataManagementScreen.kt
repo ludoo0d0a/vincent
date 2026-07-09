@@ -197,7 +197,10 @@ fun DataManagementScreen(
                         status = null
                         scope.launch {
                             runCatching { VincentBackup.clearAll() }
-                                .onSuccess { status = BackupUiStatus.ResetSuccess }
+                                .onSuccess {
+                                    status = BackupUiStatus.ResetSuccess
+                                    fr.geoking.vincent.data.Settings.setDemoDataSeeded(true)
+                                }
                                 .onFailure { status = BackupUiStatus.ImportError }
                             busy = false
                         }

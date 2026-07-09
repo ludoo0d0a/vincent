@@ -418,6 +418,11 @@
     <string name="update_error">Error checking for updates.</string>
     <string name="update_ineligible">Update available but not eligible.</string>
     <string name="settings_section_app">App</string>
+    <string name="settings_insert_demo_data">Insert demo data</string>
+    <string name="settings_insert_demo_data_confirm_title">Insert demo data?</string>
+    <string name="settings_insert_demo_data_confirm_message">This action will add sample racks and bottles to your cellar.</string>
+    <string name="settings_insert_demo_data_success_title">Data inserted</string>
+    <string name="settings_insert_demo_data_success_message">The demo data has been successfully inserted into your cellar.</string>
 
     <string name="settings_section_data_sources">Data sources</string>
 
