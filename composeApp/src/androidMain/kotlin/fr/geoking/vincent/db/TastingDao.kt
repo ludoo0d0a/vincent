@@ -14,4 +14,7 @@ interface TastingDao {
 
     @Query("DELETE FROM tastings WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("DELETE FROM tastings")
+    suspend fun deleteAll()
 }

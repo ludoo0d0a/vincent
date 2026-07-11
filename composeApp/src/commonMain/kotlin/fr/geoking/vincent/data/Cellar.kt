@@ -182,10 +182,10 @@ object Cellar {
     }
 
     suspend fun clearAll() {
-        val r = repo ?: return
-        bottles.toList().forEach { r.delete(it.id) }
+        repo?.deleteAll()
         bottles.clear()
         recent.clear()
+        addedThisMonth = 0
     }
 
     private fun persist(b: Bottle) {

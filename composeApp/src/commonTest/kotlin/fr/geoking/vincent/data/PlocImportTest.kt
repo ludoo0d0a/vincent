@@ -1,6 +1,7 @@
 package fr.geoking.vincent.data
 
 import fr.geoking.vincent.model.*
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -42,6 +43,8 @@ class PlocImportTest {
         assertEquals("12/03/2016", t.date)
         assertEquals("Paris", t.place)
         assertEquals("Un commentaire", t.notes)
+        assertEquals(WineColor.RED, t.color)
+        assertEquals(1, result.referencedWines.size)
     }
 
     @Test
@@ -70,6 +73,7 @@ class PlocImportTest {
         assertEquals("2022", sommeliere.cells[0].vintage)
         assertTrue(sommeliere.cells[1].occupied)
         assertEquals("2021", sommeliere.cells[1].vintage)
+        assertEquals(2, result.referencedWines.size)
     }
 
     @Test
@@ -89,5 +93,139 @@ class PlocImportTest {
         assertEquals("France", p.country)
         assertEquals("emilien.boulfray@uapl.fr", p.email)
         assertEquals("02 41 50 23 23", p.phone)
+    }
+
+    @Test
+    fun testPlocGridIndex() {
+        assertEquals(0, plocGridIndex("1"))
+        assertEquals(3, plocGridIndex("4"))
+        assertEquals(0, plocGridIndex("A"))
+        assertEquals(9, plocGridIndex("J"))
+    }
+
+    // --- fixtures from assets/import/ploc ---
+
+    @Test
+    fun testFixtureVinsCsv() {
+        val result = CsvFormat.parse(readPlocFixture("Vins.csv"))
+        assertEquals("PLOC", result.source)
+        assertEquals(CsvFormat.ImportType.BOTTLES, result.type)
+        assertTrue(result.bottles.size >= 300, "expected hundreds of wines, got ${result.bottles.size}")
+        val albert = result.bottles.first { it.domain.contains("Albert Besombes") }
+        assertEquals("559588af-510a-41b8-b432-cb034b5b45bd", albert.id)
+    }
+
+    @Test
+    fun testFixtureCavesCsv() {
+        val result = CsvFormat.parse(readPlocFixture("Caves.csv"))
+        assertEquals(CsvFormat.ImportType.RACKS, result.type)
+        assertTrue(result.racks.size >= 3, "expected multiple racks, got ${result.racks.size}")
+
+        val sommeliere = result.racks.first { it.name == "La Sommelière" }
+        assertEquals(3, sommeliere.cols)
+        assertTrue(sommeliere.cells.count { it.occupied } >= 15)
+
+        val maCave = result.racks.first { it.name == "Ma cave a vin" }
+        assertEquals(10, maCave.cols, "letter columns A–J → 10 cols")
+        assertTrue(maCave.cells.count { it.occupied } >= 25)
+
+        assertTrue(result.referencedWines.size >= 40, "expected wine refs from occupied cells")
+    }
+
+    @Test
+    fun testFixtureDegustationsCsv() {
+        val result = CsvFormat.parse(readPlocFixture("Degustations.csv"))
+        assertEquals(CsvFormat.ImportType.TASTINGS, result.type)
+        assertTrue(result.tastings.size >= 70)
+        assertTrue(result.tastings.any { it.color == WineColor.ROSE })
+        assertTrue(result.tastings.any { it.color == WineColor.WHITE })
+        assertEquals(result.tastings.size, result.referencedWines.size)
+    }
+
+    @Test
+    fun testFixtureProducteursCsv() {
+        val result = CsvFormat.parse(readPlocFixture("Producteurs.csv"))
+        assertEquals(CsvFormat.ImportType.PRODUCERS, result.type)
+        assertTrue(result.producers.size >= 140)
+    }
+
+    @Test
+    fun testFixtureFournisseursCsv() {
+        val result = CsvFormat.parse(readPlocFixture("Fournisseurs.csv"), CsvFormat.ImportType.SUPPLIERS)
+        assertEquals(CsvFormat.ImportType.SUPPLIERS, result.type)
+        assertTrue(result.suppliers.size >= 25)
+    }
+
+    @Test
+    fun testRackImportCreatesMissingBottles() {
+        val marker = "ploc-rack-auto-${System.nanoTime()}"
+        val refs = listOf(
+            PlocWineRef("Vin Test Auto $marker", "2020", plocId = "id-$marker"),
+        )
+        val before = Cellar.bottles.size
+        val created = PlocImport.ensureBottlesFromRacks(refs)
+        assertEquals(1, created)
+        val bottle = Cellar.bottle("id-$marker")
+        assertEquals("Vin Test Auto $marker", bottle?.domain)
+        assertEquals(1, bottle?.quantity)
+        assertEquals(before + 1, Cellar.bottles.size)
+    }
+
+    @Test
+    fun testTastingImportCreatesMissingBottles() {
+        val marker = "ploc-tasting-auto-${System.nanoTime()}"
+        val tastings = listOf(
+            Tasting(
+                id = "t-$marker",
+                wineName = "Dégustation Test $marker",
+                date = "01/01/2024",
+                rating = 4.0,
+                notes = "",
+                vintage = "2019",
+                color = WineColor.RED,
+            ),
+        )
+        val before = Cellar.bottles.size
+        val created = PlocImport.ensureBottlesFromTastings(tastings)
+        assertEquals(1, created)
+        assertTrue(Cellar.bottles.any { it.domain == "Dégustation Test $marker" && it.quantity == 0 })
+        assertEquals(before + 1, Cellar.bottles.size)
+    }
+
+    @Test
+    fun testEnsureBottlesSkipsExisting() {
+        val id = "ploc-dedupe-${System.nanoTime()}"
+        val ref = PlocWineRef("Dedupe Wine", "2021", plocId = id)
+        assertEquals(1, PlocImport.ensureBottles(listOf(ref)))
+        assertEquals(0, PlocImport.ensureBottles(listOf(ref)))
+        assertEquals(1, Cellar.bottles.count { it.id == id })
+    }
+
+    @Test
+    fun testFixtureCavesAutoCreatesBottlesOnEmptyCellar() {
+        val caves = CsvFormat.parse(readPlocFixture("Caves.csv"))
+        val snapshot = Cellar.bottles.map { it.id }.toSet()
+        val created = PlocImport.ensureBottlesFromRacks(caves.referencedWines)
+        assertTrue(created >= 1, "should create at least one new bottle from cave refs")
+        caves.referencedWines.forEach { ref ->
+            val id = ref.resolvedId()
+            if (id !in snapshot) {
+                assertTrue(Cellar.bottle(id) != null, "missing auto-created bottle $id")
+            }
+        }
+    }
+
+    private fun readPlocFixture(name: String): String {
+        val cwd = File(System.getProperty("user.dir") ?: ".")
+        val candidates = listOf(
+            File(cwd, "../../assets/import/ploc/$name"),
+            File(cwd, "../assets/import/ploc/$name"),
+            File(cwd, "assets/import/ploc/$name"),
+        )
+        val file = candidates.firstOrNull { it.isFile }
+            ?: error("Missing PLOC fixture $name (tried ${candidates.joinToString { it.path }})")
+        val bytes = file.readBytes()
+        return bytes.toString(Charsets.UTF_8).takeIf { !it.contains('\uFFFD') }
+            ?: bytes.toString(Charsets.ISO_8859_1)
     }
 }

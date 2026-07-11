@@ -79,6 +79,12 @@ actual fun cloudSyncRefresh() {
     scope.launch { CloudSyncEngine.fullSync(uid) }
 }
 
+actual suspend fun cloudSyncClearAll() {
+    if (!CloudSync.active || !CloudSyncEngine.isReady) return
+    val uid = currentUid ?: FirebaseAuth.getInstance().currentUser?.uid ?: return
+    CloudSyncEngine.clearAllRemote(uid)
+}
+
 private object CloudSyncEngine {
     lateinit var repos: CloudSyncRepos
     val isReady: Boolean get() = ::repos.isInitialized
@@ -125,6 +131,37 @@ private object CloudSyncEngine {
             } catch (e: Exception) {
                 InternalLog.e(TAG, "Full sync failed", e)
                 CloudSync.errorMessage = e.message
+            } finally {
+                fullSyncRunning = false
+                CloudSync.syncing = false
+            }
+        }
+    }
+
+    suspend fun clearAllRemote(uid: String) {
+        mutex.withLock {
+            if (!CloudSync.active) return@withLock
+            fullSyncRunning = true
+            CloudSync.syncing = true
+            CloudSync.errorMessage = null
+            try {
+                withContext(Dispatchers.IO) {
+                    for (collection in listOf(
+                        COL_BOTTLES, COL_RACKS, COL_TASTINGS, COL_PRODUCERS, COL_SUPPLIERS,
+                    )) {
+                        val docs = userCollection(uid, collection).get().await().documents
+                        for (doc in docs) {
+                            doc.reference.delete().await()
+                            prefs.edit().remove(tsKey(collection, doc.id)).apply()
+                        }
+                    }
+                }
+                CloudSync.lastSyncedAt = null
+                InternalLog.i(TAG, "Cloud data cleared for $uid")
+            } catch (e: Exception) {
+                InternalLog.e(TAG, "Cloud clear failed", e)
+                CloudSync.errorMessage = e.message
+                throw e
             } finally {
                 fullSyncRunning = false
                 CloudSync.syncing = false

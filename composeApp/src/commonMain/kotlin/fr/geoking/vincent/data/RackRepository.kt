@@ -6,4 +6,5 @@ interface RackRepository {
     suspend fun loadAll(): List<Rack>
     suspend fun upsert(rack: Rack)
     suspend fun delete(id: String)
+    suspend fun deleteAll()
 }

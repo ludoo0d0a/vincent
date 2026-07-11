@@ -38,7 +38,7 @@ fun SuppliersScreen(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
 
     val importCsv = rememberCsvImport(onLoading = { busy = it }) { text ->
-        val result = CsvFormat.parse(text)
+        val result = CsvFormat.parse(text, CsvFormat.ImportType.SUPPLIERS)
         importStatus = if (result.type == CsvFormat.ImportType.SUPPLIERS) {
             SupplierImportStatus.Success(Suppliers.import(result.suppliers))
         } else {

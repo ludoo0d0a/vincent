@@ -13,5 +13,6 @@ interface CellarRepository {
     suspend fun loadAll(): List<Bottle>
     suspend fun upsert(bottle: Bottle)
     suspend fun delete(id: String)
+    suspend fun deleteAll()
     suspend fun count(): Int
 }

@@ -34,8 +34,7 @@ object Regions {
     }
 
     suspend fun clearAll() {
-        val r = repo ?: return
-        all.toList().forEach { r.delete(it.id) }
+        repo?.deleteAll()
         all.clear()
     }
 

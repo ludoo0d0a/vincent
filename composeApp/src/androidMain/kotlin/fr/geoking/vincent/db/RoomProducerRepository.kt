@@ -7,4 +7,5 @@ class RoomProducerRepository(private val dao: ProducerDao) : ProducerRepository 
     override suspend fun loadAll(): List<Producer> = dao.getAll().map { it.toProducer() }
     override suspend fun upsert(producer: Producer) = dao.upsert(producer.toEntity())
     override suspend fun delete(id: String) = dao.delete(id)
+    override suspend fun deleteAll() = dao.deleteAll()
 }

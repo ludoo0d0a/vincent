@@ -6,4 +6,5 @@ interface SupplierRepository {
     suspend fun loadAll(): List<Supplier>
     suspend fun upsert(supplier: Supplier)
     suspend fun delete(id: String)
+    suspend fun deleteAll()
 }

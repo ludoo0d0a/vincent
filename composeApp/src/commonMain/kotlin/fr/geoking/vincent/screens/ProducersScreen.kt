@@ -47,7 +47,7 @@ fun ProducersScreen(onBack: () -> Unit) {
     val emptyMsg = stringResource(Res.string.data_import_empty)
 
     val importCsv = rememberCsvImport(onLoading = { busy = it }) { text ->
-        val result = CsvFormat.parse(text)
+        val result = CsvFormat.parse(text, CsvFormat.ImportType.PRODUCERS)
         importStatus = if (result.type == CsvFormat.ImportType.PRODUCERS) {
             ProducerImportStatus.Success(Producers.import(result.producers), result.source)
         } else {
