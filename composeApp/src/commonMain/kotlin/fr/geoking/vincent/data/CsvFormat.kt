@@ -177,18 +177,32 @@ object CsvFormat {
         }
     }
 
+    private fun parseCoordinate(s: String): Int? {
+        val trimmed = s.trim()
+        if (trimmed.isEmpty()) return null
+        val numeric = trimmed.toIntOrNull()
+        if (numeric != null) return numeric
+
+        var value = 0
+        for (char in trimmed.uppercase()) {
+            if (char !in 'A'..'Z') return null
+            value = value * 26 + (char - 'A' + 1)
+        }
+        return if (value > 0) value else null
+    }
+
     private fun parsePlocRacks(rows: List<List<String>>, index: Map<String, Int>): List<Rack> {
         val dataRows = rows.drop(1)
         val grouped = dataRows.groupBy { (it.field("name", index) ?: "Inconnu").trim() }
         return grouped.map { (name, cells) ->
-            val maxRow = cells.maxOfOrNull { it.field("rows", index)?.toIntOrNull() ?: 1 } ?: 1
-            val maxCol = cells.maxOfOrNull { it.field("cols", index)?.toIntOrNull() ?: 1 } ?: 1
+            val maxRow = cells.maxOfOrNull { parseCoordinate(it.field("rows", index) ?: "") ?: 1 } ?: 1
+            val maxCol = cells.maxOfOrNull { parseCoordinate(it.field("cols", index) ?: "") ?: 1 } ?: 1
 
             // Reconstruct cells
             val rackCells = MutableList(maxRow * maxCol) { RackCell(rowLabel(it / maxCol), false) }
             cells.forEach { row ->
-                val r = (row.field("rows", index)?.toIntOrNull() ?: 1) - 1
-                val c = (row.field("cols", index)?.toIntOrNull() ?: 1) - 1
+                val r = (parseCoordinate(row.field("rows", index) ?: "") ?: 1) - 1
+                val c = (parseCoordinate(row.field("cols", index) ?: "") ?: 1) - 1
                 val wineName = row.field("wineName", index)
                 if (r in 0 until maxRow && c in 0 until maxCol) {
                     val idx = r * maxCol + c
@@ -224,16 +238,14 @@ object CsvFormat {
 
     private fun List<String>.field(key: String, index: Map<String, Int>): String? {
         val aliases = ALIASES[key] ?: return null
-        for (a in aliases) {
-            val alias = a.lowercase().trim()
-            val i = index[alias] ?: continue
-            if (i < size) {
-                var v = this[i].trim()
-                if (v.startsWith("\"") && v.endsWith("\"")) {
-                    v = v.substring(1, v.length - 1).replace("\"\"", "\"")
-                }
-                if (v.isNotEmpty() && v != "\"\"") return v
+        val alias = aliases.firstOrNull { it.lowercase().trim() in index } ?: return null
+        val i = index[alias.lowercase().trim()] ?: return null
+        if (i < size) {
+            var v = this[i].trim()
+            if (v.startsWith("\"") && v.endsWith("\"")) {
+                v = v.substring(1, v.length - 1).replace("\"\"", "\"")
             }
+            if (v.isNotEmpty() && v != "\"\"") return v
         }
         return null
     }
