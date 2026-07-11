@@ -167,6 +167,8 @@
     </plurals>
 
     <string name="cellar_title">Racks</string>
+    <string name="cellar_empty_title">No racks configured</string>
+    <string name="cellar_empty_desc">Create your first rack or import data to get started.</string>
     <string name="cellar_subtitle_format">%1$d spots · %2$d occupied</string>
     <string name="cellar_edit_rack">Edit rack</string>
     <string name="cellar_add_rack">Add rack</string>
