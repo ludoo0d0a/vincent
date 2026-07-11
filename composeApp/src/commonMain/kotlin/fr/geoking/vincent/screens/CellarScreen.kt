@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
@@ -121,6 +122,18 @@ fun CellarScreen(
     onEditRack: (Int) -> Unit = {},
     onOpenDataManagement: () -> Unit = {},
 ) {
+    if (Racks.all.isEmpty()) {
+        CellarEmptyState(
+            modifier = modifier,
+            onAddRack = {
+                Racks.add(emptyRack("Cave A", 4, 4, false))
+                onRackIdxChange(0)
+            },
+            onOpenDataManagement = onOpenDataManagement,
+        )
+        return
+    }
+
     val rack = Racks.all[rackIdx.coerceIn(0, Racks.all.lastIndex)]
     var mode by remember { mutableStateOf(RackMode.VINTAGE) }
     var filterIdx by remember { mutableIntStateOf(-1) }
@@ -838,3 +851,101 @@ private fun PeekAction(
     }
 }
 
+@Composable
+private fun CellarEmptyState(
+    modifier: Modifier = Modifier,
+    onAddRack: () -> Unit,
+    onOpenDataManagement: () -> Unit,
+) {
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        ScreenHeader(
+            title = stringResource(Res.string.cellar_title),
+            subtitle = stringResource(Res.string.cellar_subtitle_format, 0, 0),
+        )
+
+        Column(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.height(40.dp))
+            VCard(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.GridView,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = VincentColors.Faint,
+                    )
+
+                    Text(
+                        text = stringResource(Res.string.cellar_empty_title),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.W800,
+                        color = VincentColors.Fg,
+                        textAlign = TextAlign.Center,
+                    )
+
+                    Text(
+                        text = stringResource(Res.string.cellar_empty_desc),
+                        fontSize = 13.5.sp,
+                        color = VincentColors.Muted,
+                        textAlign = TextAlign.Center,
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Button(
+                        onClick = onAddRack,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(Res.string.cellar_add_rack),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.W700,
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenDataManagement,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.FileUpload,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = VincentColors.Accent,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(Res.string.import_action),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.W700,
+                            color = VincentColors.Accent,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
