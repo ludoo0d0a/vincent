@@ -388,6 +388,11 @@
 
     <string name="export_csv_label">Exporter ma cave (CSV)</string>
     <string name="ploc_data_title">Mes données PLOC</string>
+    <string name="ploc_import_all_title">Import PLOC complet</string>
+    <string name="ploc_import_all_desc">Sélectionnez les CSV exportés depuis PLOC (Réglages → Exporter). Vins, caves, dégustations, producteurs et fournisseurs sont importés en une seule fois.</string>
+    <string name="ploc_import_all_button">Importer tout</string>
+    <string name="ploc_import_all_success">Import PLOC : %1$d vins, %2$d casiers, %3$d dégustations, %4$d producteurs, %5$d fournisseurs (%6$d fichiers).</string>
+    <string name="ploc_import_all_empty">Aucun fichier PLOC reconnu dans la sélection.</string>
     <string name="ploc_tastings">Dégustations</string>
     <string name="ploc_producers">Producteurs</string>
     <string name="ploc_suppliers">Fournisseurs</string>

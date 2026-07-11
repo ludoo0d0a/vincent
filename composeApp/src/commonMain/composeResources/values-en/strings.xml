@@ -375,6 +375,11 @@
 
     <string name="export_csv_label">Export my cellar (CSV)</string>
     <string name="ploc_data_title">My PLOC data</string>
+    <string name="ploc_import_all_title">Full PLOC import</string>
+    <string name="ploc_import_all_desc">Select CSV files exported from PLOC (Settings → Export). Wines, racks, tastings, producers and suppliers are imported in one go.</string>
+    <string name="ploc_import_all_button">Import all</string>
+    <string name="ploc_import_all_success">PLOC import: %1$d wines, %2$d racks, %3$d tastings, %4$d producers, %5$d suppliers (%6$d files).</string>
+    <string name="ploc_import_all_empty">No recognised PLOC files in the selection.</string>
     <string name="ploc_tastings">Tastings</string>
     <string name="ploc_producers">Producers</string>
     <string name="ploc_suppliers">Suppliers</string>

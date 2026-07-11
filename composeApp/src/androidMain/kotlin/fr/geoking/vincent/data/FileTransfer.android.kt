@@ -42,6 +42,44 @@ actual fun rememberCsvImport(onLoading: (Boolean) -> Unit, onText: (String) -> U
 }
 
 @Composable
+actual fun rememberPlocBundleImport(onLoading: (Boolean) -> Unit, onFiles: (List<PlocCsvFile>) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            onLoading(true)
+            try {
+                val files = withContext(Dispatchers.IO) {
+                    uris.mapNotNull { uri ->
+                        val name = context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                            ?.use { cursor ->
+                                if (cursor.moveToFirst()) cursor.getString(0) else null
+                            } ?: uri.lastPathSegment ?: "export.csv"
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@mapNotNull null
+                        val text = decodeCsvText(bytes) ?: return@mapNotNull null
+                        PlocCsvFile(name, text)
+                    }
+                }
+                if (files.isNotEmpty()) onFiles(files)
+            } finally {
+                onLoading(false)
+            }
+        }
+    }
+    return { launcher.launch(arrayOf("text/*", "text/csv", "application/csv")) }
+}
+
+private fun decodeCsvText(bytes: ByteArray): String? = try {
+    java.nio.charset.Charset.forName("UTF-8").newDecoder()
+        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+        .decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+} catch (_: Exception) {
+    String(bytes, java.nio.charset.Charset.forName("Windows-1252"))
+}
+
+@Composable
 actual fun rememberCsvExport(
     filename: String,
     content: () -> String,

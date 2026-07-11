@@ -6,6 +6,10 @@ import androidx.compose.runtime.Composable
 @Composable
 expect fun rememberCsvImport(onLoading: (Boolean) -> Unit = {}, onText: (String) -> Unit): () -> Unit
 
+/** Opens a multi-file picker for a full PLOC CSV export folder. */
+@Composable
+expect fun rememberPlocBundleImport(onLoading: (Boolean) -> Unit = {}, onFiles: (List<PlocCsvFile>) -> Unit): () -> Unit
+
 /** Opens a system "create document" dialog and writes [content] to the chosen file. */
 @Composable
 expect fun rememberCsvExport(

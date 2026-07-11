@@ -215,6 +215,25 @@ class PlocImportTest {
         }
     }
 
+    @Test
+    fun testApplyBundleFromFixtures() {
+        val files = listOf(
+            "Vins.csv",
+            "Caves.csv",
+            "Degustations.csv",
+            "Producteurs.csv",
+            "Fournisseurs.csv",
+        ).map { PlocCsvFile(it, readPlocFixture(it)) }
+
+        val result = PlocImport.applyBundle(files)
+        assertEquals(5, result.filesImported)
+        assertTrue(result.bottles >= 300)
+        assertTrue(result.racks >= 3)
+        assertTrue(result.tastings >= 70)
+        assertTrue(result.producers >= 140)
+        assertTrue(result.suppliers >= 25)
+    }
+
     private fun readPlocFixture(name: String): String {
         val cwd = File(System.getProperty("user.dir") ?: ".")
         val candidates = listOf(
