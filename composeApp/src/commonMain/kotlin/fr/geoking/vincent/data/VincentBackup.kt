@@ -113,6 +113,7 @@ object VincentBackup {
     }
 
     suspend fun clearAll() {
+        cloudSyncClearAll()
         Cellar.clearAll()
         Racks.clearAll()
         Tastings.clearAll()

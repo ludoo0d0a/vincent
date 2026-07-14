@@ -14,4 +14,7 @@ interface RackDao {
 
     @Query("DELETE FROM racks WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("DELETE FROM racks")
+    suspend fun deleteAll()
 }

@@ -6,4 +6,5 @@ interface TastingRepository {
     suspend fun loadAll(): List<Tasting>
     suspend fun upsert(tasting: Tasting)
     suspend fun delete(id: String)
+    suspend fun deleteAll()
 }

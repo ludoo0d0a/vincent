@@ -93,10 +93,10 @@ object Racks {
     }
 
     suspend fun clearAll() {
-        val r = repo ?: return
-        all.toList().forEach {
-            r.delete(it.id)
-            cloudSyncDeleteRack(it.id)
+        val r = repo
+        if (r != null) {
+            all.toList().forEach { cloudSyncDeleteRack(it.id) }
+            r.deleteAll()
         }
         all.clear()
     }

@@ -43,5 +43,8 @@ expect fun cloudSyncPushTasting(tasting: Tasting)
 expect fun cloudSyncPushProducer(producer: Producer)
 expect fun cloudSyncPushSupplier(supplier: Supplier)
 
+/** Purge all cloud data for the signed-in user (called on local reset). */
+expect suspend fun cloudSyncClearAll()
+
 /** Manual refresh from the account screen. */
 expect fun cloudSyncRefresh()

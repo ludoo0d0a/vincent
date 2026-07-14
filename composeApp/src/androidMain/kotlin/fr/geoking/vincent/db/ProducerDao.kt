@@ -14,4 +14,7 @@ interface ProducerDao {
 
     @Query("DELETE FROM producers WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("DELETE FROM producers")
+    suspend fun deleteAll()
 }

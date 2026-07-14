@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fr.geoking.vincent.data.CsvFormat
+import fr.geoking.vincent.data.PlocImport
 import fr.geoking.vincent.data.Tastings
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
@@ -40,6 +41,7 @@ fun TastingsScreen(onBack: () -> Unit) {
     val importCsv = rememberCsvImport(onLoading = { busy = it }) { text ->
         val result = CsvFormat.parse(text)
         importStatus = if (result.type == CsvFormat.ImportType.TASTINGS) {
+            PlocImport.ensureBottlesFromTastings(result.tastings)
             TastingImportStatus.Success(Tastings.import(result.tastings))
         } else {
             TastingImportStatus.WrongType

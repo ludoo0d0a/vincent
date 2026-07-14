@@ -50,6 +50,8 @@ import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.Regions
 import fr.geoking.vincent.data.Suppliers
 import fr.geoking.vincent.data.Tastings
+import fr.geoking.vincent.data.PlocImport
+import fr.geoking.vincent.data.PlocBundleResult
 import fr.geoking.vincent.data.VincentBackup
 import fr.geoking.vincent.data.VincentImportMode
 import fr.geoking.vincent.data.VincentImportResult
@@ -57,12 +59,15 @@ import fr.geoking.vincent.data.VincentParsedBackup
 import fr.geoking.vincent.data.readLocalBytes
 import fr.geoking.vincent.data.rememberLabelImageSaver
 import fr.geoking.vincent.data.rememberRackImageSaver
+import fr.geoking.vincent.data.rememberPlocBundleImport
 import fr.geoking.vincent.data.rememberVincentExport
 import fr.geoking.vincent.data.rememberVincentImport
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.DataScreenHeader
+import fr.geoking.vincent.ui.DataImportCard
 import fr.geoking.vincent.ui.ImportBusyIndicator
 import fr.geoking.vincent.ui.ImportStatusBanner
+import fr.geoking.vincent.ui.RedImportButton
 import fr.geoking.vincent.ui.SectionHeader
 import fr.geoking.vincent.ui.VCard
 import kotlinx.coroutines.launch
@@ -76,6 +81,11 @@ private sealed interface BackupUiStatus {
     data object ExportSuccess : BackupUiStatus
     data object ExportCanceled : BackupUiStatus
     data object ResetSuccess : BackupUiStatus
+}
+
+private sealed interface PlocImportStatus {
+    data class Success(val result: PlocBundleResult) : PlocImportStatus
+    data object Empty : PlocImportStatus
 }
 
 @Composable
@@ -94,6 +104,7 @@ fun DataManagementScreen(
     var busy by remember { mutableStateOf(false) }
     var includePhotos by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<BackupUiStatus?>(null) }
+    var plocImportStatus by remember { mutableStateOf<PlocImportStatus?>(null) }
     var pendingImport by remember { mutableStateOf<VincentParsedBackup?>(null) }
     var importMode by remember { mutableStateOf(VincentImportMode.MERGE) }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -110,9 +121,16 @@ fun DataManagementScreen(
 
     val importBackup = rememberVincentImport(onLoading = { busy = it }) { bytes ->
         status = null
+        plocImportStatus = null
         runCatching { VincentBackup.parseImport(bytes) }
             .onSuccess { pendingImport = it }
             .onFailure { status = BackupUiStatus.ImportError }
+    }
+
+    val importPlocBundle = rememberPlocBundleImport(onLoading = { busy = it }) { files ->
+        status = null
+        val result = PlocImport.applyBundle(files)
+        plocImportStatus = if (result.isEmpty) PlocImportStatus.Empty else PlocImportStatus.Success(result)
     }
 
     val exportBackup = rememberVincentExport(
@@ -291,6 +309,38 @@ fun DataManagementScreen(
                         BackupUiStatus.ExportSuccess -> stringResource(Res.string.vincent_backup_export_success)
                         BackupUiStatus.ExportCanceled -> stringResource(Res.string.vincent_backup_export_canceled)
                         BackupUiStatus.ResetSuccess -> stringResource(Res.string.data_management_reset_success)
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SectionHeader(stringResource(Res.string.ploc_data_title))
+            DataImportCard(
+                title = stringResource(Res.string.ploc_import_all_title),
+                description = stringResource(Res.string.ploc_import_all_desc),
+                busy = busy,
+            ) {
+                RedImportButton(
+                    stringResource(Res.string.ploc_import_all_button),
+                    enabled = !busy,
+                    onClick = importPlocBundle,
+                )
+            }
+
+            plocImportStatus?.let { s ->
+                Spacer(Modifier.height(14.dp))
+                ImportStatusBanner(
+                    when (s) {
+                        is PlocImportStatus.Success -> stringResource(
+                            Res.string.ploc_import_all_success,
+                            s.result.bottles,
+                            s.result.racks,
+                            s.result.tastings,
+                            s.result.producers,
+                            s.result.suppliers,
+                            s.result.filesImported,
+                        )
+                        PlocImportStatus.Empty -> stringResource(Res.string.ploc_import_all_empty)
                     },
                 )
             }

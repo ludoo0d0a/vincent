@@ -14,4 +14,7 @@ interface SupplierDao {
 
     @Query("DELETE FROM suppliers WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("DELETE FROM suppliers")
+    suspend fun deleteAll()
 }

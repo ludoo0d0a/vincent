@@ -14,4 +14,7 @@ interface RegionDao {
 
     @Query("DELETE FROM regions WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("DELETE FROM regions")
+    suspend fun deleteAll()
 }

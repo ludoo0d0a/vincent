@@ -12,5 +12,7 @@ class RoomCellarRepository(private val dao: BottleDao) : CellarRepository {
 
     override suspend fun delete(id: String) = dao.delete(id)
 
+    override suspend fun deleteAll() = dao.deleteAll()
+
     override suspend fun count(): Int = dao.count()
 }

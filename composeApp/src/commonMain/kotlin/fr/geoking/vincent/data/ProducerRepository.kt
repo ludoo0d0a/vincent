@@ -6,4 +6,5 @@ interface ProducerRepository {
     suspend fun loadAll(): List<Producer>
     suspend fun upsert(producer: Producer)
     suspend fun delete(id: String)
+    suspend fun deleteAll()
 }

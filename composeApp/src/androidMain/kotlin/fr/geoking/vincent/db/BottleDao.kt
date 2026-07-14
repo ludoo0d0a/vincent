@@ -15,6 +15,9 @@ interface BottleDao {
     @Query("DELETE FROM bottles WHERE id = :id")
     suspend fun delete(id: String)
 
+    @Query("DELETE FROM bottles")
+    suspend fun deleteAll()
+
     @Query("SELECT COUNT(*) FROM bottles")
     suspend fun count(): Int
 }

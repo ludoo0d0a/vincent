@@ -142,10 +142,12 @@ object CsvFormat {
         val tastings: List<Tasting> = emptyList(),
         val producers: List<Producer> = emptyList(),
         val suppliers: List<Supplier> = emptyList(),
+        /** Wines referenced in caves / dégustations rows (for auto bottle creation). */
+        val referencedWines: List<PlocWineRef> = emptyList(),
         val source: String,
     )
 
-    fun parse(text: String): ImportResult {
+    fun parse(text: String, preferredType: ImportType? = null): ImportResult {
         val rows = tokenize(text)
         if (rows.isEmpty()) return ImportResult(ImportType.UNKNOWN, source = "Inconnu")
         val header = rows.first().map {
@@ -161,59 +163,56 @@ object CsvFormat {
         }
 
         val source = detectSource(header)
-        val type = detectType(header)
+        val type = when (preferredType) {
+            ImportType.SUPPLIERS, ImportType.PRODUCERS ->
+                if ("contact principal" in header) preferredType else detectType(header)
+            else -> detectType(header)
+        }
 
         return when (type) {
             ImportType.BOTTLES -> ImportResult(type, bottles = rows.drop(1).mapNotNull { it.toBottle(index) }, source = source)
             ImportType.RACKS -> {
-                val racks = if (source == "PLOC") parsePlocRacks(rows, index)
-                            else rows.drop(1).mapNotNull { it.toRack(index) }
-                ImportResult(type, racks = racks, source = source)
+                val (racks, refs) = if (source == "PLOC") parsePlocRacks(rows, index)
+                else rows.drop(1).mapNotNull { it.toRack(index) } to emptyList()
+                ImportResult(type, racks = racks, referencedWines = refs, source = source)
             }
-            ImportType.TASTINGS -> ImportResult(type, tastings = rows.drop(1).mapNotNull { it.toTasting(index) }, source = source)
+            ImportType.TASTINGS -> {
+                val tastings = rows.drop(1).mapNotNull { it.toTasting(index) }
+                val refs = tastings.map { PlocWineRef(it.wineName, it.vintage, color = it.color) }
+                ImportResult(type, tastings = tastings, referencedWines = refs, source = source)
+            }
             ImportType.PRODUCERS -> ImportResult(type, producers = rows.drop(1).mapNotNull { it.toProducer(index) }, source = source)
             ImportType.SUPPLIERS -> ImportResult(type, suppliers = rows.drop(1).mapNotNull { it.toSupplier(index) }, source = source)
             else -> ImportResult(ImportType.UNKNOWN, source = source)
         }
     }
 
-    private fun parseCoordinate(s: String): Int? {
-        val trimmed = s.trim()
-        if (trimmed.isEmpty()) return null
-        val numeric = trimmed.toIntOrNull()
-        if (numeric != null) return numeric
-
-        var value = 0
-        for (char in trimmed.uppercase()) {
-            if (char !in 'A'..'Z') return null
-            value = value * 26 + (char - 'A' + 1)
-        }
-        return if (value > 0) value else null
-    }
-
-    private fun parsePlocRacks(rows: List<List<String>>, index: Map<String, Int>): List<Rack> {
+    private fun parsePlocRacks(rows: List<List<String>>, index: Map<String, Int>): Pair<List<Rack>, List<PlocWineRef>> {
         val dataRows = rows.drop(1)
+        val refs = mutableListOf<PlocWineRef>()
         val grouped = dataRows.groupBy { (it.field("name", index) ?: "Inconnu").trim() }
-        return grouped.map { (name, cells) ->
-            val maxRow = cells.maxOfOrNull { parseCoordinate(it.field("rows", index) ?: "") ?: 1 } ?: 1
-            val maxCol = cells.maxOfOrNull { parseCoordinate(it.field("cols", index) ?: "") ?: 1 } ?: 1
+        val racks = grouped.map { (name, cells) ->
+            val maxRow = cells.maxOfOrNull { plocGridIndex(it.field("rows", index)) + 1 } ?: 1
+            val maxCol = cells.maxOfOrNull { plocGridIndex(it.field("cols", index)) + 1 } ?: 1
 
-            // Reconstruct cells
             val rackCells = MutableList(maxRow * maxCol) { RackCell(rowLabel(it / maxCol), false) }
             cells.forEach { row ->
-                val r = (parseCoordinate(row.field("rows", index) ?: "") ?: 1) - 1
-                val c = (parseCoordinate(row.field("cols", index) ?: "") ?: 1) - 1
-                val wineName = row.field("wineName", index)
+                val r = plocGridIndex(row.field("rows", index))
+                val c = plocGridIndex(row.field("cols", index))
+                val wineName = row.plocColumn("nom du vin", index)
                 if (r in 0 until maxRow && c in 0 until maxCol) {
                     val idx = r * maxCol + c
                     if (!wineName.isNullOrBlank()) {
-                        // We don't have full bottle info here, just name/vintage
-                        rackCells[idx] = RackCell(rowLabel(r), true, vintage = row.field("vintage", index))
+                        val vintage = row.field("vintage", index)
+                        val plocId = row.field("id", index)
+                        refs += PlocWineRef(wineName, vintage, plocId)
+                        rackCells[idx] = RackCell(rowLabel(r), true, vintage = vintage)
                     }
                 }
             }
             Rack(name, maxCol, maxRow, false, rackCells)
         }
+        return racks to refs.distinctBy { it.key }
     }
 
     fun detectSource(header: List<String>): String = when {
@@ -248,6 +247,17 @@ object CsvFormat {
             if (v.isNotEmpty() && v != "\"\"") return v
         }
         return null
+    }
+
+    /** Read a PLOC column by exact header (avoids alias clashes, e.g. rack "Nom" vs "Nom du vin"). */
+    private fun List<String>.plocColumn(header: String, index: Map<String, Int>): String? {
+        val i = index[header.lowercase()] ?: return null
+        if (i >= size) return null
+        var v = this[i].trim()
+        if (v.startsWith("\"") && v.endsWith("\"")) {
+            v = v.substring(1, v.length - 1).replace("\"\"", "\"")
+        }
+        return v.takeIf { it.isNotEmpty() && it != "\"\"" }
     }
 
     private fun List<String>.toBottle(index: Map<String, Int>): Bottle? {
@@ -353,12 +363,21 @@ object CsvFormat {
 
     private fun parseColor(raw: String?): WineColor {
         val v = raw?.lowercase() ?: return WineColor.RED
+        if (v.startsWith("#")) return plocHexColor(v)
         return when {
             "ros" in v -> WineColor.ROSE
             "blanc" in v || "white" in v -> WineColor.WHITE
             "pétill" in v || "petill" in v || "spark" in v || "champ" in v || "efferv" in v || "mousseux" in v -> WineColor.SPARKLING
             else -> WineColor.RED
         }
+    }
+
+    /** PLOC dégustations export encodes colour as a hex swatch. */
+    private fun plocHexColor(hex: String): WineColor = when (hex.uppercase()) {
+        "#E18891" -> WineColor.ROSE
+        "#FFD374", "#FFF8DC" -> WineColor.WHITE
+        "#EDD6B6", "#F5E6C8" -> WineColor.SPARKLING
+        else -> WineColor.RED
     }
 
     private fun parseSugar(raw: String?): SugarLevel {

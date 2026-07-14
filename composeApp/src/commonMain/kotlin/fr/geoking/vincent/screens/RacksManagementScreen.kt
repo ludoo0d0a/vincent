@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fr.geoking.vincent.data.CsvFormat
+import fr.geoking.vincent.data.PlocImport
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
@@ -40,6 +41,7 @@ fun RacksManagementScreen(onBack: () -> Unit) {
     val importCsv = rememberCsvImport(onLoading = { busy = it }) { text ->
         val result = CsvFormat.parse(text)
         importStatus = if (result.type == CsvFormat.ImportType.RACKS) {
+            PlocImport.ensureBottlesFromRacks(result.referencedWines)
             result.racks.forEach { Racks.add(it) }
             RackImportStatus.Success(result.racks.size)
         } else {
