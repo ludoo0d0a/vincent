@@ -77,6 +77,42 @@ class PlocImportTest {
     }
 
     @Test
+    fun testPlocRacksImportWithEmptyAlphabeticCells() {
+        val csv = """
+"Nom";"Ligne";"Colonne";"Nom du vin";"Millésime";"IdVin"
+"Ma cave a vin";10;F;"Moscato Dezzani";;"db2d1ccd-826b-48df-9c11-d5dbcd30c215"
+"Ma cave a vin";10;G;"";;""
+"Ma cave a vin";10;H;"";;""
+"Ma cave a vin";10;I;"";;""
+"Ma cave a vin";10;J;"";;""
+        """.trimIndent()
+
+        val result = CsvFormat.parse(csv)
+        assertEquals("PLOC", result.source)
+        assertEquals(CsvFormat.ImportType.RACKS, result.type)
+        assertEquals(1, result.racks.size)
+
+        val rack = result.racks[0]
+        assertEquals("Ma cave a vin", rack.name)
+        assertTrue(rack.cols >= 10, "cols should be at least 10, was ${rack.cols}")
+        assertTrue(rack.rows >= 10, "rows should be at least 10, was ${rack.rows}")
+
+        // Row 10 is index 9, Col F is index 5 (0-indexed)
+        val idxF = 9 * rack.cols + 5
+        assertTrue(rack.cells[idxF].occupied)
+
+        // Col G, H, I, J should be unoccupied but their coordinate indexes should exist
+        val idxG = 9 * rack.cols + 6
+        val idxH = 9 * rack.cols + 7
+        val idxI = 9 * rack.cols + 8
+        val idxJ = 9 * rack.cols + 9
+        assertTrue(!rack.cells[idxG].occupied)
+        assertTrue(!rack.cells[idxH].occupied)
+        assertTrue(!rack.cells[idxI].occupied)
+        assertTrue(!rack.cells[idxJ].occupied)
+    }
+
+    @Test
     fun testPlocProducersImport() {
         val csv = """
 "Nom";"Contact principal";"Adresse";"Complément";"Code postal";"Ville";"Pays";"Email";"Site web";"Téléphone";"Portable";"Fax";"Commentaires"

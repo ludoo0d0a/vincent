@@ -237,16 +237,14 @@ object CsvFormat {
 
     private fun List<String>.field(key: String, index: Map<String, Int>): String? {
         val aliases = ALIASES[key] ?: return null
-        for (a in aliases) {
-            val alias = a.lowercase().trim()
-            val i = index[alias] ?: continue
-            if (i < size) {
-                var v = this[i].trim()
-                if (v.startsWith("\"") && v.endsWith("\"")) {
-                    v = v.substring(1, v.length - 1).replace("\"\"", "\"")
-                }
-                if (v.isNotEmpty() && v != "\"\"") return v
+        val alias = aliases.firstOrNull { it.lowercase().trim() in index } ?: return null
+        val i = index[alias.lowercase().trim()] ?: return null
+        if (i < size) {
+            var v = this[i].trim()
+            if (v.startsWith("\"") && v.endsWith("\"")) {
+                v = v.substring(1, v.length - 1).replace("\"\"", "\"")
             }
+            if (v.isNotEmpty() && v != "\"\"") return v
         }
         return null
     }
