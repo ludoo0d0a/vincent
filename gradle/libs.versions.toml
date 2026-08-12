@@ -12,6 +12,7 @@ serialization = "1.8.1"
 credentials = "1.6.0"
 googleid = "1.2.0"
 codeScanner = "16.1.0"
+mlkitTextRecognition = "19.0.1"
 appUpdate = "2.1.0"
 coil = "2.7.0"
 firebase-bom = "34.15.0"
@@ -42,6 +43,8 @@ androidx-credentials = { module = "androidx.credentials:credentials", version.re
 androidx-credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 google-identity-googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 google-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "codeScanner" }
+# Play Services OCR (Latin); model downloaded via mlkit.vision.DEPENDENCIES=ocr
+google-mlkit-text-recognition = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "mlkitTextRecognition" }
 google-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdate" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }

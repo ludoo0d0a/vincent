@@ -82,7 +82,15 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `ENRICH`.
 |---|----------|--------------|------------|--------|
 | 1 | **Open Food Facts** | `BARCODE_SCAN` | none (open API) | ✅ active |
 | 2 | **grapeminds** | `TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH` | `GRAPEMINDS_API_KEY` (`Authorization: Bearer`) | ✅ active when key set (label scan needs Enterprise plan) |
-| 3 | **AI Label (Gemini)** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ active |
+| 3 | **AI Label** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ OCR-first + Gemini fallback |
+
+> **On-device label + voice (cost cut):** label photos run **ML Kit OCR** (Play Services,
+> preloaded via `mlkit.vision.DEPENDENCIES=ocr`) then a local parser
+> (`ai/WineLabelParser`) and optional grapeminds `TEXT_SEARCH`. Gemini **vision** is
+> only used when OCR is empty/weak; Gemini **text** when the parser confidence is low
+> (also the voice path after free `SpeechRecognizer` STT). JPEGs are downscaled before
+> any vision upload. KPIs live on `AiUsage` (`localParseHits`, `geminiVisionCalls`,
+> `geminiTextCalls`, `fallbackRate()`, `lastPath`).
 
 > grapeminds Public API v1 — base `https://api.grapeminds.eu/public/v1`, `Accept-Language` ∈ {de,en,es,fr,it,da}.
 > Full typed client: `androidMain/.../data/GrapeMindsClient.kt` (wines, producers, regions, region insights,
@@ -96,7 +104,17 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `ENRICH`.
 > bottle detail screen (Description, Grape varieties, Flavour-profile bars, pairing prose, maturity notes).
 > No barcode and no price field; region insights are available on the client but not yet wired in the UI.
 
-> Real priority: `OpenFoodFacts → grapeminds → AiLabel`.
+> Real priority: `OpenFoodFacts → grapeminds → AiLabel` (AiLabel itself is OCR → parse → search → Gemini).
+
+### Label / voice cost KPIs (relative)
+
+| Path | Gemini $ | Worker quota | Offline structure |
+|---|---|---|---|
+| OCR + local parse hit | ~0 | 0 | yes |
+| Voice STT + local parse hit | ~0 | 0 | yes (STT often offline) |
+| OCR weak → Gemini text | medium | 1 | no |
+| OCR empty → Gemini vision (downscaled) | high (lower than full-res) | 1 | no |
+| Status quo (vision every label) | highest | 1 | no |
 
 ### Config keys
 
@@ -149,22 +167,23 @@ Keys present in `local.properties` but **not read by the app code** (used by CI/
   screen is reachable from Account.
 - **Recognition & price (AI, wired).** `ai/WineAi.kt` exposes `WineRecognizer`
   (title/photo → `Bottle`), `PriceEstimator` and `PriceSearcher` (→ estimated price).
-  Both use **Gemini Flash** via `GeminiClient` (`ai/WineAi.android.kt`): estimation
-  at add time (photo/voice) and on the bottle detail “Auto” search (Gemini first, then
-  retailer pages — Nicolas, Vivino, Wine-Searcher…). Price is always shown as an
-  **estimate** with its source (Gemini).
+  Label photos and voice titles try **on-device first** (ML Kit OCR / `SpeechRecognizer`
+  + `WineLabelParser` ± catalogue search); **Gemini Flash** via `GeminiClient`
+  (`ai/WineAi.android.kt`) is the fallback. Price estimation at add time and on the
+  bottle detail “Auto” search still use Gemini (then retailer pages — Nicolas, Vivino,
+  Wine-Searcher…). Price is always shown as an **estimate** with its source (Gemini).
 - **Food pairings (AI, wired).** `FoodPairer` (same `GeminiClient`): the bottle
   detail has a "Suggest more pairings (AI)" button → Gemini returns dishes, merged
   with the existing pairings.
 - **Voice dictation (wired).** `ai/Dictation.kt` (expect) + `Dictation.android.kt`
   (`android.speech.SpeechRecognizer`, fr-FR, free/offline): live transcript + mic
   level for the waveform, `RECORD_AUDIO` requested on tap. The final transcript is
-  passed to `WineRecognizer.fromText` (Gemini) which fills the fields; the Voice
-  screen shows the real waveform, transcript and result.
+  parsed locally when confident, else `WineRecognizer.fromText` (Gemini).
 - **Label photo (wired).** `ai/PhotoCapture.kt` (expect) + `PhotoCapture.android.kt`:
   **system** camera (`TakePicture` + `FileProvider`, full resolution, **no CameraX**
-  — overkill for a one-shot snap), CAMERA permission on tap. In Photo mode the button
-  captures → `WineRecognizer.fromImage` (Gemini) fills the fields + price.
+  — overkill for a one-shot snap), CAMERA permission on tap. Photo mode runs OCR →
+  local parse → optional catalogue; Gemini vision only if OCR is empty/weak (JPEG
+  downscaled before upload).
 - **Barcode (wired).** `ai/Barcode.kt` (expect) + `Barcode.android.kt`: **Google Code
   Scanner** (`play-services-code-scanner`, no camera permission, module preloaded via
   the manifest `mlkit.vision.DEPENDENCIES` meta-data) reads the EAN/UPC. `data/ProductLookup.kt`

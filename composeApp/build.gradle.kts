@@ -78,6 +78,7 @@ kotlin {
             implementation(libs.firebase.appcheck.playintegrity)
             implementation(libs.kotlinx.coroutines.play.services)
             implementation(libs.google.code.scanner)
+            implementation(libs.google.mlkit.text.recognition)
             implementation(libs.google.app.update.ktx)
             implementation(libs.coil.compose)
             // ARCore (Google Play Services for AR) + SceneView (Filament + Compose)

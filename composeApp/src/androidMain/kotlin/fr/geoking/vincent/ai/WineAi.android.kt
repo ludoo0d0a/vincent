@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.auth.FirebaseAuth
 import fr.geoking.vincent.BuildConfig
+import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.debug.HttpDebug
 import fr.geoking.vincent.model.AddSource
@@ -30,8 +31,13 @@ import vincent.composeapp.generated.resources.*
 // Gemini key stays server-side and each call carries an App Check token + the user's
 // Firebase ID token. Debug builds without a proxy fall back to a direct Gemini call
 // using BuildConfig.GEMINI_API_KEY (blank in release → no key ever ships in the APK).
+//
+// Label + voice recognition try on-device OCR/STT text + [WineLabelParser] first;
+// Gemini is only the fallback (vision for empty OCR, text for weak parse).
 private const val MODEL = "gemini-flash-latest"
 private const val TAG = "VincentAI"
+/** Below this, OCR is treated as empty → Gemini vision. */
+private const val OCR_MIN_CHARS = 8
 
 /** Single Gemini-backed client implementing both seams. */
 object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer {
@@ -108,21 +114,12 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
     }
 
     override suspend fun fromText(title: String): RecognizeOutcome = withContext(Dispatchers.IO) {
-        val json = generate(
-            langDirective() +
-                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
-                "color parmi rouge/blanc/rosé/pétillant. " +
-                "alcohol = nombre (ex: 13.5). " +
-                "sugar parmi sec/demi-sec/moelleux. " +
-                "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
-                "aging_potential = nombre d'années de garde estimé (entier). " +
-                "drink_from/drink_to = années de début/fin de consommation estimées. " +
-                "Titre: \"$title\"",
-            imageB64 = null,
-        ) ?: return@withContext RecognizeOutcome(error = lastError)
-        val bottle = toBottle(json, "ia-${title.hashCode()}")
-        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
-        else RecognizeOutcome(bottle = bottle)
+        recognizeFromFreeText(
+            title,
+            localPath = AiPath.VOICE_LOCAL,
+            geminiPath = AiPath.TEXT_FALLBACK,
+            source = AddSource.VOICE,
+        )
     }
 
     override suspend fun refine(current: Bottle, instruction: String): RecognizeOutcome = withContext(Dispatchers.IO) {
@@ -175,6 +172,74 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
     }
 
     override suspend fun fromImage(jpeg: ByteArray): RecognizeOutcome = withContext(Dispatchers.IO) {
+        val compact = downscaleJpeg(jpeg)
+        val ocrText = try {
+            labelOcr().recognize(compact)
+        } catch (e: Exception) {
+            Log.w(TAG, "OCR failed: ${e.message}")
+            ""
+        }
+        if (ocrText.length < OCR_MIN_CHARS) {
+            return@withContext geminiFromImage(compact)
+        }
+        val local = recognizeFromFreeText(
+            ocrText,
+            localPath = AiPath.OCR_LOCAL,
+            geminiPath = AiPath.OCR_TEXT_FALLBACK,
+            source = AddSource.SCAN,
+        )
+        if (local.bottle != null) return@withContext local
+        // Text Gemini also failed (or weak) — last resort: vision on the downscaled JPEG.
+        geminiFromImage(compact)
+    }
+
+    /**
+     * Shared path for voice transcripts and OCR text: local parse (± catalogue search),
+     * then Gemini text when confidence is low.
+     */
+    private suspend fun recognizeFromFreeText(
+        title: String,
+        localPath: AiPath,
+        geminiPath: AiPath,
+        source: AddSource,
+    ): RecognizeOutcome {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) {
+            return RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
+        }
+        val parsed = WineLabelParser.parse(trimmed)
+        if (parsed.isConfident) {
+            val bottle = bottleFromFields(parsed, "local-${trimmed.hashCode()}", source)
+                ?.let { enrichFromCatalogue(it, parsed.searchQuery) }
+            if (bottle != null) {
+                AiUsage.recordLocal(localPath)
+                return RecognizeOutcome(bottle = bottle)
+            }
+        }
+        return geminiFromText(trimmed, geminiPath)
+    }
+
+    private suspend fun geminiFromText(title: String, path: AiPath): RecognizeOutcome {
+        AiUsage.recordGeminiText(path)
+        val json = generate(
+            langDirective() +
+                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
+                "color parmi rouge/blanc/rosé/pétillant. " +
+                "alcohol = nombre (ex: 13.5). " +
+                "sugar parmi sec/demi-sec/moelleux. " +
+                "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
+                "aging_potential = nombre d'années de garde estimé (entier). " +
+                "drink_from/drink_to = années de début/fin de consommation estimées. " +
+                "Titre: \"$title\"",
+            imageB64 = null,
+        ) ?: return RecognizeOutcome(error = lastError)
+        val bottle = toBottle(json, "ia-${title.hashCode()}")
+        return if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
+        else RecognizeOutcome(bottle = bottle)
+    }
+
+    private suspend fun geminiFromImage(jpeg: ByteArray): RecognizeOutcome {
+        AiUsage.recordGeminiVision()
         val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
         val json = generate(
             langDirective() +
@@ -186,10 +251,65 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
                 "sugar parmi sec/demi-sec/moelleux. " +
                 "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]).",
             imageB64 = b64,
-        ) ?: return@withContext RecognizeOutcome(error = lastError)
+        ) ?: return RecognizeOutcome(error = lastError)
         val bottle = toBottle(json, "ia-img-${jpeg.size}")
-        if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_no_label))
+        return if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_no_label))
         else RecognizeOutcome(bottle = bottle)
+    }
+
+    private suspend fun bottleFromFields(
+        fields: WineLabelFields,
+        id: String,
+        source: AddSource,
+    ): Bottle? {
+        if (fields.domain.isBlank()) return null
+        val region = fields.region
+        val appellation = fields.appellation.ifBlank { region }
+        return Bottle(
+            id = id,
+            domain = fields.domain,
+            appellation = appellation,
+            color = colorOf(fields.colorHint),
+            category = categoryOf("$region $appellation ${fields.categoryHint}"),
+            vintage = fields.vintage.ifBlank { "NM" },
+            price = 0,
+            quantity = 1,
+            rating = 0.0,
+            cellarSpot = "—",
+            provenance = region.ifBlank { appellation },
+            merchant = "—",
+            purchaseDate = getString(Res.string.add_today),
+            occasion = "—",
+            alcoholLevel = fields.alcohol,
+            sugarLevel = sugarOf(fields.sugarHint),
+            grapes = fields.grapes,
+            source = source,
+            addedLabel = getString(Res.string.ai_added_label),
+        )
+    }
+
+    /** Best-effort fill of blank fields from grapeminds / other TEXT_SEARCH providers. */
+    private suspend fun enrichFromCatalogue(bottle: Bottle, query: String): Bottle {
+        if (query.isBlank()) return bottle
+        val hit = try {
+            WineDataSource.search(query).firstOrNull()
+        } catch (e: Exception) {
+            Log.w(TAG, "Catalogue search failed: ${e.message}")
+            null
+        } ?: return bottle
+        return bottle.copy(
+            domain = bottle.domain.ifBlank { hit.brand }.ifBlank { bottle.domain },
+            appellation = bottle.appellation.ifBlank {
+                hit.name.takeIf { it.isNotBlank() && !it.equals(hit.brand, ignoreCase = true) }.orEmpty()
+            }.ifBlank { bottle.appellation },
+            provenance = bottle.provenance.ifBlank { hit.region.orEmpty() }.ifBlank { bottle.provenance },
+            vintage = bottle.vintage.takeUnless { it == "NM" }
+                ?: hit.vintage?.takeIf { it.isNotBlank() }
+                ?: bottle.vintage,
+            grapes = bottle.grapes.ifEmpty {
+                hit.grape?.takeIf { it.isNotBlank() }?.let { listOf(it) }.orEmpty()
+            },
+        )
     }
 
     override suspend fun estimate(bottle: Bottle): PriceEstimate? = withContext(Dispatchers.IO) {

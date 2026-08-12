@@ -200,8 +200,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
             }
         }
     }
-    // Label capture: snap the label/bottle with the system camera (full-res) and let
-    // the vision model read it → Gemini fromImage. No hardcoded recognition result.
+    // Label capture: OCR + local parse first; Gemini vision only if OCR is empty/weak.
     val startCapture = rememberPhotoCapture { bytes ->
         busy = true
         aiError = null
