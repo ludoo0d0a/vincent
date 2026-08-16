@@ -147,6 +147,7 @@
     <string name="detail_price_value">Price</string>
     <string name="detail_price_not_found">Not found</string>
     <string name="price_source_gemini">Gemini</string>
+    <string name="price_source_gemma">Gemma</string>
 
     <string name="bottles_title">My bottles</string>
     <plurals name="bottles_subtitle_format">
@@ -332,6 +333,17 @@
     <string name="add_placement_chosen_format">Selected: %1$s · %2$s — or leave « no location ».</string>
     <string name="add_placement_current">Current</string>
     <string name="add_mode_identify">Identify</string>
+    <string name="add_describe_title">Describe the wine</string>
+    <string name="add_describe_hint">e.g. “Château Palmer Margaux 2016 red”</string>
+    <string name="add_describe_action">Identify</string>
+    <string name="add_catalogue_suggestions">Catalogue suggestions</string>
+    <string name="add_estimate_price">Estimate price</string>
+    <string name="add_estimating_price">Estimating…</string>
+    <string name="add_photo_back">Photograph the back</string>
+    <string name="add_cellar_add_one">Add +1</string>
+    <string name="add_cellar_new_vintage">New vintage</string>
+    <string name="add_cellar_pick_title">Bottle already in cellar</string>
+    <string name="add_cellar_pick_message">“%1$s” is already in your cellar. Add one bottle or create another vintage?</string>
     <string name="add_voice_title">Dictate your bottle</string>
     <string name="add_voice_subtitle">“domain, vintage, color, quantity, rack”</string>
     <string name="add_voice_placeholder">Tap the mic and dictate your bottle…</string>
@@ -425,6 +437,24 @@
     <string name="update_error">Error checking for updates.</string>
     <string name="update_ineligible">Update available but not eligible.</string>
     <string name="settings_section_app">App</string>
+    <string name="settings_section_ai">Artificial intelligence</string>
+    <string name="settings_gemma_title">Gemma model (on-device)</string>
+    <string name="settings_gemma_desc">Gemma 3 1B on-device (~550 MB). Free, offline after download.</string>
+    <string name="settings_gemma_missing">Not downloaded</string>
+    <string name="settings_gemma_ready">Ready</string>
+    <string name="settings_gemma_downloading">Downloading… %1$d%%</string>
+    <string name="settings_gemma_download">Download model</string>
+    <string name="settings_gemma_delete">Delete model</string>
+    <string name="settings_gemma_error">Error: %1$s</string>
+    <string name="settings_hf_token">Hugging Face token (optional)</string>
+    <string name="settings_hf_token_hint">Required if the Gemma repo is gated</string>
+    <string name="settings_gemini_title">Gemini (optional)</string>
+    <string name="settings_gemini_desc">Your API key — used only when Gemma fails or for vision.</string>
+    <string name="settings_gemini_key">Gemini API key</string>
+    <string name="settings_gemini_key_hint">Paste your AI Studio key</string>
+    <string name="settings_gemini_fallback">Use Gemini as fallback</string>
+    <string name="settings_gemini_key_saved">Key saved</string>
+    <string name="settings_gemini_key_clear">Clear</string>
     <string name="settings_insert_demo_data">Insert demo data</string>
     <string name="settings_insert_demo_data_confirm_title">Insert demo data?</string>
     <string name="settings_insert_demo_data_confirm_message">This action will add sample racks and bottles to your cellar.</string>
@@ -513,11 +543,13 @@
     <string name="export_producers_button">Export producers to CSV</string>
     <string name="export_suppliers_button">Export suppliers to CSV</string>
 
-    <string name="ai_error_no_key">Missing Gemini API key. Add GEMINI_API_KEY to local.properties.</string>
+    <string name="ai_error_no_key">Missing Gemini API key. Add it in Settings.</string>
     <string name="ai_error_sign_in">Sign in to use AI features.</string>
     <string name="ai_error_extract_text">Could not extract wine details from the text.</string>
     <string name="ai_error_no_label">No estate detected on the label.</string>
     <string name="ai_error_generic">Identification failed — try again or switch to manual.</string>
+    <string name="ai_error_gemma_unavailable">Gemma model unavailable. Download it in Settings, or enable Gemini.</string>
+    <string name="ai_error_ocr_empty">Could not read text on the photo. Retry, photograph the back, or type a description.</string>
     <string name="ai_error_http_403">Invalid API key or API not enabled.%1$s</string>
     <string name="ai_error_http_404">Model or URL not found (%1$d).%2$s</string>
     <string name="ai_error_http_429">Gemini quota exceeded — try again later.</string>

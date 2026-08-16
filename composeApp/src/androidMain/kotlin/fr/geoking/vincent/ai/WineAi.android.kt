@@ -2,9 +2,8 @@ package fr.geoking.vincent.ai
 
 import android.util.Base64
 import android.util.Log
-import com.google.firebase.appcheck.FirebaseAppCheck
-import com.google.firebase.auth.FirebaseAuth
-import fr.geoking.vincent.BuildConfig
+import fr.geoking.vincent.data.ProductInfo
+import fr.geoking.vincent.data.Settings
 import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.bottlePriceCompareLinks
 import fr.geoking.vincent.debug.HttpDebug
@@ -17,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.getString
 import org.json.JSONArray
@@ -27,25 +25,24 @@ import java.net.URL
 import java.util.Locale
 import vincent.composeapp.generated.resources.*
 
-// AI calls go through the Cloudflare Worker proxy (BuildConfig.AI_PROXY_URL): the
-// Gemini key stays server-side and each call carries an App Check token + the user's
-// Firebase ID token. Debug builds without a proxy fall back to a direct Gemini call
-// using BuildConfig.GEMINI_API_KEY (blank in release → no key ever ships in the APK).
-//
-// Label + voice recognition try on-device OCR/STT text + [WineLabelParser] first;
-// Gemini is only the fallback (vision for empty OCR, text for weak parse).
+/**
+ * Wine AI router: OCR/STT → [WineLabelParser] → Gemma on-device → optional Gemini BYOK
+ * (user key in Settings). No BuildConfig Gemini key and no vision without a user key.
+ */
 private const val MODEL = "gemini-flash-latest"
 private const val TAG = "VincentAI"
-/** Below this, OCR is treated as empty → Gemini vision. */
+/** Below this, OCR is treated as empty → Gemma cannot help from pixels alone. */
 private const val OCR_MIN_CHARS = 8
 
-/** Single Gemini-backed client implementing both seams. */
-object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer {
+object WineAiEngine : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer {
+
+    private fun geminiEnabled(): Boolean =
+        Settings.geminiFallbackEnabled && Settings.geminiApiKey.isNotBlank()
 
     override fun search(bottle: Bottle): Flow<PriceSearchResult> = flow {
         val geminiLabel = getString(Res.string.price_source_gemini)
         estimate(bottle)?.let { est ->
-            emit(PriceSearchResult(geminiLabel, est.amountEur, "", true))
+            emit(PriceSearchResult(est.source.ifBlank { geminiLabel }, est.amountEur, "", true))
         }
         val links = bottlePriceCompareLinks(bottle)
         for (link in links) {
@@ -55,14 +52,13 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
                 continue
             }
             val q = "${bottle.domain} ${bottle.vintage} ${bottle.appellation}".trim()
-            val json = generate(
+            val json = generateJson(
                 langDirective() +
-                        "Dans le texte suivant (résultats de recherche), trouve le prix exact (entier en euros) " +
-                        "et l'URL de la fiche produit pour ce vin : \"$q\". " +
-                        "Renvoie JSON {price:int, url:string, found:boolean}. " +
-                        "Si plusieurs résultats, prends le plus pertinent. " +
-                        "Texte: \n\n$content",
-                imageB64 = null,
+                    "Dans le texte suivant (résultats de recherche), trouve le prix exact (entier en euros) " +
+                    "et l'URL de la fiche produit pour ce vin : \"$q\". " +
+                    "Renvoie JSON {price:int, url:string, found:boolean}. " +
+                    "Si plusieurs résultats, prends le plus pertinent. " +
+                    "Texte: \n\n$content",
             )
             if (json != null && json.optBoolean("found", false)) {
                 emit(
@@ -88,13 +84,12 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             }
             if (conn.responseCode !in 200..299) return ""
             val html = conn.inputStream.bufferedReader().use { it.readText() }
-            // Basic HTML to Text: remove scripts, styles and tags
             html.replace(Regex("<script[\\s\\S]*?</script>", RegexOption.IGNORE_CASE), "")
                 .replace(Regex("<style[\\s\\S]*?</style>", RegexOption.IGNORE_CASE), "")
                 .replace(Regex("<[^>]*>"), " ")
                 .replace(Regex("\\s+"), " ")
                 .trim()
-                .take(8000) // Gemini context limit safety
+                .take(8000)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to fetch $url: ${e.message}")
             ""
@@ -102,12 +97,11 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
     }
 
     override suspend fun pairings(bottle: Bottle): List<String> = withContext(Dispatchers.IO) {
-        val q = "${bottle.domain} ${bottle.vintage} — ${bottle.color.label}, ${bottle.appellation}"
-        val json = generate(
+        val q = "${bottle.domain} ${bottle.vintage} — ${colorToken(bottle.color)}, ${bottle.appellation}"
+        val json = generateJson(
             langDirective() +
                 "Propose 6 accords mets-vin concis (un plat chacun, 1–3 mots) pour ce vin. " +
                 "JSON {pairings:[string]}. Vin: \"$q\"",
-            imageB64 = null,
         ) ?: return@withContext emptyList()
         val arr = json.optJSONArray("pairings") ?: return@withContext emptyList()
         (0 until arr.length()).mapNotNull { i -> arr.optString(i).trim().takeIf { it.isNotEmpty() } }
@@ -117,7 +111,6 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         recognizeFromFreeText(
             title,
             localPath = AiPath.VOICE_LOCAL,
-            geminiPath = AiPath.TEXT_FALLBACK,
             source = AddSource.VOICE,
         )
     }
@@ -132,25 +125,24 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             .put("price", current.price)
             .put("alcohol", current.alcoholLevel)
             .put("sugar", sugarToken(current.sugarLevel))
-        val json = generate(
-            langDirective() +
-                "Tu aides à compléter la fiche d'un vin par la discussion. " +
-                "Fiche actuelle (JSON): $ctx. " +
-                "Précision de l'utilisateur : \"$instruction\". " +
-                "Renvoie la fiche mise à jour en JSON " +
-                "{domain, appellation, color, region, vintage, category, price, alcohol, sugar, grapes, aging_potential, drink_from, drink_to, reply}. " +
-                "aging_potential = nombre d'années de garde estimé (entier). " +
-                "drink_from/drink_to = années de début/fin de consommation estimées. " +
-                "color parmi rouge/blanc/rosé/pétillant. " +
-                "price = prix unitaire en euros (entier, 0 si inconnu). " +
-                "vintage = année sur 4 chiffres ou \"NM\" si non millésimé. " +
-                "alcohol = nombre (ex: 13.5). " +
-                "sugar parmi sec/demi-sec/moelleux. " +
-                "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
-                "Conserve les valeurs déjà connues si l'utilisateur ne les change pas. " +
-                "reply = une phrase courte confirmant ce qui a été complété ou demandant la donnée manquante.",
-            imageB64 = null,
-        ) ?: return@withContext RecognizeOutcome(error = lastError)
+        val prompt = langDirective() +
+            "Tu aides à compléter la fiche d'un vin par la discussion. " +
+            "Fiche actuelle (JSON): $ctx. " +
+            "Précision de l'utilisateur : \"$instruction\". " +
+            "Renvoie la fiche mise à jour en JSON " +
+            "{domain, appellation, color, region, vintage, category, price, alcohol, sugar, grapes, aging_potential, drink_from, drink_to, reply}. " +
+            "aging_potential = nombre d'années de garde estimé (entier). " +
+            "drink_from/drink_to = années de début/fin de consommation estimées. " +
+            "color parmi rouge/blanc/rosé/pétillant. " +
+            "price = prix unitaire en euros (entier, 0 si inconnu). " +
+            "vintage = année sur 4 chiffres ou \"NM\" si non millésimé. " +
+            "alcohol = nombre (ex: 13.5). " +
+            "sugar parmi sec/demi-sec/moelleux. " +
+            "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
+            "Conserve les valeurs déjà connues si l'utilisateur ne les change pas. " +
+            "reply = une phrase courte confirmant ce qui a été complété ou demandant la donnée manquante."
+        val json = generateJson(prompt)
+            ?: return@withContext RecognizeOutcome(error = lastError ?: getString(Res.string.ai_error_gemma_unavailable))
         val reply = json.str("reply").takeIf { it.isNotEmpty() }
         val updated = toBottle(json, current.id)?.copy(
             price = json.optInt("price", current.price).takeIf { it > 0 } ?: current.price,
@@ -180,27 +172,27 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             ""
         }
         if (ocrText.length < OCR_MIN_CHARS) {
-            return@withContext geminiFromImage(compact)
+            // No Gemma vision in v1. Optional Gemini vision only with BYOK.
+            if (geminiEnabled()) return@withContext geminiFromImage(compact)
+            return@withContext RecognizeOutcome(
+                error = getString(Res.string.ai_error_ocr_empty),
+                rawText = ocrText,
+            )
         }
-        val local = recognizeFromFreeText(
+        recognizeFromFreeText(
             ocrText,
             localPath = AiPath.OCR_LOCAL,
-            geminiPath = AiPath.OCR_TEXT_FALLBACK,
             source = AddSource.SCAN,
-        )
-        if (local.bottle != null) return@withContext local
-        // Text Gemini also failed (or weak) — last resort: vision on the downscaled JPEG.
-        geminiFromImage(compact)
+        ).copy(rawText = ocrText)
     }
 
     /**
-     * Shared path for voice transcripts and OCR text: local parse (± catalogue search),
-     * then Gemini text when confidence is low.
+     * Shared path for voice transcripts and OCR text: local parse, catalogue suggestions,
+     * then Gemma (then optional Gemini) when confidence is low.
      */
     private suspend fun recognizeFromFreeText(
         title: String,
         localPath: AiPath,
-        geminiPath: AiPath,
         source: AddSource,
     ): RecognizeOutcome {
         val trimmed = title.trim()
@@ -208,40 +200,53 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             return RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
         }
         val parsed = WineLabelParser.parse(trimmed)
+        val query = parsed.searchQuery.ifBlank { trimmed }
+        val suggestions = catalogueSuggestions(query)
         if (parsed.isConfident) {
             val bottle = bottleFromFields(parsed, "local-${trimmed.hashCode()}", source)
-                ?.let { enrichFromCatalogue(it, parsed.searchQuery) }
             if (bottle != null) {
                 AiUsage.recordLocal(localPath)
-                return RecognizeOutcome(bottle = bottle)
+                return RecognizeOutcome(bottle = bottle, suggestions = suggestions)
             }
         }
-        return geminiFromText(trimmed, geminiPath)
+        return generativeFromText(trimmed, source, suggestions)
     }
 
-    private suspend fun geminiFromText(title: String, path: AiPath): RecognizeOutcome {
-        AiUsage.recordGeminiText(path)
-        val json = generate(
-            langDirective() +
-                "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
-                "color parmi rouge/blanc/rosé/pétillant. " +
-                "alcohol = nombre (ex: 13.5). " +
-                "sugar parmi sec/demi-sec/moelleux. " +
-                "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
-                "aging_potential = nombre d'années de garde estimé (entier). " +
-                "drink_from/drink_to = années de début/fin de consommation estimées. " +
-                "Titre: \"$title\"",
-            imageB64 = null,
-        ) ?: return RecognizeOutcome(error = lastError)
-        val bottle = toBottle(json, "ia-${title.hashCode()}")
-        return if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_extract_text))
-        else RecognizeOutcome(bottle = bottle)
+    private suspend fun generativeFromText(
+        title: String,
+        source: AddSource,
+        suggestions: List<ProductInfo>,
+    ): RecognizeOutcome {
+        val prompt = extractPrompt(title)
+        val json = generateJson(prompt)
+        if (json != null) {
+            val bottle = toBottle(json, "ia-${title.hashCode()}")?.copy(source = source)
+            if (bottle != null) {
+                val more = suggestions.ifEmpty { catalogueSuggestions("${bottle.domain} ${bottle.appellation} ${bottle.vintage}") }
+                return RecognizeOutcome(bottle = bottle, suggestions = more)
+            }
+        }
+        return RecognizeOutcome(
+            error = lastError ?: getString(Res.string.ai_error_extract_text),
+            suggestions = suggestions,
+        )
     }
+
+    private fun extractPrompt(title: String): String =
+        langDirective() +
+            "Extrait les détails du vin en JSON {domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
+            "color parmi rouge/blanc/rosé/pétillant. " +
+            "alcohol = nombre (ex: 13.5). " +
+            "sugar parmi sec/demi-sec/moelleux. " +
+            "grapes = liste de chaînes (ex: [\"Merlot\", \"Cabernet Sauvignon\"]). " +
+            "aging_potential = nombre d'années de garde estimé (entier). " +
+            "drink_from/drink_to = années de début/fin de consommation estimées. " +
+            "Titre: \"$title\""
 
     private suspend fun geminiFromImage(jpeg: ByteArray): RecognizeOutcome {
         AiUsage.recordGeminiVision()
         val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
-        val json = generate(
+        val json = generateGemini(
             langDirective() +
                 "Lis l'étiquette de cette bouteille et renvoie JSON " +
                 "{domain, appellation, color, region, vintage, category, alcohol, sugar, grapes, aging_potential, drink_from, drink_to}. " +
@@ -254,7 +259,10 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         ) ?: return RecognizeOutcome(error = lastError)
         val bottle = toBottle(json, "ia-img-${jpeg.size}")
         return if (bottle == null) RecognizeOutcome(error = getString(Res.string.ai_error_no_label))
-        else RecognizeOutcome(bottle = bottle)
+        else RecognizeOutcome(
+            bottle = bottle,
+            suggestions = catalogueSuggestions("${bottle.domain} ${bottle.appellation} ${bottle.vintage}"),
+        )
     }
 
     private suspend fun bottleFromFields(
@@ -288,16 +296,18 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         )
     }
 
-    /** Best-effort fill of blank fields from grapeminds / other TEXT_SEARCH providers. */
-    private suspend fun enrichFromCatalogue(bottle: Bottle, query: String): Bottle {
-        if (query.isBlank()) return bottle
-        val hit = try {
-            WineDataSource.search(query).firstOrNull()
+    private suspend fun catalogueSuggestions(query: String): List<ProductInfo> {
+        if (query.isBlank()) return emptyList()
+        return try {
+            WineDataSource.search(query).take(5)
         } catch (e: Exception) {
             Log.w(TAG, "Catalogue search failed: ${e.message}")
-            null
-        } ?: return bottle
-        return bottle.copy(
+            emptyList()
+        }
+    }
+
+    fun mergeProduct(bottle: Bottle, hit: ProductInfo): Bottle =
+        bottle.copy(
             domain = bottle.domain.ifBlank { hit.brand }.ifBlank { bottle.domain },
             appellation = bottle.appellation.ifBlank {
                 hit.name.takeIf { it.isNotBlank() && !it.equals(hit.brand, ignoreCase = true) }.orEmpty()
@@ -310,24 +320,23 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
                 hit.grape?.takeIf { it.isNotBlank() }?.let { listOf(it) }.orEmpty()
             },
         )
-    }
 
     override suspend fun estimate(bottle: Bottle): PriceEstimate? = withContext(Dispatchers.IO) {
         val q = "${bottle.domain} ${bottle.vintage} ${bottle.appellation}".trim()
-        val source = getString(Res.string.price_source_gemini)
-        val json = generate(
+        val json = generateJson(
             langDirective() +
                 "Donne le prix marché estimé en euros (entier) pour ce vin. " +
                 "JSON {price:int}. Vin: \"$q\"",
-            imageB64 = null,
         ) ?: return@withContext null
         val price = json.optInt("price", 0)
-        if (price <= 0) null
-        else PriceEstimate(price, source, source)
+        if (price <= 0) return@withContext null
+        val source = when {
+            AiUsage.lastPath == AiPath.GEMMA_TEXT -> getString(Res.string.price_source_gemma)
+            else -> getString(Res.string.price_source_gemini)
+        }
+        PriceEstimate(price, source, source)
     }
 
-    // Instructs Gemini to reply in the device's current language so user-facing
-    // text (pairings, price source…) matches the rest of the localized UI.
     private fun langDirective(): String {
         val locale = Locale.getDefault()
         val name = locale.getDisplayLanguage(Locale.ENGLISH).ifBlank { locale.language }
@@ -342,124 +351,38 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         return null
     }
 
-    // The proxy reports the user's remaining daily allowance via these headers
-    // (present on success, cache hits and the 429 quota-exceeded response).
-    private fun readQuotaHeaders(conn: HttpURLConnection) {
-        val remaining = conn.getHeaderField("X-AI-Quota-Remaining")?.toIntOrNull() ?: return
-        val limit = conn.getHeaderField("X-AI-Quota-Limit")?.toIntOrNull() ?: return
-        AiUsage.update(remaining = remaining, limit = limit)
-    }
-
-    private suspend fun generate(prompt: String, imageB64: String?): JSONObject? {
+    /**
+     * Gemma first when the model is ready; else Gemini if BYOK is enabled.
+     * Text-only (no image).
+     */
+    private suspend fun generateJson(prompt: String): JSONObject? {
         lastError = null
-        val proxyUrl = BuildConfig.AI_PROXY_URL
-        return if (proxyUrl.isNotBlank()) {
-            generateViaProxy(proxyUrl, prompt, imageB64)
+        if (GemmaLlm.isAvailable) {
+            val json = GemmaLlm.generateJson(prompt)
+            if (json != null) return json
+            Log.w(TAG, "Gemma returned no JSON — trying Gemini if enabled")
         } else {
-            generateDirect(prompt, imageB64)
+            AiUsage.recordGemmaUnavailable()
         }
+        if (!geminiEnabled()) {
+            return fail(
+                if (!GemmaModel.isReady()) getString(Res.string.ai_error_gemma_unavailable)
+                else getString(Res.string.ai_error_extract_text),
+            )
+        }
+        AiUsage.recordGeminiText()
+        return generateGemini(prompt, imageB64 = null)
     }
 
-    // Production path: POST to the Cloudflare Worker proxy. The Gemini key stays
-    // server-side; the call is authenticated with an App Check token and the user's
-    // Firebase ID token. The Worker returns the raw Gemini response, parsed below.
-    private suspend fun generateViaProxy(
-        proxyUrl: String,
-        prompt: String,
-        imageB64: String?,
-    ): JSONObject? {
-        val appCheckToken = try {
-            FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
-        } catch (e: Exception) {
-            Log.w(TAG, "App Check token unavailable: ${e.message}")
-            ""
-        }
-        val idToken = try {
-            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
-        } catch (e: Exception) {
-            Log.w(TAG, "ID token unavailable: ${e.message}")
-            null
-        }
-        if (idToken.isNullOrBlank()) {
-            return fail(getString(Res.string.ai_error_sign_in))
-        }
-        val started = System.currentTimeMillis()
-        return try {
-            val body = JSONObject()
-                .put("prompt", prompt)
-                .put("responseMimeType", "application/json")
-                .put("cacheable", imageB64 == null)
-            if (imageB64 != null) body.put("imageB64", imageB64)
-            val bodyText = body.toString()
-            val logBody = if (imageB64 != null) {
-                bodyText.replace(imageB64, "<image ${imageB64.length} chars>")
-            } else {
-                bodyText
-            }
-
-            val conn = (URL(proxyUrl).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                connectTimeout = 15000
-                readTimeout = 25000
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Authorization", "Bearer $idToken")
-                setRequestProperty("X-Firebase-AppCheck", appCheckToken)
-            }
-            conn.outputStream.use { it.write(bodyText.encodeToByteArray()) }
-            val code = conn.responseCode
-            val elapsed = System.currentTimeMillis() - started
-            readQuotaHeaders(conn)
-            if (code !in 200..299) {
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                Log.e(TAG, "AI proxy HTTP $code: ${err?.take(400)}")
-                HttpDebug.log(
-                    label = "AI proxy",
-                    method = "POST",
-                    url = proxyUrl,
-                    requestBody = logBody,
-                    statusCode = code,
-                    responseBody = err,
-                    durationMs = elapsed,
-                    error = geminiErrorDetail(err),
-                )
-                return fail(httpFailMessage(code, err))
-            }
-            val resp = conn.inputStream.bufferedReader().use { it.readText() }
-            HttpDebug.log(
-                label = "AI proxy",
-                method = "POST",
-                url = proxyUrl,
-                requestBody = logBody,
-                statusCode = code,
-                responseBody = resp,
-                durationMs = elapsed,
-            )
-            parseModelJson(resp)
-        } catch (e: Exception) {
-            val elapsed = System.currentTimeMillis() - started
-            Log.e(TAG, "AI proxy call failed: ${e.javaClass.simpleName}: ${e.message}", e)
-            HttpDebug.log(
-                label = "AI proxy",
-                method = "POST",
-                url = proxyUrl,
-                durationMs = elapsed,
-                error = "${e.javaClass.simpleName}: ${e.message}",
-            )
-            fail(getString(Res.string.ai_error_generic))
-        }
-    }
-
-    // Dev fallback (debug builds without a configured proxy): call Gemini directly
-    // with BuildConfig.GEMINI_API_KEY. Never reached in release (key is blank there).
-    private suspend fun generateDirect(prompt: String, imageB64: String?): JSONObject? {
-        if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+    private suspend fun generateGemini(prompt: String, imageB64: String?): JSONObject? {
+        lastError = null
+        val key = Settings.geminiApiKey.trim()
+        if (key.isBlank()) {
             return fail(getString(Res.string.ai_error_no_key))
         }
         val started = System.currentTimeMillis()
         val endpoint =
-            "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent" +
-                "?key=${BuildConfig.GEMINI_API_KEY}"
+            "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$key"
         return try {
             val parts = JSONArray().put(JSONObject().put("text", prompt))
             if (imageB64 != null) {
@@ -496,7 +419,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
                 HttpDebug.log(
                     label = "Gemini $MODEL",
                     method = "POST",
-                    url = endpoint,
+                    url = endpoint.substringBefore("?"),
                     requestBody = logBody,
                     statusCode = code,
                     responseBody = err,
@@ -509,7 +432,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             HttpDebug.log(
                 label = "Gemini $MODEL",
                 method = "POST",
-                url = endpoint,
+                url = endpoint.substringBefore("?"),
                 requestBody = logBody,
                 statusCode = code,
                 responseBody = resp,
@@ -522,7 +445,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             HttpDebug.log(
                 label = "Gemini $MODEL",
                 method = "POST",
-                url = endpoint,
+                url = endpoint.substringBefore("?"),
                 durationMs = elapsed,
                 error = "${e.javaClass.simpleName}: ${e.message}",
             )
@@ -530,8 +453,6 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         }
     }
 
-    // The proxy and the direct call both return the raw Gemini generateContent
-    // response; the model's JSON answer is the text of the first candidate part.
     private fun parseModelJson(resp: String): JSONObject {
         val text = JSONObject(resp)
             .getJSONArray("candidates").getJSONObject(0)
@@ -552,17 +473,6 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
     }
 
     private suspend fun httpFailMessage(code: Int, raw: String?): String {
-        // The proxy tags its own 429s with a reason so we can show a tailored,
-        // friendlier message instead of the generic Gemini-quota one.
-        if (code == 429) {
-            when (proxyQuotaReason(raw)) {
-                "burst" -> return getString(Res.string.ai_error_quota_burst)
-                "global" -> return getString(Res.string.ai_error_quota_global)
-                "daily" -> AiUsage.quota?.limit?.let {
-                    return getString(Res.string.ai_error_quota_daily, it)
-                }
-            }
-        }
         val detail = geminiErrorDetail(raw)?.let { " — $it" }.orEmpty()
         return when (code) {
             403 -> getString(Res.string.ai_error_http_403, detail)
@@ -570,19 +480,6 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
             429 -> getString(Res.string.ai_error_http_429)
             in 400..499 -> getString(Res.string.ai_error_http_4xx, code, detail)
             else -> getString(Res.string.ai_error_http_other, code, detail)
-        }
-    }
-
-    // A RESOURCE_EXHAUSTED 429 from our proxy carries error.reason; null for
-    // upstream/Gemini 429s (which fall back to the generic message).
-    private fun proxyQuotaReason(raw: String?): String? {
-        if (raw.isNullOrBlank()) return null
-        return try {
-            val err = JSONObject(raw).optJSONObject("error") ?: return null
-            if (err.optString("status") != "RESOURCE_EXHAUSTED") return null
-            err.optString("reason").takeIf { it.isNotBlank() }
-        } catch (_: Exception) {
-            null
         }
     }
 
@@ -622,8 +519,6 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         )
     }
 
-    // Stable French token sent back to Gemini so a refinement keeps the same colour
-    // vocabulary it was asked to produce (decoupled from the localized UI label).
     private fun colorToken(color: WineColor): String = when (color) {
         WineColor.RED -> "rouge"
         WineColor.WHITE -> "blanc"
@@ -669,7 +564,7 @@ object GeminiClient : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
     }
 }
 
-actual fun wineRecognizer(): WineRecognizer = GeminiClient
-actual fun priceEstimator(): PriceEstimator = GeminiClient
-actual fun priceSearcher(): PriceSearcher = GeminiClient
-actual fun foodPairer(): FoodPairer = GeminiClient
+actual fun wineRecognizer(): WineRecognizer = WineAiEngine
+actual fun priceEstimator(): PriceEstimator = WineAiEngine
+actual fun priceSearcher(): PriceSearcher = WineAiEngine
+actual fun foodPairer(): FoodPairer = WineAiEngine

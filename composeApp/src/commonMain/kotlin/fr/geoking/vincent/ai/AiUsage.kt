@@ -14,6 +14,8 @@ enum class AiPath {
     OCR_TEXT_FALLBACK,
     VISION_FALLBACK,
     TEXT_FALLBACK,
+    GEMMA_TEXT,
+    GEMMA_UNAVAILABLE,
 }
 
 /**
@@ -21,7 +23,7 @@ enum class AiPath {
  * X-AI-Quota-* response headers). Platform AI clients update it after each call;
  * screens observe [quota] to show "x scans left today". Null until the first call.
  *
- * Path counters track on-device vs Gemini usage for label/voice cost KPIs.
+ * Path counters track on-device vs cloud usage for label/voice cost KPIs.
  */
 object AiUsage {
     var quota: AiQuota? by mutableStateOf(null)
@@ -30,6 +32,8 @@ object AiUsage {
     var geminiVisionCalls: Int by mutableStateOf(0)
         private set
     var geminiTextCalls: Int by mutableStateOf(0)
+        private set
+    var gemmaTextCalls: Int by mutableStateOf(0)
         private set
     var localParseHits: Int by mutableStateOf(0)
         private set
@@ -59,10 +63,19 @@ object AiUsage {
         lastPath = path
     }
 
-    /** Fraction of label/voice attempts that needed Gemini (0 when no attempts yet). */
+    fun recordGemmaText() {
+        gemmaTextCalls += 1
+        lastPath = AiPath.GEMMA_TEXT
+    }
+
+    fun recordGemmaUnavailable() {
+        lastPath = AiPath.GEMMA_UNAVAILABLE
+    }
+
+    /** Fraction of label/voice attempts that needed a generative model (0 when no attempts yet). */
     fun fallbackRate(): Float {
-        val total = localParseHits + fallbackCount
+        val total = localParseHits + fallbackCount + gemmaTextCalls
         if (total <= 0) return 0f
-        return fallbackCount.toFloat() / total.toFloat()
+        return (fallbackCount + gemmaTextCalls).toFloat() / total.toFloat()
     }
 }

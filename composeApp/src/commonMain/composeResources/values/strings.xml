@@ -154,6 +154,7 @@
     <string name="detail_price_value">Prix</string>
     <string name="detail_price_not_found">Non trouvé</string>
     <string name="price_source_gemini">Gemini</string>
+    <string name="price_source_gemma">Gemma</string>
 
     <string name="bottles_title">Mes bouteilles</string>
     <plurals name="bottles_subtitle_format">
@@ -342,6 +343,17 @@
     <string name="add_placement_chosen_format">Choisi : %1$s · %2$s — ou laissez « sans emplacement ».</string>
     <string name="add_placement_current">Actuel</string>
     <string name="add_mode_identify">Identifier</string>
+    <string name="add_describe_title">Décrire le vin</string>
+    <string name="add_describe_hint">Ex. « Château Palmer Margaux 2016 rouge »</string>
+    <string name="add_describe_action">Identifier</string>
+    <string name="add_catalogue_suggestions">Suggestions catalogue</string>
+    <string name="add_estimate_price">Estimer le prix</string>
+    <string name="add_estimating_price">Estimation…</string>
+    <string name="add_photo_back">Photographier le dos</string>
+    <string name="add_cellar_add_one">Ajouter +1</string>
+    <string name="add_cellar_new_vintage">Nouveau millésime</string>
+    <string name="add_cellar_pick_title">Bouteille déjà en cave</string>
+    <string name="add_cellar_pick_message">« %1$s » est déjà dans votre cave. Ajouter une bouteille ou créer un autre millésime ?</string>
     <string name="add_voice_title">Dictez votre bouteille</string>
     <string name="add_voice_subtitle">« domaine, millésime, couleur, quantité, casier »</string>
     <string name="add_voice_placeholder">Touchez le micro et dictez votre bouteille…</string>
@@ -438,6 +450,24 @@
     <string name="update_error">Erreur lors de la vérification de la mise à jour.</string>
     <string name="update_ineligible">Mise à jour disponible mais non éligible.</string>
     <string name="settings_section_app">Application</string>
+    <string name="settings_section_ai">Intelligence artificielle</string>
+    <string name="settings_gemma_title">Modèle Gemma (local)</string>
+    <string name="settings_gemma_desc">Gemma 3 1B on-device (~550 Mo). Gratuit, hors-ligne après téléchargement.</string>
+    <string name="settings_gemma_missing">Non téléchargé</string>
+    <string name="settings_gemma_ready">Prêt</string>
+    <string name="settings_gemma_downloading">Téléchargement… %1$d%%</string>
+    <string name="settings_gemma_download">Télécharger le modèle</string>
+    <string name="settings_gemma_delete">Supprimer le modèle</string>
+    <string name="settings_gemma_error">Erreur : %1$s</string>
+    <string name="settings_hf_token">Jeton Hugging Face (optionnel)</string>
+    <string name="settings_hf_token_hint">Requis si le dépôt Gemma est protégé</string>
+    <string name="settings_gemini_title">Gemini (optionnel)</string>
+    <string name="settings_gemini_desc">Votre clé API — utilisée seulement si Gemma échoue ou pour la vision.</string>
+    <string name="settings_gemini_key">Clé API Gemini</string>
+    <string name="settings_gemini_key_hint">Collez votre clé AI Studio</string>
+    <string name="settings_gemini_fallback">Utiliser Gemini en secours</string>
+    <string name="settings_gemini_key_saved">Clé enregistrée</string>
+    <string name="settings_gemini_key_clear">Effacer</string>
     <string name="settings_insert_demo_data">Insérer les données de démo</string>
     <string name="settings_insert_demo_data_confirm_title">Insérer les données de démo ?</string>
     <string name="settings_insert_demo_data_confirm_message">Cette action va ajouter des casiers et des bouteilles d\'exemple à votre cave.</string>
@@ -540,11 +570,13 @@
     <string name="export_producers_button">Exporter les producteurs en CSV</string>
     <string name="export_suppliers_button">Exporter les fournisseurs en CSV</string>
 
-    <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez GEMINI_API_KEY dans local.properties.</string>
+    <string name="ai_error_no_key">Clé API Gemini manquante. Ajoutez-la dans Réglages.</string>
     <string name="ai_error_sign_in">Connectez-vous pour utiliser l'IA.</string>
     <string name="ai_error_extract_text">Impossible d'extraire les infos du texte.</string>
     <string name="ai_error_no_label">Aucun domaine détecté sur l'étiquette.</string>
     <string name="ai_error_generic">Identification impossible — réessayez ou passez en manuel.</string>
+    <string name="ai_error_gemma_unavailable">Modèle Gemma non disponible. Téléchargez-le dans Réglages, ou activez Gemini.</string>
+    <string name="ai_error_ocr_empty">Texte illisible sur la photo. Réessayez, photographiez le dos, ou saisissez une description.</string>
     <string name="ai_error_http_403">Clé API invalide ou API non activée.%1$s</string>
     <string name="ai_error_http_404">Modèle ou URL introuvable (%1$d).%2$s</string>
     <string name="ai_error_http_429">Quota Gemini dépassé — réessayez plus tard.</string>

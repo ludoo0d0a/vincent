@@ -30,12 +30,14 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -105,12 +107,16 @@ import fr.geoking.vincent.ui.QuickRegionPicker
 import fr.geoking.vincent.ui.VintageQuickPicker
 import fr.geoking.vincent.ui.WineBottle
 
-// One "Identifier" screen handles BOTH barcode and label; plus voice and manual.
+// Identify (barcode or label) + voice + manual.
 private enum class AddMode(val label: org.jetbrains.compose.resources.StringResource) {
-    PHOTO(Res.string.add_mode_photo),
-    SCAN(Res.string.add_mode_scan),
+    IDENTIFY(Res.string.add_mode_identify),
     VOICE(Res.string.add_mode_voice),
     MANUAL(Res.string.add_mode_manual)
+}
+
+private enum class IdentifyMethod(val label: org.jetbrains.compose.resources.StringResource) {
+    LABEL(Res.string.add_method_label),
+    BARCODE(Res.string.add_method_barcode),
 }
 
 private sealed interface ScanMessage {
@@ -122,12 +128,16 @@ private sealed interface ScanMessage {
 @Composable
 fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, editingBottle: Bottle? = null) {
     // Opened from an empty rack cell → start on the manual form with the spot pre-filled.
-    var mode by remember { mutableStateOf(if (initialPlacement != null || editingBottle != null) AddMode.MANUAL else AddMode.PHOTO) }
+    var mode by remember { mutableStateOf(if (initialPlacement != null || editingBottle != null) AddMode.MANUAL else AddMode.IDENTIFY) }
+    var identifyMethod by remember { mutableStateOf(IdentifyMethod.LABEL) }
     val recognizer = wineRecognizer()
     val estimator = priceEstimator()
     val scope = rememberCoroutineScope()
     var aiBottle by remember { mutableStateOf<Bottle?>(null) }
     var aiPrice by remember { mutableStateOf<PriceEstimate?>(null) }
+    var priceEstimating by remember { mutableStateOf(false) }
+    var catalogueSuggestions by remember { mutableStateOf<List<WineSuggestion>>(emptyList()) }
+    var cellarPick by remember { mutableStateOf<WineSuggestion?>(null) }
     var busy by remember { mutableStateOf(false) }
     var manualBottle by remember { mutableStateOf<Bottle?>(null) }
     // Optional placement chosen in the manual wizard: (rackIndex, cellIndex).
@@ -200,26 +210,99 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
             }
         }
     }
-    // Label capture: OCR + local parse first; Gemini vision only if OCR is empty/weak.
+    var captureKind by remember { mutableStateOf(BottlePhotoKind.LABEL) }
+    var pendingFrontOcr by remember { mutableStateOf<String?>(null) }
+    fun productSuggestions(outcome: fr.geoking.vincent.ai.RecognizeOutcome): List<WineSuggestion> =
+        outcome.suggestions.map { p ->
+            WineSuggestion(
+                domain = p.brand.ifBlank { p.name },
+                appellation = (if (p.brand.isNotBlank()) p.name else p.region.orEmpty()).ifBlank { p.name },
+                vintage = p.vintage.orEmpty(),
+                source = p.source,
+                externalId = p.externalId,
+                externalSource = p.externalSource,
+                grape = p.grape,
+                region = p.region,
+            )
+        }
+    // Label / back capture: OCR + local parse first; no automatic price estimate.
     val startCapture = rememberPhotoCapture { bytes ->
         busy = true
         aiError = null
         scope.launch {
-            val bottleId = "new-${Cellar.references()}-${System.currentTimeMillis()}"
-            val imagePath = labelSaver.save(bytes, bottleId, BottlePhotoKind.LABEL)
-            capturedLabelUri = imagePath
-            val outcome = recognizer.fromImage(bytes)
+            val bottleId = aiBottle?.id ?: "new-${Cellar.references()}-${System.currentTimeMillis()}"
+            val kind = captureKind
+            val imagePath = labelSaver.save(bytes, bottleId, kind)
+            if (kind == BottlePhotoKind.LABEL) capturedLabelUri = imagePath
+            val outcome = if (kind == BottlePhotoKind.BACK) {
+                val back = recognizer.fromImage(bytes)
+                val front = pendingFrontOcr
+                pendingFrontOcr = null
+                if (!front.isNullOrBlank() && !back.rawText.isNullOrBlank()) {
+                    recognizer.fromText("$front\n${back.rawText}")
+                } else if (!front.isNullOrBlank() && back.bottle == null) {
+                    recognizer.fromText(front)
+                } else {
+                    back
+                }
+            } else {
+                recognizer.fromImage(bytes)
+            }
+            if (kind == BottlePhotoKind.LABEL && outcome.bottle == null && !outcome.rawText.isNullOrBlank()) {
+                pendingFrontOcr = outcome.rawText
+            } else if (kind == BottlePhotoKind.LABEL && outcome.bottle == null) {
+                pendingFrontOcr = ""
+            }
+            catalogueSuggestions = productSuggestions(outcome)
             aiBottle = outcome.bottle?.copy(
                 id = bottleId,
-                photoLabel = imagePath,
+                photoLabel = capturedLabelUri ?: outcome.bottle?.photoLabel,
+                photoBack = if (kind == BottlePhotoKind.BACK) imagePath else (aiBottle?.photoBack ?: outcome.bottle?.photoBack),
                 source = AddSource.SCAN,
             )
-            aiPrice = aiBottle?.let { estimator.estimate(it) }
+            aiPrice = null
             aiError = outcome.error
             busy = false
+            aiBottle?.let { b ->
+                val eff = aiPrice?.amountEur ?: b.price
+                manualSeed = ManualSeed(
+                    domain = b.domain,
+                    appellation = b.appellation,
+                    color = b.color,
+                    category = b.category,
+                    vintage = if (b.vintage == "NM") "" else b.vintage,
+                    price = eff.takeIf { it > 0 }?.toString() ?: "",
+                    agingPotential = b.agingPotential.takeIf { it > 0 }?.toString() ?: "",
+                    alcohol = b.alcoholLevel.takeIf { it > 0.0 }?.toString() ?: "",
+                    sugar = b.sugarLevel,
+                    grapes = b.grapes,
+                    imageUrl = capturedLabelUri,
+                    photos = BottlePhotoKind.entries.associateWith { b.photo(it) }.toMutableMap().apply {
+                        if (capturedLabelUri != null) put(BottlePhotoKind.LABEL, capturedLabelUri)
+                    },
+                )
+            }
         }
     }
-    val identify: () -> Unit = { startCapture() }
+    val identify: () -> Unit = {
+        captureKind = BottlePhotoKind.LABEL
+        startCapture()
+    }
+    val captureBack: () -> Unit = {
+        captureKind = BottlePhotoKind.BACK
+        startCapture()
+    }
+    val estimatePrice: () -> Unit = {
+        val b = aiBottle
+        if (b != null) {
+            priceEstimating = true
+            scope.launch {
+                aiPrice = estimator.estimate(b)
+                aiPrice?.amountEur?.takeIf { it > 0 }?.let { aiBottle = aiBottle?.copy(price = it) }
+                priceEstimating = false
+            }
+        }
+    }
     var transcript by remember { mutableStateOf("") }
     // Conversation used to complete the parsed bottle by discussing with the assistant.
     var voiceChat by remember { mutableStateOf<List<VoiceChatMsg>>(emptyList()) }
@@ -257,14 +340,11 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
             val outcome = recognizer.fromText(text)
             val b = outcome.bottle
             aiBottle = b
+            catalogueSuggestions = productSuggestions(outcome)
             aiError = outcome.error
+            aiPrice = null
             busy = false
-            if (b != null) {
-                // Stay on the voice summary; the user completes missing data by tapping
-                // a field or chatting, and only switches to the manual form on demand.
-                aiPrice = estimator.estimate(b)
-                seedManualFromCurrent()
-            }
+            if (b != null) seedManualFromCurrent()
         }
     }
     // Inline edits on the summary update the parsed bottle directly.
@@ -287,12 +367,57 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                 val outcome = recognizer.refine(current, msg)
                 outcome.bottle?.let { b ->
                     aiBottle = b
-                    // Keep an explicit price; otherwise try to (re)estimate the missing one.
-                    aiPrice = if (b.price > 0) null else estimator.estimate(b)
+                    // Keep an explicit price; do not auto-estimate.
+                    if (b.price > 0) aiPrice = null
                 }
                 val reply = outcome.reply ?: outcome.error ?: assistantDone
                 voiceChat = voiceChat + VoiceChatMsg(fromUser = false, text = reply)
                 chatBusy = false
+            }
+        }
+    }
+    val onPickCatalogue: (WineSuggestion) -> Unit = { s ->
+        if (s.bottle != null) {
+            cellarPick = s
+        } else {
+            scope.launch {
+                val base = aiBottle
+                val merged = if (base != null) {
+                    base.copy(
+                        domain = s.domain.ifBlank { base.domain },
+                        appellation = s.appellation.ifBlank { base.appellation },
+                        vintage = s.vintage.ifBlank { base.vintage },
+                        grapes = s.grape?.let { listOf(it) }?.takeIf { base.grapes.isEmpty() } ?: base.grapes,
+                        provenance = s.region?.takeIf { base.provenance.isBlank() || base.provenance == "—" } ?: base.provenance,
+                    )
+                } else {
+                    null
+                }
+                var enriched = merged
+                val extId = s.externalId
+                if (extId != null && merged != null) {
+                    val enr = WineDataSource.enrich(s.externalSource, extId)
+                    if (enr != null) {
+                        val vintageYear = merged.vintage.toIntOrNull()
+                        enriched = merged.copy(
+                            description = enr.description.ifBlank { merged.description },
+                            pairingNotes = enr.pairingText.ifBlank { merged.pairingNotes },
+                            grapes = enr.grapes.ifEmpty { merged.grapes },
+                            flavorProfile = enr.flavorProfile ?: merged.flavorProfile,
+                            maturity = enr.maturityText().ifBlank { merged.maturity },
+                            tastingNotes = enr.tastingNotes.ifBlank { merged.tastingNotes },
+                            drinkFrom = enr.drinkFromYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: merged.drinkFrom,
+                            drinkTo = enr.drinkToYears?.let { resolveGrapemindsDrinkYear(it, vintageYear) } ?: merged.drinkTo,
+                            provenance = enr.provenanceText().ifBlank { merged.provenance },
+                            sugarLevel = enr.sugarLevel() ?: merged.sugarLevel,
+                        )
+                    }
+                }
+                if (enriched != null) {
+                    aiBottle = enriched
+                    seedManualFromCurrent()
+                }
+                catalogueSuggestions = emptyList()
             }
         }
     }
@@ -323,7 +448,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (on) VincentColors.Surface else Color.Transparent)
                         .clickable {
                             mode = m
-                            if (m != AddMode.PHOTO && m != AddMode.SCAN && m != AddMode.VOICE) aiError = null
+                            if (m != AddMode.IDENTIFY && m != AddMode.VOICE) aiError = null
                         }.padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) { Text(stringResource(m.label), fontSize = 12.sp, fontWeight = FontWeight.W700, color = if (on) VincentColors.Accent else VincentColors.Muted) }
@@ -356,34 +481,52 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
         Spacer(Modifier.height(12.dp))
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
             when (mode) {
-                AddMode.PHOTO -> ScanPane(
-                    isLabel = true,
-                    color = aiBottle?.color ?: WineColor.RED,
-                    bottle = aiBottle,
-                    title = aiBottle?.let { "${it.domain} ${it.vintage}" }.orEmpty(),
-                    subtitle = aiBottle?.let { "${it.appellation} · ${stringResource(it.color.label)}" }.orEmpty(),
-                    priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
-                    busy = busy,
-                    hasResult = aiBottle != null,
-                    errorMsg = aiError,
-                    onIdentify = identify,
-                    onScanBarcode = scanBarcode,
-                    onSwitchToManual = onSwitchToManual,
-                )
-                AddMode.SCAN -> ScanPane(
-                    isLabel = false,
-                    color = aiBottle?.color ?: WineColor.RED,
-                    bottle = aiBottle,
-                    title = aiBottle?.let { "${it.domain} ${it.vintage}" }.orEmpty(),
-                    subtitle = aiBottle?.let { "${it.appellation} · ${stringResource(it.color.label)}" }.orEmpty(),
-                    priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
-                    busy = busy,
-                    hasResult = aiBottle != null,
-                    errorMsg = aiError,
-                    onIdentify = identify,
-                    onScanBarcode = scanBarcode,
-                    onSwitchToManual = onSwitchToManual,
-                )
+                AddMode.IDENTIFY -> Column(Modifier.fillMaxSize()) {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(VincentColors.Surface2)
+                            .border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp)).padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        IdentifyMethod.entries.forEach { m ->
+                            val on = m == identifyMethod
+                            Box(
+                                Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                                    .background(if (on) VincentColors.Surface else Color.Transparent)
+                                    .clickable { identifyMethod = m }
+                                    .padding(vertical = 7.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    stringResource(m.label),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.W700,
+                                    color = if (on) VincentColors.Accent else VincentColors.Muted,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    ScanPane(
+                        isLabel = identifyMethod == IdentifyMethod.LABEL,
+                        color = aiBottle?.color ?: WineColor.RED,
+                        bottle = aiBottle,
+                        title = aiBottle?.let { "${it.domain} ${it.vintage}" }.orEmpty(),
+                        subtitle = aiBottle?.let { "${it.appellation} · ${stringResource(it.color.label)}" }.orEmpty(),
+                        priceLabel = aiPrice?.let { "≈ ${it.amountEur} € · ${it.source}" },
+                        busy = busy,
+                        hasResult = aiBottle != null,
+                        errorMsg = aiError,
+                        suggestions = catalogueSuggestions,
+                        priceEstimating = priceEstimating,
+                        showBackPhoto = aiBottle == null && (aiError != null || pendingFrontOcr != null),
+                        onIdentify = identify,
+                        onScanBarcode = scanBarcode,
+                        onCaptureBack = captureBack,
+                        onEstimatePrice = estimatePrice,
+                        onPickSuggestion = onPickCatalogue,
+                        onSwitchToManual = onSwitchToManual,
+                    )
+                }
                 AddMode.VOICE -> VoicePane(
                     transcript = transcript,
                     onTranscriptChange = { transcript = it },
@@ -395,14 +538,35 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                     busy = busy,
                     chat = voiceChat,
                     chatBusy = chatBusy,
+                    suggestions = catalogueSuggestions,
+                    priceEstimating = priceEstimating,
                     onBottleChange = onVoiceBottleChange,
                     onPriceChange = onVoicePriceChange,
+                    onEstimatePrice = estimatePrice,
+                    onPickSuggestion = onPickCatalogue,
                     onSendChat = onSendChat,
                     onSwitchToManual = onSwitchToManual,
                 )
                 AddMode.MANUAL -> ManualPane(
                     seed = manualSeed,
                     onBottle = { b, place -> manualBottle = b; manualPlacement = place },
+                    onDescribe = { text ->
+                        busy = true
+                        aiError = null
+                        scope.launch {
+                            val outcome = recognizer.fromText(text)
+                            catalogueSuggestions = productSuggestions(outcome)
+                            outcome.bottle?.let { b ->
+                                aiBottle = b
+                                seedManualFromCurrent()
+                                mode = AddMode.MANUAL
+                            }
+                            aiError = outcome.error
+                            busy = false
+                        }
+                    },
+                    onCellarPick = { cellarPick = it },
+                    describeBusy = busy,
                 )
             }
         }
@@ -418,8 +582,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                 else -> stringResource(Res.string.add_confirm)
             }
             busy -> stringResource(Res.string.add_analyzing)
-            mode == AddMode.PHOTO -> stringResource(Res.string.add_barcode_required)
-            mode == AddMode.SCAN -> stringResource(Res.string.add_barcode_required)
+            mode == AddMode.IDENTIFY -> stringResource(Res.string.add_barcode_required)
             mode == AddMode.VOICE -> stringResource(Res.string.add_dictate_required)
             else -> stringResource(Res.string.add_confirm)
         }
@@ -464,6 +627,54 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
             Text(buttonLabel, fontWeight = FontWeight.W700)
         }
     }
+
+    cellarPick?.let { pick ->
+        val b = pick.bottle ?: return@let
+        AlertDialog(
+            onDismissRequest = { cellarPick = null },
+            title = { Text(stringResource(Res.string.add_cellar_pick_title)) },
+            text = {
+                Text(
+                    stringResource(Res.string.add_cellar_pick_message, "${b.domain} ${b.vintage}"),
+                    fontSize = 13.sp,
+                    color = VincentColors.Fg,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        Cellar.adjustQuantity(b.id, 1)
+                        cellarPick = null
+                        onClose()
+                    },
+                ) { Text(stringResource(Res.string.add_cellar_add_one)) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = {
+                            manualSeed = ManualSeed(
+                                domain = b.domain,
+                                appellation = b.appellation,
+                                color = b.color,
+                                category = b.category,
+                                vintage = "",
+                                alcohol = b.alcoholLevel.takeIf { it > 0.0 }?.toString() ?: "",
+                                sugar = b.sugarLevel,
+                                grapes = b.grapes,
+                                photos = BottlePhotoKind.entries.associateWith { b.photo(it) },
+                            )
+                            mode = AddMode.MANUAL
+                            cellarPick = null
+                        },
+                    ) { Text(stringResource(Res.string.add_cellar_new_vintage)) }
+                    TextButton(onClick = { cellarPick = null }) {
+                        Text(stringResource(Res.string.cellar_action_cancel))
+                    }
+                }
+            },
+        )
+    }
 }
 
 /** Values pushed into the manual form, e.g. from a barcode lookup or cellar suggestion. */
@@ -487,7 +698,14 @@ private data class ManualSeed(
 
 /** Manual entry — search cellar + form; emits a Bottle (or null while the name is empty). */
 @Composable
-private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -> Unit) {
+private fun ManualPane(
+    seed: ManualSeed?,
+    onBottle: (Bottle?, Pair<Int, Int>?) -> Unit,
+    onDescribe: (String) -> Unit = {},
+    onCellarPick: (WineSuggestion) -> Unit = {},
+    describeBusy: Boolean = false,
+) {
+    var describeText by remember { mutableStateOf("") }
     var domain by remember { mutableStateOf("") }
     var appellation by remember { mutableStateOf("") }
     var color by remember { mutableStateOf(WineColor.RED) }
@@ -519,12 +737,17 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
     }
 
     fun applySuggestion(s: WineSuggestion) {
+        if (s.bottle != null) {
+            onCellarPick(s)
+            return
+        }
         if (s.domain.isNotBlank()) domain = s.domain
         if (s.appellation.isNotBlank()) appellation = s.appellation
         s.color?.let { color = it }
         s.category?.let { category = it }
         if (s.vintage.isNotBlank()) vintage = s.vintage
         s.price?.let { price = it.toString() }
+        s.grape?.takeIf { grapes.isEmpty() }?.let { grapes = listOf(it) }
         s.bottle?.let { b ->
             photos = BottlePhotoKind.entries.associateWith { b.photo(it) }
             agingPotential = if (b.agingPotential > 0) b.agingPotential.toString() else ""
@@ -629,6 +852,38 @@ private fun ManualPane(seed: ManualSeed?, onBottle: (Bottle?, Pair<Int, Int>?) -
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        Text(
+            stringResource(Res.string.add_describe_title),
+            fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
+            modifier = Modifier.padding(start = 2.dp),
+        )
+        OutlinedTextField(
+            value = describeText,
+            onValueChange = { describeText = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text(stringResource(Res.string.add_describe_hint), fontSize = 12.sp) },
+        )
+        Row(
+            Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(12.dp))
+                .background(if (describeBusy || describeText.isBlank()) VincentColors.Surface2 else VincentColors.Accent)
+                .clickable(enabled = !describeBusy && describeText.isNotBlank()) {
+                    onDescribe(describeText.trim())
+                },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            if (describeBusy) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = VincentColors.Accent)
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                stringResource(Res.string.add_describe_action),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.W700,
+                color = if (describeBusy || describeText.isBlank()) VincentColors.Muted else Color.White,
+            )
+        }
         Text(
             stringResource(Res.string.add_photos_optional),
             fontSize = 11.sp, color = VincentColors.Muted, fontWeight = FontWeight.W600,
@@ -834,6 +1089,8 @@ internal data class WineSuggestion(
     /** Catalogue id + provider, when the candidate can be enriched (drink window, notes…). */
     val externalId: String? = null,
     val externalSource: String? = null,
+    val grape: String? = null,
+    val region: String? = null,
 )
 
 /** Suggestions for the add form: local cellar bottles first, then the wine catalogue. */
@@ -849,21 +1106,27 @@ internal suspend fun searchWineSuggestions(query: String): List<WineSuggestion> 
             vintage = if (b.vintage == "NM") "" else b.vintage,
             price = b.price.takeIf { it > 0 },
             bottle = b,
+            grape = b.grapes.firstOrNull(),
+            region = b.provenance.takeIf { it.isNotBlank() && it != "—" },
         )
     }
     val catalog = runCatching { WineDataSource.search(q) }.getOrDefault(emptyList()).map { p ->
+        val regionName = p.region.orEmpty()
         WineSuggestion(
             domain = p.brand.ifBlank { p.name },
-            appellation = (if (p.brand.isNotBlank()) p.name else p.region.orEmpty()).ifBlank { p.name },
+            appellation = (if (p.brand.isNotBlank()) p.name else regionName).ifBlank { p.name },
+            category = regionName.takeIf { it.isNotBlank() }?.let { categoryFromRegionName(it) },
             vintage = p.vintage.orEmpty(),
             source = p.source,
             externalId = p.externalId,
             externalSource = p.externalSource,
+            grape = p.grape,
+            region = p.region,
         )
     }
     return (local + catalog)
         .filter { it.domain.isNotBlank() || it.appellation.isNotBlank() }
-        .distinctBy { it.domain.lowercase() to it.appellation.lowercase() }
+        .distinctBy { it.domain.lowercase() to it.appellation.lowercase() to it.vintage }
         .take(8)
 }
 
@@ -998,8 +1261,14 @@ private fun ScanPane(
     busy: Boolean,
     hasResult: Boolean,
     errorMsg: String? = null,
+    suggestions: List<WineSuggestion> = emptyList(),
+    priceEstimating: Boolean = false,
+    showBackPhoto: Boolean = false,
     onIdentify: () -> Unit,
     onScanBarcode: (() -> Unit)? = null,
+    onCaptureBack: () -> Unit = {},
+    onEstimatePrice: () -> Unit = {},
+    onPickSuggestion: (WineSuggestion) -> Unit = {},
     onSwitchToManual: () -> Unit,
 ) {
     val label = isLabel
@@ -1011,7 +1280,6 @@ private fun ScanPane(
             contentAlignment = Alignment.Center,
         ) {
             if (label) {
-                // Portrait frame around the bottle/label.
                 Box(Modifier.size(width = 170.dp, height = 240.dp), contentAlignment = Alignment.Center) {
                     WineBottle(if (hasResult) color else WineColor.RED, Modifier.size(width = 72.dp, height = 165.dp))
                     listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd).forEach { a ->
@@ -1020,7 +1288,6 @@ private fun ScanPane(
                     Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(Color(0xFF7BE6A8)))
                 }
             } else {
-                // Landscape frame with a barcode glyph.
                 Box(Modifier.size(width = 232.dp, height = 132.dp), contentAlignment = Alignment.Center) {
                     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                         listOf(3, 2, 4, 2, 3, 2, 2, 4, 3, 2, 4, 2, 3, 2, 2, 3, 2, 4).forEach { w ->
@@ -1056,51 +1323,38 @@ private fun ScanPane(
             }
         }
 
-        // Result (clear) — only once the AI returned a bottle.
         Spacer(Modifier.height(12.dp))
-        if (hasResult) {
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(VincentColors.Surface)
-                    .border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp)).padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (bottle != null && bottle.thumbnailUri() != null) {
-                    BottleThumb(bottle, Modifier.size(width = 30.dp, height = 54.dp))
-                } else {
-                    WineBottle(color, Modifier.size(width = 30.dp, height = 54.dp))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(5.dp))
-                        Text(stringResource(Res.string.add_identified_ai), fontSize = 9.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
-                    }
-                    Text(title, fontSize = 15.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 3.dp))
-                    Text(subtitle, fontSize = 12.sp, color = VincentColors.Muted)
-                    if (priceLabel != null) {
-                        Text(priceLabel, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Green, modifier = Modifier.padding(top = 3.dp))
-                    }
-                }
-                Box(
-                    Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.Surface2)
-                        .border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp))
-                        .clickable(onClick = onSwitchToManual),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = stringResource(Res.string.add_voice_switch_manual), tint = VincentColors.Accent, modifier = Modifier.size(16.dp))
-                }
-            }
+        if (hasResult && bottle != null) {
+            IdentifySummaryCard(
+                bottle = bottle,
+                title = title,
+                subtitle = subtitle,
+                priceLabel = priceLabel,
+                priceEstimating = priceEstimating,
+                onEstimatePrice = onEstimatePrice,
+                onSwitchToManual = onSwitchToManual,
+            )
+            CatalogueSuggestionRow(suggestions, onPickSuggestion)
         } else if (!busy && errorMsg != null) {
             Text(
                 errorMsg,
                 fontSize = 12.5.sp, color = VincentColors.Red, lineHeight = 17.sp,
-                modifier = Modifier.padding(vertical = 14.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
             )
+            if (showBackPhoto && label) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(12.dp))
+                        .background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(12.dp))
+                        .clickable(onClick = onCaptureBack),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text(stringResource(Res.string.add_photo_back), fontSize = 13.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                }
+            }
         }
 
-
-        // Single action, scoped to the active method.
         Spacer(Modifier.height(10.dp))
         val onAction = if (label) onIdentify else (onScanBarcode ?: onIdentify)
         Row(
@@ -1123,6 +1377,118 @@ private fun ScanPane(
     }
 }
 
+@Composable
+private fun IdentifySummaryCard(
+    bottle: Bottle,
+    title: String,
+    subtitle: String,
+    priceLabel: String?,
+    priceEstimating: Boolean,
+    onEstimatePrice: () -> Unit,
+    onSwitchToManual: () -> Unit,
+) {
+    val missingVintage = bottle.vintage.isBlank() || bottle.vintage == "NM"
+    val missingPrice = (priceLabel == null) && bottle.price <= 0
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(VincentColors.Surface)
+            .border(1.dp, VincentColors.Border, RoundedCornerShape(14.dp)).padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (bottle.thumbnailUri() != null) {
+                BottleThumb(bottle, Modifier.size(width = 30.dp, height = 54.dp))
+            } else {
+                WineBottle(bottle.color, Modifier.size(width = 30.dp, height = 54.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(stringResource(Res.string.add_identified_ai), fontSize = 9.sp, fontWeight = FontWeight.W800, color = VincentColors.Accent)
+                }
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, modifier = Modifier.padding(top = 3.dp))
+                Text(subtitle, fontSize = 12.sp, color = VincentColors.Muted)
+                if (priceLabel != null) {
+                    Text(priceLabel, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Green, modifier = Modifier.padding(top = 3.dp))
+                }
+                if (missingVintage || missingPrice) {
+                    Text(
+                        stringResource(Res.string.add_voice_missing),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.W700,
+                        color = VincentColors.Red,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(VincentColors.Surface2)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp))
+                    .clickable(onClick = onSwitchToManual),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = stringResource(Res.string.add_voice_switch_manual), tint = VincentColors.Accent, modifier = Modifier.size(16.dp))
+            }
+        }
+        if (missingPrice) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp))
+                    .background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp))
+                    .clickable(enabled = !priceEstimating, onClick = onEstimatePrice),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                if (priceEstimating) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = VincentColors.Accent)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(Res.string.add_estimating_price), fontSize = 12.sp, color = VincentColors.Muted)
+                } else {
+                    Text(stringResource(Res.string.add_estimate_price), fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogueSuggestionRow(
+    suggestions: List<WineSuggestion>,
+    onPick: (WineSuggestion) -> Unit,
+) {
+    if (suggestions.isEmpty()) return
+    Spacer(Modifier.height(8.dp))
+    Text(
+        stringResource(Res.string.add_catalogue_suggestions),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.W600,
+        color = VincentColors.Muted,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        suggestions.forEach { s ->
+            Column(
+                Modifier.clip(RoundedCornerShape(10.dp)).background(VincentColors.Surface2)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp))
+                    .clickable { onPick(s) }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Text(s.domain, fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOf(s.appellation, s.vintage).filter { it.isNotBlank() }.joinToString(" · "),
+                    fontSize = 10.sp,
+                    color = VincentColors.Muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 /** A single message in the "complete by discussion" conversation. */
 private data class VoiceChatMsg(val fromUser: Boolean, val text: String)
 
@@ -1141,8 +1507,12 @@ private fun VoicePane(
     busy: Boolean = false,
     chat: List<VoiceChatMsg>,
     chatBusy: Boolean,
+    suggestions: List<WineSuggestion> = emptyList(),
+    priceEstimating: Boolean = false,
     onBottleChange: (Bottle) -> Unit,
     onPriceChange: (Int) -> Unit,
+    onEstimatePrice: () -> Unit = {},
+    onPickSuggestion: (WineSuggestion) -> Unit = {},
     onSendChat: (String) -> Unit,
     onSwitchToManual: () -> Unit,
 ) {
@@ -1151,7 +1521,6 @@ private fun VoicePane(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (parsed == null) {
-            // Step 1 — dictate, then parse. Once parsed, we keep the user on the summary.
             SpeechTextInput(
                 value = transcript,
                 onValueChange = onTranscriptChange,
@@ -1171,15 +1540,17 @@ private fun VoicePane(
                 Text(errorMsg, fontSize = 12.sp, color = VincentColors.Red, lineHeight = 17.sp, modifier = Modifier.fillMaxWidth())
             }
         } else {
-            // Step 2 — summary with editable / missing fields + the discussion assistant.
             VoiceSummary(
                 parsed = parsed,
                 effectivePrice = effectivePrice,
                 priceSource = priceSource,
+                priceEstimating = priceEstimating,
                 onBottleChange = onBottleChange,
                 onPriceChange = onPriceChange,
+                onEstimatePrice = onEstimatePrice,
                 onSwitchToManual = onSwitchToManual,
             )
+            CatalogueSuggestionRow(suggestions, onPickSuggestion)
             Spacer(Modifier.height(18.dp))
             VoiceDiscussion(messages = chat, busy = chatBusy, onSend = onSendChat)
             Spacer(Modifier.height(8.dp))
@@ -1192,8 +1563,10 @@ private fun VoiceSummary(
     parsed: Bottle,
     effectivePrice: Int,
     priceSource: String?,
+    priceEstimating: Boolean = false,
     onBottleChange: (Bottle) -> Unit,
     onPriceChange: (Int) -> Unit,
+    onEstimatePrice: () -> Unit = {},
     onSwitchToManual: () -> Unit,
 ) {
     var editing by remember { mutableStateOf<VoiceField?>(null) }
@@ -1292,8 +1665,27 @@ private fun VoiceSummary(
             editing = editing == VoiceField.PRICE,
             onToggle = { toggle(VoiceField.PRICE) },
         ) {
-            InlineEditField(effectivePrice.takeIf { it > 0 }?.toString().orEmpty(), numeric = true) {
-                onPriceChange(it.filter { c -> c.isDigit() }.toIntOrNull() ?: 0)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                InlineEditField(effectivePrice.takeIf { it > 0 }?.toString().orEmpty(), numeric = true) {
+                    onPriceChange(it.filter { c -> c.isDigit() }.toIntOrNull() ?: 0)
+                }
+                if (effectivePrice <= 0) {
+                    Row(
+                        Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp))
+                            .background(VincentColors.Surface2).border(1.dp, VincentColors.Border, RoundedCornerShape(10.dp))
+                            .clickable(enabled = !priceEstimating, onClick = onEstimatePrice),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        if (priceEstimating) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = VincentColors.Accent)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(Res.string.add_estimating_price), fontSize = 12.sp, color = VincentColors.Muted)
+                        } else {
+                            Text(stringResource(Res.string.add_estimate_price), fontSize = 12.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent)
+                        }
+                    }
+                }
             }
         }
         SummaryRow(

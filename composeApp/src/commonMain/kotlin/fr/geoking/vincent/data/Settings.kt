@@ -22,4 +22,22 @@ expect object Settings {
 
     val demoDataSeeded: Boolean
     fun setDemoDataSeeded(seeded: Boolean)
+
+    /**
+     * Optional Gemini API key entered by the user (BYOK). Empty → Gemini disabled.
+     * Stored encrypted on Android.
+     */
+    val geminiApiKey: String
+    fun setGeminiApiKey(key: String)
+
+    /** When true and [geminiApiKey] is set, Gemini is used after Gemma fails. */
+    val geminiFallbackEnabled: Boolean
+    fun setGeminiFallbackEnabled(enabled: Boolean)
+
+    /**
+     * Optional Hugging Face token for downloading the gated Gemma `.task` file.
+     * Not needed when a public GEMMA_MODEL_URL CDN is configured at build time.
+     */
+    val huggingFaceToken: String
+    fun setHuggingFaceToken(token: String)
 }

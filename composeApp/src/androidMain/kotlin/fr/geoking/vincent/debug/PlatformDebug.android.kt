@@ -6,9 +6,11 @@ actual fun initHttpDebug() {
     val isDebug = BuildConfig.DEBUG
     HttpDebug.enabled = isDebug
     HttpDebug.apiKeyHint = when {
-        BuildConfig.GEMINI_API_KEY.isBlank() ->
-            "GEMINI_API_KEY: absente — ajoutez-la dans local.properties"
+        fr.geoking.vincent.data.Settings.geminiApiKey.isNotBlank() ->
+            "Gemini BYOK: clé présente (${fr.geoking.vincent.data.Settings.geminiApiKey.length} car.)"
+        BuildConfig.GEMINI_API_KEY.isNotBlank() ->
+            "GEMINI_API_KEY build: présente (non utilisée — préférez Réglages)"
         else ->
-            "GEMINI_API_KEY: présente (${BuildConfig.GEMINI_API_KEY.length} car.)"
+            "Gemini: aucune clé (Gemma local ou Réglages → clé utilisateur)"
     }
 }

@@ -1,7 +1,7 @@
 package fr.geoking.vincent.data
 
 import fr.geoking.vincent.BuildConfig
-import fr.geoking.vincent.ai.GeminiClient
+import fr.geoking.vincent.ai.WineAiEngine
 import fr.geoking.vincent.model.FlavorProfile
 import fr.geoking.vincent.debug.HttpDebug
 import kotlinx.coroutines.tasks.await
@@ -288,7 +288,7 @@ private object WikipediaProvider : WineDataProvider {
 }
 
 /**
- * AI label reader — wraps the Gemini-backed recognizer as a LABEL_SCAN provider so
+ * AI label reader — wraps the on-device / BYOK recognizer as a LABEL_SCAN provider so
  * the factory can route label photos uniformly alongside the data sources.
  */
 private object AiLabelProvider : WineDataProvider {
@@ -297,7 +297,7 @@ private object AiLabelProvider : WineDataProvider {
     override val capabilities = setOf(ProviderCapability.LABEL_SCAN)
 
     override suspend fun byLabel(imageBytes: ByteArray): ProductInfo? {
-        val bottle = GeminiClient.fromImage(imageBytes).bottle ?: return null
+        val bottle = WineAiEngine.fromImage(imageBytes).bottle ?: return null
         return ProductInfo(
             name = bottle.appellation.ifBlank { bottle.domain },
             brand = bottle.domain,

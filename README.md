@@ -82,15 +82,16 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `ENRICH`.
 |---|----------|--------------|------------|--------|
 | 1 | **Open Food Facts** | `BARCODE_SCAN` | none (open API) | ✅ active |
 | 2 | **grapeminds** | `TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH` | `GRAPEMINDS_API_KEY` (`Authorization: Bearer`) | ✅ active when key set (label scan needs Enterprise plan) |
-| 3 | **AI Label** | `LABEL_SCAN` | proxy `AI_PROXY_URL` (prod) / `GEMINI_API_KEY` (debug) | ✅ OCR-first + Gemini fallback |
+| 3 | **AI Label** | `LABEL_SCAN` | on-device **Gemma 3 1B** (download in Settings); optional **Gemini BYOK** | ✅ OCR-first + Gemma; Gemini only if user key + fallback enabled |
 
 > **On-device label + voice (cost cut):** label photos run **ML Kit OCR** (Play Services,
 > preloaded via `mlkit.vision.DEPENDENCIES=ocr`) then a local parser
-> (`ai/WineLabelParser`) and optional grapeminds `TEXT_SEARCH`. Gemini **vision** is
-> only used when OCR is empty/weak; Gemini **text** when the parser confidence is low
-> (also the voice path after free `SpeechRecognizer` STT). JPEGs are downscaled before
-> any vision upload. KPIs live on `AiUsage` (`localParseHits`, `geminiVisionCalls`,
-> `geminiTextCalls`, `fallbackRate()`, `lastPath`).
+> (`ai/WineLabelParser`) and optional grapeminds `TEXT_SEARCH`. **Gemma** (MediaPipe
+> `.task`, downloaded from Settings) is the generative fallback. **Gemini** is optional
+> BYOK (key stored encrypted in Settings) — text/vision only when the user enables
+> fallback. JPEGs are downscaled before any vision upload. KPIs live on `AiUsage`
+> (`localParseHits`, `gemmaTextCalls`, `geminiVisionCalls`, `geminiTextCalls`,
+> `fallbackRate()`, `lastPath`).
 
 > grapeminds Public API v1 — base `https://api.grapeminds.eu/public/v1`, `Accept-Language` ∈ {de,en,es,fr,it,da}.
 > Full typed client: `androidMain/.../data/GrapeMindsClient.kt` (wines, producers, regions, region insights,
@@ -104,17 +105,17 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `ENRICH`.
 > bottle detail screen (Description, Grape varieties, Flavour-profile bars, pairing prose, maturity notes).
 > No barcode and no price field; region insights are available on the client but not yet wired in the UI.
 
-> Real priority: `OpenFoodFacts → grapeminds → AiLabel` (AiLabel itself is OCR → parse → search → Gemini).
+> Real priority: `OpenFoodFacts → grapeminds → AiLabel` (AiLabel itself is OCR → parse → Gemma → optional Gemini).
 
 ### Label / voice cost KPIs (relative)
 
-| Path | Gemini $ | Worker quota | Offline structure |
-|---|---|---|---|
-| OCR + local parse hit | ~0 | 0 | yes |
-| Voice STT + local parse hit | ~0 | 0 | yes (STT often offline) |
-| OCR weak → Gemini text | medium | 1 | no |
-| OCR empty → Gemini vision (downscaled) | high (lower than full-res) | 1 | no |
-| Status quo (vision every label) | highest | 1 | no |
+| Path | Cloud $ | Offline structure |
+|---|---|---|
+| OCR + local parse hit | ~0 | yes |
+| Voice STT + local parse hit | ~0 | yes (STT often offline) |
+| OCR weak → Gemma text | ~0 (on-device) | yes after model download |
+| OCR empty → Gemini vision (BYOK) | user's Gemini bill | no |
+| Status quo (vision every label) | highest | no |
 
 ### Config keys
 
@@ -125,8 +126,9 @@ Resolved by the `secret()` function in `composeApp/build.gradle.kts`, in order:
 | Key | Role | Default if absent |
 |-----|------|-------------------|
 | `GRAPEMINDS_API_KEY` | grapeminds provider (Bearer token) | `xxx` |
-| `GEMINI_API_KEY` | direct Gemini call (debug) | blank in release |
-| `AI_PROXY_URL` | Cloudflare Worker AI proxy (prod) | blank |
+| `GEMMA_MODEL_URL` | CDN / mirror for Gemma `.task` (optional) | Hugging Face default |
+| `GEMINI_API_KEY` | legacy build-time key (unused for recognition; prefer Settings BYOK) | blank in release |
+| `AI_PROXY_URL` | Cloudflare Worker (grapeminds catalogue proxy) | blank |
 | `WEB_CLIENT_ID` | Google Sign-in / Firebase | — |
 | `AR_ENABLED` | AR feature flag | `true` |
 
@@ -168,12 +170,13 @@ Keys present in `local.properties` but **not read by the app code** (used by CI/
 - **Recognition & price (AI, wired).** `ai/WineAi.kt` exposes `WineRecognizer`
   (title/photo → `Bottle`), `PriceEstimator` and `PriceSearcher` (→ estimated price).
   Label photos and voice titles try **on-device first** (ML Kit OCR / `SpeechRecognizer`
-  + `WineLabelParser` ± catalogue search); **Gemini Flash** via `GeminiClient`
-  (`ai/WineAi.android.kt`) is the fallback. Price estimation at add time and on the
-  bottle detail “Auto” search still use Gemini (then retailer pages — Nicolas, Vivino,
-  Wine-Searcher…). Price is always shown as an **estimate** with its source (Gemini).
-- **Food pairings (AI, wired).** `FoodPairer` (same `GeminiClient`): the bottle
-  detail has a "Suggest more pairings (AI)" button → Gemini returns dishes, merged
+  + `WineLabelParser` ± catalogue search); **Gemma 3 1B** via MediaPipe (`GemmaLlm`)
+  is the generative fallback once the model is downloaded in Settings. Optional
+  **Gemini BYOK** (encrypted key + toggle in Settings) for text/vision when Gemma
+  is missing or fails. Price estimation is **opt-in** on the Add summary (not
+  auto-fired). Price is always shown as an **estimate** with its source (Gemma/Gemini).
+- **Food pairings (AI, wired).** `FoodPairer` (same `WineAiEngine`): the bottle
+  detail has a "Suggest more pairings (AI)" button → Gemma (or Gemini BYOK) returns dishes, merged
   with the existing pairings.
 - **Voice dictation (wired).** `ai/Dictation.kt` (expect) + `Dictation.android.kt`
   (`android.speech.SpeechRecognizer`, fr-FR, free/offline): live transcript + mic

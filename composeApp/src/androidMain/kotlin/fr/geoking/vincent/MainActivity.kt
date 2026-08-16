@@ -156,6 +156,8 @@ class MainActivity : ComponentActivity() {
         val regionRepo = RoomRegionRepository(db.regionDao())
 
         Settings.init(applicationContext)
+        fr.geoking.vincent.ai.GemmaModel.init(applicationContext)
+        fr.geoking.vincent.ai.GemmaLlm.init(applicationContext)
         val syncRepos = CloudSyncRepos(
             cellar = repository,
             racks = rackRepo,

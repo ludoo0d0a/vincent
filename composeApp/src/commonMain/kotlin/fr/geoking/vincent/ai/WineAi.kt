@@ -1,5 +1,6 @@
 package fr.geoking.vincent.ai
 
+import fr.geoking.vincent.data.ProductInfo
 import fr.geoking.vincent.model.Bottle
 
 /** An estimated market price (always shown as an estimate, with its source/date). */
@@ -8,8 +9,16 @@ data class PriceEstimate(val amountEur: Int, val source: String, val asOf: Strin
 /**
  * Outcome of an AI recognition attempt — bottle and/or a user-visible error.
  * [reply] carries a short conversational confirmation when refining via discussion.
+ * [suggestions] are catalogue candidates for the user to pick (no silent firstOrNull).
  */
-data class RecognizeOutcome(val bottle: Bottle? = null, val error: String? = null, val reply: String? = null)
+data class RecognizeOutcome(
+    val bottle: Bottle? = null,
+    val error: String? = null,
+    val reply: String? = null,
+    val suggestions: List<ProductInfo> = emptyList(),
+    /** OCR / transcript text when available (for verso merge). */
+    val rawText: String? = null,
+)
 
 /** Resolves a noisy title or a label photo into a structured [Bottle]. */
 interface WineRecognizer {
@@ -42,7 +51,7 @@ interface FoodPairer {
     suspend fun pairings(bottle: Bottle): List<String>
 }
 
-// Platform providers (Android = Gemini Flash). Other targets can return no-ops.
+// Platform providers (Android = Gemma on-device + optional Gemini BYOK).
 expect fun wineRecognizer(): WineRecognizer
 expect fun priceEstimator(): PriceEstimator
 expect fun priceSearcher(): PriceSearcher

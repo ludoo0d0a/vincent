@@ -89,6 +89,8 @@ kotlin {
             // hybrid marker AR mode. boofcv-android adds GrayU8 <-> Bitmap conversion.
             implementation(libs.boofcv.core)
             implementation(libs.boofcv.android)
+            implementation(libs.google.mediapipe.tasks.genai)
+            implementation(libs.androidx.security.crypto)
         }
     }
 }
@@ -120,6 +122,8 @@ android {
         // configured": the matching providers stay inert until a real value is set
         // via local.properties / gradle properties / CI env.
         buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY").ifBlank { "xxx" }}\"")
+        // Optional CDN / mirror for the on-device Gemma .task file. Blank → Hugging Face default.
+        buildConfigField("String", "GEMMA_MODEL_URL", "\"${secret("GEMMA_MODEL_URL")}\"")
     }
 
     buildFeatures {

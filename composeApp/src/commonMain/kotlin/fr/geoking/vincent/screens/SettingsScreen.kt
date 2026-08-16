@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,6 +25,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -39,18 +42,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.compose.resources.stringResource
-import vincent.composeapp.generated.resources.*
+import fr.geoking.vincent.ai.GemmaModel
+import fr.geoking.vincent.ai.GemmaModelState
 import fr.geoking.vincent.data.SUPPORTED_LANGUAGES
 import fr.geoking.vincent.data.Settings
 import fr.geoking.vincent.data.Updater
 import fr.geoking.vincent.debug.InternalLog
-import kotlinx.coroutines.launch
 import fr.geoking.vincent.getAppVersion
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.SectionHeader
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.*
 
 @Composable
 fun SettingsScreen(
@@ -61,6 +69,10 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
+    var geminiDraft by remember { mutableStateOf(Settings.geminiApiKey) }
+    var hfDraft by remember { mutableStateOf(Settings.huggingFaceToken) }
+    var showGeminiKey by remember { mutableStateOf(false) }
+    val gemmaState = GemmaModel.state
 
     if (showConfirmDialog) {
         AlertDialog(
@@ -144,6 +156,116 @@ fun SettingsScreen(
                 }
             }
 
+            SectionHeader(stringResource(Res.string.settings_section_ai))
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(stringResource(Res.string.settings_gemma_title), fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.settings_gemma_desc), fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 16.sp)
+                val statusLabel = when (val s = gemmaState) {
+                    is GemmaModelState.Missing -> stringResource(Res.string.settings_gemma_missing)
+                    is GemmaModelState.Ready -> stringResource(Res.string.settings_gemma_ready)
+                    is GemmaModelState.Downloading -> stringResource(Res.string.settings_gemma_downloading, (s.progress * 100).toInt())
+                    is GemmaModelState.Error -> stringResource(Res.string.settings_gemma_error, s.message)
+                }
+                Text(
+                    statusLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.W700,
+                    color = when (gemmaState) {
+                        is GemmaModelState.Ready -> VincentColors.Green
+                        is GemmaModelState.Error -> VincentColors.Red
+                        else -> VincentColors.Muted
+                    },
+                )
+                if (gemmaState is GemmaModelState.Downloading) {
+                    Box(
+                        Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(VincentColors.Surface2),
+                    ) {
+                        Box(
+                            Modifier.fillMaxWidth(gemmaState.progress.coerceIn(0f, 1f))
+                                .height(6.dp)
+                                .background(VincentColors.Accent),
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when (gemmaState) {
+                        is GemmaModelState.Missing, is GemmaModelState.Error -> {
+                            SettingsActionChip(stringResource(Res.string.settings_gemma_download)) {
+                                scope.launch { GemmaModel.download() }
+                            }
+                        }
+                        is GemmaModelState.Downloading -> {
+                            Text(
+                                stringResource(Res.string.settings_gemma_downloading, (gemmaState.progress * 100).toInt()),
+                                fontSize = 12.sp,
+                                color = VincentColors.Muted,
+                            )
+                        }
+                        is GemmaModelState.Ready -> {
+                            SettingsActionChip(stringResource(Res.string.settings_gemma_delete), danger = true) {
+                                GemmaModel.delete()
+                            }
+                        }
+                    }
+                }
+                SettingsSecretField(
+                    label = stringResource(Res.string.settings_hf_token),
+                    placeholder = stringResource(Res.string.settings_hf_token_hint),
+                    value = hfDraft,
+                    onChange = { hfDraft = it },
+                    onSave = { Settings.setHuggingFaceToken(hfDraft) },
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(VincentColors.Surface)
+                    .border(1.dp, VincentColors.Border, RoundedCornerShape(13.dp)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(stringResource(Res.string.settings_gemini_title), fontSize = 13.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg)
+                Text(stringResource(Res.string.settings_gemini_desc), fontSize = 12.sp, color = VincentColors.Muted, lineHeight = 16.sp)
+                SettingsToggle(
+                    label = stringResource(Res.string.settings_gemini_fallback),
+                    checked = Settings.geminiFallbackEnabled,
+                    onCheckedChange = { Settings.setGeminiFallbackEnabled(it) },
+                )
+                OutlinedTextField(
+                    value = geminiDraft,
+                    onValueChange = { geminiDraft = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.settings_gemini_key), fontSize = 12.sp) },
+                    placeholder = { Text(stringResource(Res.string.settings_gemini_key_hint), fontSize = 12.sp) },
+                    visualTransformation = if (showGeminiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VincentColors.Accent,
+                        unfocusedBorderColor = VincentColors.Border,
+                        focusedTextColor = VincentColors.Fg,
+                        unfocusedTextColor = VincentColors.Fg,
+                    ),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingsActionChip(stringResource(Res.string.settings_gemini_key_saved)) {
+                        Settings.setGeminiApiKey(geminiDraft)
+                        showGeminiKey = false
+                    }
+                    if (Settings.geminiApiKey.isNotBlank() || geminiDraft.isNotBlank()) {
+                        SettingsActionChip(stringResource(Res.string.settings_gemini_key_clear), danger = true) {
+                            geminiDraft = ""
+                            Settings.setGeminiApiKey("")
+                        }
+                    }
+                    SettingsActionChip(if (showGeminiKey) "•••" else "ABC") {
+                        showGeminiKey = !showGeminiKey
+                    }
+                }
+            }
+
             SectionHeader(stringResource(Res.string.settings_section_app))
             SettingsLink(stringResource(Res.string.settings_data_management), onOpenDataManagement)
             Spacer(Modifier.height(8.dp))
@@ -168,6 +290,53 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun SettingsSecretField(
+    label: String,
+    placeholder: String,
+    value: String,
+    onChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(label, fontSize = 12.sp) },
+            placeholder = { Text(placeholder, fontSize = 12.sp) },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = VincentColors.Accent,
+                unfocusedBorderColor = VincentColors.Border,
+                focusedTextColor = VincentColors.Fg,
+                unfocusedTextColor = VincentColors.Fg,
+            ),
+        )
+        SettingsActionChip(stringResource(Res.string.settings_gemini_key_saved), onClick = onSave)
+    }
+}
+
+@Composable
+private fun SettingsActionChip(label: String, danger: Boolean = false, onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(10.dp))
+            .background(if (danger) VincentColors.AccentSoft else VincentColors.Surface2)
+            .border(1.dp, if (danger) VincentColors.Accent else VincentColors.Border, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.W700,
+            color = if (danger) VincentColors.Accent else VincentColors.Fg,
+        )
     }
 }
 
