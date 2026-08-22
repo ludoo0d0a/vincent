@@ -39,7 +39,7 @@ actual fun rememberMapPackDownload(onLoading: (Boolean) -> Unit, onResult: (Long
 }
 
 actual fun isMapPackInstalled(): Boolean {
-    // Called from composables via context in OriginsMapScreen instead.
+    // Use isMapPackInstalled(context) from composables; this stub is for non-composable callers.
     return false
 }
 

@@ -66,6 +66,7 @@ import fr.geoking.vincent.screens.RegionsManagementScreen
 import fr.geoking.vincent.screens.GrapesManagementScreen
 import fr.geoking.vincent.screens.AppellationsManagementScreen
 import fr.geoking.vincent.screens.OriginsMapScreen
+import fr.geoking.vincent.screens.OriginsMapTab
 import fr.geoking.vincent.screens.TastingEditScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
@@ -97,7 +98,10 @@ private sealed interface Dest {
     data object RegionsManagement : Dest
     data object GrapesManagement : Dest
     data object AppellationsManagement : Dest
-    data object OriginsMap : Dest
+    data class OriginsMap(
+        val initialTab: OriginsMapTab = OriginsMapTab.Cellar,
+        val highlightOriginKey: String? = null,
+    ) : Dest
     data object Tastings : Dest
     data object Producers : Dest
     data object Suppliers : Dest
@@ -164,6 +168,7 @@ fun App() = VincentTheme {
                     onAdd = { stack.add(Dest.Add()) },
                     onAddToCell = { stack.add(Dest.Add(it)) },
                     onAccount = { stack.add(Dest.Account) },
+                    onOpenOriginsMap = { stack.add(Dest.OriginsMap()) },
                     onOpenDataManagement = { stack.add(Dest.DataManagement) },
                     onOpenAr = { stack.add(Dest.Ar(it)) },
                     onEditRack = { stack.add(Dest.RackEdit(it)) },
@@ -175,6 +180,10 @@ fun App() = VincentTheme {
                     onEdit = { stack.add(Dest.Edit(it)) },
                     onOpenTastings = { stack.add(Dest.BottleTastings(it)) },
                     onMove = { stack.add(Dest.Placement(it)) },
+                    onOpenOnMap = { b ->
+                        val key = fr.geoking.vincent.data.OriginGeocoder.resolveOrigin(b).key
+                        stack.add(Dest.OriginsMap(highlightOriginKey = key))
+                    },
                 )
 
                 is Dest.Add -> AddScreen(onClose = { stack.clear() }, initialPlacement = top.placement)
@@ -223,9 +232,14 @@ fun App() = VincentTheme {
                 Dest.GrapesManagement -> GrapesManagementScreen(onBack = ::pop)
                 Dest.AppellationsManagement -> AppellationsManagementScreen(
                     onBack = ::pop,
-                    onOpenOriginsMap = { stack.add(Dest.OriginsMap) },
+                    onOpenOriginsMap = { stack.add(Dest.OriginsMap(initialTab = OriginsMapTab.Reference)) },
                 )
-                Dest.OriginsMap -> OriginsMapScreen(onBack = ::pop)
+                is Dest.OriginsMap -> OriginsMapScreen(
+                    onBack = ::pop,
+                    initialTab = top.initialTab,
+                    highlightOriginKey = top.highlightOriginKey,
+                    onOpenBottle = { stack.add(Dest.Detail(it)) },
+                )
 
                 Dest.Tastings -> TastingsScreen(onBack = ::pop)
                 Dest.Producers -> ProducersScreen(onBack = ::pop)
@@ -342,6 +356,7 @@ private fun MainScaffold(
     onAdd: () -> Unit,
     onAddToCell: (RackPlacement) -> Unit,
     onAccount: () -> Unit,
+    onOpenOriginsMap: () -> Unit,
     onOpenDataManagement: () -> Unit,
     onOpenAr: (Int) -> Unit,
     onEditRack: (Int) -> Unit,
@@ -384,7 +399,13 @@ private fun MainScaffold(
     ) { inner ->
         val content = Modifier.padding(inner)
         when (tab) {
-            Tab.HOME -> DashboardScreen(content, onOpenBottle = onOpenBottle, onOpenRecent = onOpenRecent, onAccount = onAccount)
+            Tab.HOME -> DashboardScreen(
+                content,
+                onOpenBottle = onOpenBottle,
+                onOpenRecent = onOpenRecent,
+                onAccount = onAccount,
+                onOpenOriginsMap = onOpenOriginsMap,
+            )
             Tab.CELLAR -> CellarScreen(
                 content,
                 rackIdx = cellarRackIdx,

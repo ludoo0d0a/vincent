@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.*
 import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.CellarOrigins
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BrandAvatar
@@ -47,6 +48,7 @@ fun DashboardScreen(
     onOpenBottle: (fr.geoking.vincent.model.Bottle) -> Unit,
     onOpenRecent: () -> Unit,
     onAccount: () -> Unit,
+    onOpenOriginsMap: () -> Unit,
 ) {
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
         ScreenHeader(
@@ -64,6 +66,7 @@ fun DashboardScreen(
             }
             SectionHeader(stringResource(Res.string.breakdown_by_color), stringResource(Res.string.details))
             BreakdownCard()
+            OriginsCard(onClick = onOpenOriginsMap)
             SectionHeader(stringResource(Res.string.last_added), stringResource(Res.string.details), onAction = onOpenRecent)
             Cellar.recent.take(3).forEach { b ->
                 RecentRow(b, onOpenBottle)
@@ -114,6 +117,34 @@ private fun MiniStat(label: String, value: String, modifier: Modifier = Modifier
                     Text(" $suffix", color = VincentColors.Green, fontSize = 11.sp, fontWeight = FontWeight.W600, modifier = Modifier.padding(bottom = 2.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OriginsCard(onClick: () -> Unit) {
+    val count = CellarOrigins.distinctOriginCount()
+    VCard(Modifier.fillMaxWidth().padding(top = 10.dp).clickable(onClick = onClick)) {
+        Row(
+            Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(Res.string.dashboard_origins_title),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.W700,
+                    color = VincentColors.Fg,
+                )
+                Text(
+                    stringResource(Res.string.dashboard_origins_subtitle, count),
+                    fontSize = 11.sp,
+                    color = VincentColors.Muted,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+            Text(stringResource(Res.string.dashboard_origins_action), fontSize = 11.sp, color = VincentColors.Accent, fontWeight = FontWeight.W600)
         }
     }
 }

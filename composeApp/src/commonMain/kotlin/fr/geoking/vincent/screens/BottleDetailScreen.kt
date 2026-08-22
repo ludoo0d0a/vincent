@@ -83,7 +83,14 @@ import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
 
 @Composable
-fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> Unit, onOpenTastings: (Bottle) -> Unit, onMove: (Bottle) -> Unit) {
+fun BottleDetailScreen(
+    bottle: Bottle,
+    onBack: () -> Unit,
+    onEdit: (Bottle) -> Unit,
+    onOpenTastings: (Bottle) -> Unit,
+    onMove: (Bottle) -> Unit,
+    onOpenOnMap: (Bottle) -> Unit = {},
+) {
     val live = Cellar.bottle(bottle.id) ?: bottle
     val qty = live.quantity
     val fav = live.favorite
@@ -209,6 +216,24 @@ fun BottleDetailScreen(bottle: Bottle, onBack: () -> Unit, onEdit: (Bottle) -> U
                             InfoRow(Icons.Filled.Place, stringResource(Res.string.detail_spot), live.cellarSpot, divider = true)
                         }
                         InfoRow(Icons.Filled.Place, stringResource(Res.string.detail_source_label), live.provenance, divider = true)
+                        if (live.provenance.isNotBlank() || live.appellation.isNotBlank()) {
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenOnMap(live) }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Filled.Place, contentDescription = null, tint = VincentColors.Accent, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    stringResource(Res.string.detail_view_on_map),
+                                    fontSize = 13.sp,
+                                    color = VincentColors.Accent,
+                                    fontWeight = FontWeight.W600,
+                                )
+                            }
+                        }
                         if (live.alcoholLevel > 0.0) {
                             InfoRow(Icons.Filled.LocalBar, stringResource(Res.string.detail_alcohol_label), "${live.alcoholLevel}%", divider = true)
                         }

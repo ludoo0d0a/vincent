@@ -597,10 +597,23 @@
 
     <string name="origins_map_title">Carte des origines</string>
     <string name="origins_map_subtitle">%1$d appellations en référentiel</string>
+    <string name="origins_map_cellar_subtitle">%1$d origines dans votre cave</string>
+    <string name="origins_map_tab_cellar">Ma cave</string>
+    <string name="origins_map_tab_reference">Référentiel</string>
     <string name="origins_map_search">Rechercher une appellation…</string>
     <string name="origins_map_open">Ouvrir la carte des origines</string>
     <string name="origins_map_pack_missing">Pack carto non téléchargé — importez depuis Appellations.</string>
+    <string name="origins_map_pack_hint">Carte macro-régions active. Téléchargez le pack carto pour le détail par appellation.</string>
     <string name="origins_map_select_appellation">Sélectionnez une appellation pour afficher son contour.</string>
+    <string name="origins_map_no_geometry">Pas de géométrie cartographique pour cette appellation.</string>
+    <string name="origins_map_loading">Chargement de la carte…</string>
+    <string name="origins_map_filter_all">Toutes</string>
+    <string name="origins_map_unmapped">Origines non localisées</string>
+    <string name="origins_map_bottles_title">%1$d bouteille(s)</string>
+    <string name="dashboard_origins_title">Origines de ma cave</string>
+    <string name="dashboard_origins_subtitle">%1$d origines distinctes</string>
+    <string name="dashboard_origins_action">Voir la carte</string>
+    <string name="detail_view_on_map">Voir sur la carte</string>
 
     <string name="catalog_source_archive_2017">Archive 2017</string>
 

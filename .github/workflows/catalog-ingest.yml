@@ -10,6 +10,7 @@ on:
         options:
           - winemag-d1
           - vivc-popular
+          - inao-geo
 
 jobs:
   ingest:
@@ -47,3 +48,23 @@ jobs:
           test -f scripts/catalog/data/winemag-data-130k-v2.csv || exit 1
           npm ci --prefix worker
           python scripts/catalog/ingest-winemag.py
+
+      - name: Install GDAL for INAO geo ingest
+        if: inputs.target == 'inao-geo'
+        run: sudo apt-get update && sudo apt-get install -y gdal-bin
+
+      - name: Build appellations map pack
+        if: inputs.target == 'inao-geo'
+        run: |
+          test -f scripts/catalog/data/parcellaire.shp || { echo "Missing scripts/catalog/data/parcellaire.shp — download INAO shapefile first"; exit 1; }
+          python scripts/catalog/ingest-inao-geo.py --shp scripts/catalog/data/parcellaire.shp
+
+      - name: Upload map pack to R2
+        if: inputs.target == 'inao-geo'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npm ci --prefix worker
+          npx --prefix worker wrangler r2 object put vincent-map-pack/appellations-map-fr.zip \
+            --file scripts/catalog/out/appellations-map-fr.zip

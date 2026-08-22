@@ -571,10 +571,23 @@
 
     <string name="origins_map_title">Origins map</string>
     <string name="origins_map_subtitle">%1$d appellations in reference</string>
+    <string name="origins_map_cellar_subtitle">%1$d origins in your cellar</string>
+    <string name="origins_map_tab_cellar">My cellar</string>
+    <string name="origins_map_tab_reference">Reference</string>
     <string name="origins_map_search">Search an appellation…</string>
     <string name="origins_map_open">Open origins map</string>
     <string name="origins_map_pack_missing">Map pack not downloaded — import from Appellations.</string>
+    <string name="origins_map_pack_hint">Macro-region map active. Download the map pack for appellation detail.</string>
     <string name="origins_map_select_appellation">Select an appellation to show its boundary.</string>
+    <string name="origins_map_no_geometry">No map geometry for this appellation.</string>
+    <string name="origins_map_loading">Loading map…</string>
+    <string name="origins_map_filter_all">All</string>
+    <string name="origins_map_unmapped">Unlocated origins</string>
+    <string name="origins_map_bottles_title">%1$d bottle(s)</string>
+    <string name="dashboard_origins_title">Cellar origins</string>
+    <string name="dashboard_origins_subtitle">%1$d distinct origins</string>
+    <string name="dashboard_origins_action">View map</string>
+    <string name="detail_view_on_map">View on map</string>
 
     <string name="catalog_source_archive_2017">Archive 2017</string>
 

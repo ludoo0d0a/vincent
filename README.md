@@ -98,6 +98,19 @@ Not `WineDataProvider` catalogue sources — imported JSON via **Gestion des don
 
 Attribution: VIVC (Röckel et al.), INAO (Licence Ouverte 2.0), OSM (ODbL). Origins map: `OriginsMapScreen` (osmdroid + GeoJSON overlay).
 
+### INAO map pack (R2)
+
+The optional France appellations GeoJSON zip is served by the Worker at `GET /v1/catalog/map-pack` from R2 bucket `vincent-map-pack` (key `appellations-map-fr.zip`). One-time setup:
+
+1. Create the R2 bucket: `wrangler r2 bucket create vincent-map-pack` (binding is in `worker/wrangler.jsonc`).
+2. Download the [INAO parcellaire shapefile](https://www.data.gouv.fr/datasets/delimitation-parcellaire-des-aoc-viticoles-de-linao/) into `scripts/catalog/data/parcellaire.shp` (+ sidecar files).
+3. Build locally: `python scripts/catalog/ingest-inao-geo.py --shp scripts/catalog/data/parcellaire.shp`
+4. Upload: `wrangler r2 object put vincent-map-pack/appellations-map-fr.zip --file scripts/catalog/out/appellations-map-fr.zip`
+
+Or run the GitHub Action **Catalog ingest → inao-geo** (requires shapefile committed or supplied as a CI artifact, plus `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets).
+
+The app bundles simplified macro-region polygons (`france-macro-regions.geojson`) so the cellar map works before the first map-pack download.
+
 > Real priority: `OpenFoodFacts → grapeminds → WineMag → AiLabel` for text search merge; enrich only when grapeminds `externalId` is set.
 
 > **On-device label + voice (cost cut):** label photos run **ML Kit OCR** (Play Services,

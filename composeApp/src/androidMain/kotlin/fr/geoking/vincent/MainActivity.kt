@@ -178,6 +178,7 @@ class MainActivity : ComponentActivity() {
             Regions.bootstrap(regionRepo)
             Grapes.bootstrap(grapeRepo) { loadBundledPopularGrapes() }
             Appellations.bootstrap(appellationRepo)
+            loadBundledOriginCentroids()
             if (shouldSeed) {
                 Settings.setDemoDataSeeded(true)
             }
