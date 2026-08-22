@@ -44,7 +44,7 @@ object PlocImport {
         if (files.isEmpty()) return PlocBundleResult()
 
         val recognised = files.mapNotNull { file ->
-            val kind = PlocKnownFile.fromFilename(file.name) ?: return@mapNotNull null
+            val kind = classifyPlocFile(file.name, file.text) ?: return@mapNotNull null
             kind to file
         }.sortedBy { it.first.order }
 
@@ -80,7 +80,7 @@ object PlocImport {
                     }
                 }
                 PlocKnownFile.CAVES -> {
-                    val result = CsvFormat.parse(file.text)
+                    val result = CsvFormat.parse(file.text, wineLookup = plocWineLookup())
                     if (result.type == CsvFormat.ImportType.RACKS) {
                         bottlesFromRefs += ensureBottlesFromRacks(result.referencedWines)
                         racks += Racks.import(result.racks)
@@ -136,9 +136,35 @@ object PlocImport {
 
     fun ensureBottlesFromRacks(refs: List<PlocWineRef>): Int =
         ensureBottles(refs, quantity = 1)
+
+    /** Classify a PLOC export file by filename, falling back to CSV headers. */
+    internal fun classifyPlocFile(name: String, text: String): PlocKnownFile? {
+        PlocKnownFile.fromFilename(name)?.let { return it }
+        val header = CsvFormat.peekHeader(text)
+        return when {
+            "ligne" in header && "colonne" in header -> PlocKnownFile.CAVES
+            "contact principal" in header -> PlocKnownFile.PRODUCTEURS
+            header.any { it == "emotiploc" } ||
+                ("date" in header && "nom du vin" in header && "ligne" !in header) -> PlocKnownFile.DEGUSTATIONS
+            "type" in header && "nom" in header && "contact principal" !in header -> PlocKnownFile.FOURNISSEURS
+            ("nom du vin" in header || "idvin" in header) && "couleur" in header -> PlocKnownFile.VINS
+            else -> null
+        }
+    }
+
+    internal fun wineLookup(): (String?, String, String?) -> Bottle? = plocWineLookup()
 }
 
-private enum class PlocKnownFile(val order: Int) {
+private fun plocWineLookup(): (String?, String, String?) -> Bottle? {
+    val byId = Cellar.bottles.associateBy { it.id }
+    val byKey = Cellar.bottles.associateBy { "${it.domain.trim().lowercase()}|${it.vintage}" }
+    return { id, name, vintage ->
+        id?.takeIf { it.isNotBlank() }?.let { byId[it] }
+            ?: byKey["${name.trim().lowercase()}|${vintage?.trim()?.ifBlank { "NM" } ?: "NM"}"]
+    }
+}
+
+internal enum class PlocKnownFile(val order: Int) {
     VINS(0),
     PRODUCTEURS(1),
     FOURNISSEURS(2),
@@ -155,7 +181,7 @@ private enum class PlocKnownFile(val order: Int) {
                 base.contains("degust") || base.contains("dégust") || base.contains("tasting") -> DEGUSTATIONS
                 base.contains("producteur") || base.contains("producer") -> PRODUCTEURS
                 base.contains("fournisseur") || base.contains("supplier") -> FOURNISSEURS
-                else -> null
+                 else -> null
             }
         }
     }

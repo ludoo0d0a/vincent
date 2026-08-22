@@ -39,10 +39,10 @@ fun RacksManagementScreen(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
 
     val importCsv = rememberCsvImport(onLoading = { busy = it }) { text ->
-        val result = CsvFormat.parse(text)
+        val result = CsvFormat.parse(text, wineLookup = PlocImport.wineLookup())
         importStatus = if (result.type == CsvFormat.ImportType.RACKS) {
             PlocImport.ensureBottlesFromRacks(result.referencedWines)
-            result.racks.forEach { Racks.add(it) }
+            Racks.import(result.racks)
             RackImportStatus.Success(result.racks.size)
         } else {
             RackImportStatus.WrongType

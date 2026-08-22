@@ -27,7 +27,7 @@ object CsvFormat {
         "color" to listOf("color", "colour", "couleur", "wine type", "type"),
         "vintage" to listOf("vintage", "millésime", "millesime", "année", "annee", "year"),
         "price" to listOf("price", "prix", "prix d'achat", "purchase price", "price paid"),
-        "quantity" to listOf("quantity", "quantité", "quantite", "qty", "stock", "stock (en cave)", "bottles", "nombre"),
+        "quantity" to listOf("stock (en cave)", "stock en cave", "quantity", "quantité", "quantite", "qty", "stock", "bottles", "nombre"),
         "rating" to listOf("rating", "note", "your rating", "score", "ma note"),
         "cellarSpot" to listOf("cellarspot", "casier", "emplacement", "location", "bin", "rangement"),
         "provenance" to listOf("provenance", "region", "région", "country", "pays", "origine"),
@@ -147,16 +147,17 @@ object CsvFormat {
         val source: String,
     )
 
-    fun parse(text: String, preferredType: ImportType? = null): ImportResult {
+    /** First-row headers (lower-cased, quotes stripped) for PLOC bundle file classification. */
+    internal fun peekHeader(text: String): List<String> = normalizeHeader(tokenize(text).firstOrNull() ?: emptyList())
+
+    fun parse(
+        text: String,
+        preferredType: ImportType? = null,
+        wineLookup: ((plocId: String?, wineName: String, vintage: String?) -> Bottle?)? = null,
+    ): ImportResult {
         val rows = tokenize(text)
         if (rows.isEmpty()) return ImportResult(ImportType.UNKNOWN, source = "Inconnu")
-        val header = rows.first().map {
-            var h = it.trim().lowercase()
-            if (h.startsWith("\"") && h.endsWith("\"")) {
-                h = h.substring(1, h.length - 1).replace("\"\"", "\"")
-            }
-            h
-        }
+        val header = normalizeHeader(rows.first())
         val index = HashMap<String, Int>()
         header.forEachIndexed { i, h ->
             if (h.isNotEmpty()) index.putIfAbsent(h, i)
@@ -172,7 +173,8 @@ object CsvFormat {
         return when (type) {
             ImportType.BOTTLES -> ImportResult(type, bottles = rows.drop(1).mapNotNull { it.toBottle(index) }, source = source)
             ImportType.RACKS -> {
-                val (racks, refs) = if (source == "PLOC") parsePlocRacks(rows, index)
+                val isPlocGrid = "ligne" in header && "colonne" in header
+                val (racks, refs) = if (isPlocGrid) parsePlocRacks(rows, index, wineLookup)
                 else rows.drop(1).mapNotNull { it.toRack(index) } to emptyList()
                 ImportResult(type, racks = racks, referencedWines = refs, source = source)
             }
@@ -187,7 +189,11 @@ object CsvFormat {
         }
     }
 
-    private fun parsePlocRacks(rows: List<List<String>>, index: Map<String, Int>): Pair<List<Rack>, List<PlocWineRef>> {
+    private fun parsePlocRacks(
+        rows: List<List<String>>,
+        index: Map<String, Int>,
+        wineLookup: ((plocId: String?, wineName: String, vintage: String?) -> Bottle?)? = null,
+    ): Pair<List<Rack>, List<PlocWineRef>> {
         val dataRows = rows.drop(1)
         val refs = mutableListOf<PlocWineRef>()
         val grouped = dataRows.groupBy { (it.field("name", index) ?: "Inconnu").trim() }
@@ -205,8 +211,16 @@ object CsvFormat {
                     if (!wineName.isNullOrBlank()) {
                         val vintage = row.field("vintage", index)
                         val plocId = row.field("id", index)
-                        refs += PlocWineRef(wineName, vintage, plocId)
-                        rackCells[idx] = RackCell(rowLabel(r), true, vintage = vintage)
+                        val bottle = wineLookup?.invoke(plocId, wineName, vintage)
+                        refs += PlocWineRef(wineName, vintage, plocId, bottle?.color)
+                        rackCells[idx] = RackCell(
+                            row = rowLabel(r),
+                            occupied = true,
+                            color = bottle?.color,
+                            category = bottle?.category,
+                            vintage = vintage ?: bottle?.vintage,
+                            price = bottle?.price?.takeIf { it > 0 },
+                        )
                     }
                 }
             }
@@ -215,11 +229,20 @@ object CsvFormat {
         return racks to refs.distinctBy { it.key }
     }
 
+    private fun normalizeHeader(row: List<String>): List<String> = row.map {
+        var h = it.trim().lowercase()
+        if (h.startsWith("\"") && h.endsWith("\"")) {
+            h = h.substring(1, h.length - 1).replace("\"\"", "\"")
+        }
+        h
+    }
+
     fun detectSource(header: List<String>): String = when {
         "id" in header && "domain" in header && "color" in header -> "Vincent"
         header.any { it == "winery" } || header.any { it == "wine name" } -> "Vivino"
         ("nom" in header || "nom du vin" in header || "idvin" in header) &&
-            (header.any { it == "couleur" } || header.any { it == "millésime" } || header.any { it == "date dégustation" } || "ligne" in header || "contact principal" in header) -> "PLOC"
+            (header.any { it == "couleur" } || header.any { it == "millésime" || it == "millesime" } ||
+                header.any { it == "date dégustation" } || "ligne" in header || "contact principal" in header) -> "PLOC"
         header.any { it == "bin" } || header.any { it == "begin consume" } || header.any { it == "valuation" } -> "CellarTracker"
         else -> "CSV générique"
     }

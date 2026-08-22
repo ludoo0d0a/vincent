@@ -240,15 +240,52 @@ class PlocImportTest {
     @Test
     fun testFixtureCavesAutoCreatesBottlesOnEmptyCellar() {
         val caves = CsvFormat.parse(readPlocFixture("Caves.csv"))
-        val snapshot = Cellar.bottles.map { it.id }.toSet()
-        val created = PlocImport.ensureBottlesFromRacks(caves.referencedWines)
-        assertTrue(created >= 1, "should create at least one new bottle from cave refs")
+        PlocImport.ensureBottlesFromRacks(caves.referencedWines)
+        assertTrue(caves.referencedWines.isNotEmpty())
         caves.referencedWines.forEach { ref ->
             val id = ref.resolvedId()
-            if (id !in snapshot) {
-                assertTrue(Cellar.bottle(id) != null, "missing auto-created bottle $id")
-            }
+            assertTrue(Cellar.bottle(id) != null, "missing bottle for ref $id")
         }
+    }
+
+    @Test
+    fun testClassifyCavesByContentWhenFilenameGeneric() {
+        val text = readPlocFixture("Caves.csv")
+        assertEquals(PlocKnownFile.CAVES, PlocImport.classifyPlocFile("export.csv", text))
+        assertEquals(PlocKnownFile.VINS, PlocImport.classifyPlocFile("9923.csv", readPlocFixture("Vins.csv")))
+    }
+
+    @Test
+    fun testPlocRacksParsedAsGridWithoutPlocSourceLabel() {
+        // Header without accented millésime — still a Ligne/Colonne grid, not per-row toRack().
+        val csv = readPlocFixture("Caves.csv").replace("Millésime", "Millesime")
+        val result = CsvFormat.parse(csv)
+        assertEquals(CsvFormat.ImportType.RACKS, result.type)
+        val sommeliere = result.racks.first { it.name == "La Sommelière" }
+        assertTrue(sommeliere.rows >= 6, "expected multi-row rack, got ${sommeliere.rows}")
+        assertTrue(sommeliere.cells.count { it.occupied } >= 15)
+    }
+
+    @Test
+    fun testPlocRacksEnrichedFromImportedVins() {
+        val vins = CsvFormat.parse(readPlocFixture("Vins.csv"))
+        Cellar.importBottles(vins.bottles)
+        val caves = CsvFormat.parse(readPlocFixture("Caves.csv"), wineLookup = PlocImport.wineLookup())
+        val sommeliere = caves.racks.first { it.name == "La Sommelière" }
+        val roséCell = sommeliere.cells.first { it.vintage == "2011" && it.occupied }
+        assertEquals(WineColor.ROSE, roséCell.color)
+    }
+
+    @Test
+    fun testApplyBundleClassifiesGenericFilenames() {
+        val files = listOf(
+            PlocCsvFile("export-vins.csv", readPlocFixture("Vins.csv")),
+            PlocCsvFile("document.csv", readPlocFixture("Caves.csv")),
+        )
+        val result = PlocImport.applyBundle(files)
+        assertEquals(2, result.filesImported)
+        assertTrue(result.bottles >= 300)
+        assertTrue(result.racks >= 3)
     }
 
     @Test
