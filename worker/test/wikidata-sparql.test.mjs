@@ -6,13 +6,13 @@ import assert from "node:assert/strict";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
-test("WikipediaRegionsParser Kotlin unit tests", () => {
+test("WikidataSparql Kotlin unit tests", () => {
   const result = spawnSync(
     join(repoRoot, "gradlew"),
     [
       ":composeApp:testDebugUnitTest",
       "--tests",
-      "fr.geoking.vincent.data.WikipediaRegionsParserTest",
+      "fr.geoking.vincent.data.WikidataSparqlTest",
     ],
     { cwd: repoRoot, encoding: "utf8" },
   );
@@ -22,5 +22,5 @@ test("WikipediaRegionsParser Kotlin unit tests", () => {
     process.stderr.write(result.stderr ?? "");
   }
 
-  assert.equal(result.status, 0, "WikipediaRegionsParserTest failed");
+  assert.equal(result.status, 0, "WikidataSparqlTest failed");
 });

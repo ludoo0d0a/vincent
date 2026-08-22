@@ -82,9 +82,9 @@ Capabilities: `BARCODE_SCAN`, `LABEL_SCAN`, `TEXT_SEARCH`, `ENRICH`.
 |---|----------|--------------|------------|--------|
 | 1 | **Open Food Facts** | `BARCODE_SCAN` | none (open API) | ✅ active |
 | 2 | **grapeminds** | `TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH`, `LIST_*` | `GRAPEMINDS_API_KEY` (`Authorization: Bearer`) | ✅ active when key set (label scan needs Enterprise plan) |
-| 3 | **WineMag archive** | `TEXT_SEARCH` | Worker `AI_PROXY_URL` + D1 (`/v1/catalog/search`) | ✅ secondary search; no `ENRICH`; badge « Archive 2017 » |
-| 4 | **AI Label** | `LABEL_SCAN` | on-device **Gemma 3 1B** (download in Settings); optional **Gemini BYOK** | ✅ OCR-first + Gemma; Gemini only if user key + fallback enabled |
-| 5 | **Wikipedia** | `LIST_REGIONS` | none (HTML scrape) | ✅ active |
+| 3 | **Wikidata** | `TEXT_SEARCH`, `ENRICH`, `LIST_REGIONS` | none (SPARQL) | ✅ active — search domaines/appellations/vins (+ image P18); enrich faits; list = régions viticoles FR |
+| 4 | **WineMag archive** | `TEXT_SEARCH` | Worker `AI_PROXY_URL` + D1 (`/v1/catalog/search`) | ✅ secondary search; no `ENRICH`; badge « Archive 2017 » |
+| 5 | **AI Label** | `LABEL_SCAN` | on-device **Gemma 3 1B** (download in Settings); optional **Gemini BYOK** | ✅ OCR-first + Gemma; Gemini only if user key + fallback enabled |
 
 ## Reference data (local Room)
 
@@ -96,7 +96,7 @@ Not `WineDataProvider` catalogue sources — imported JSON via **Gestion des don
 | **INAO SIQO** | `appellations` | JSON file | `scripts/catalog/ingest-inao-siqo.py` |
 | **INAO parcellaire** | map pack on device | Worker `GET /v1/catalog/map-pack` → R2 zip | `scripts/catalog/ingest-inao-geo.py` |
 
-Attribution: VIVC (Röckel et al.), INAO (Licence Ouverte 2.0), OSM (ODbL). Origins map: `OriginsMapScreen` (osmdroid + GeoJSON overlay).
+Attribution: VIVC (Röckel et al.), INAO (Licence Ouverte 2.0), OSM (ODbL), Wikidata (CC0 facts; Commons images via P18, badge « Wikidata »). Origins map: `OriginsMapScreen` (osmdroid + GeoJSON overlay).
 
 ### INAO map pack (R2)
 
@@ -111,7 +111,7 @@ Or run the GitHub Action **Catalog ingest → inao-geo** (requires shapefile com
 
 The app bundles simplified macro-region polygons (`france-macro-regions.geojson`) so the cellar map works before the first map-pack download.
 
-> Real priority: `OpenFoodFacts → grapeminds → WineMag → AiLabel` for text search merge; enrich only when grapeminds `externalId` is set.
+> Real priority: `OpenFoodFacts → grapeminds → Wikidata → WineMag → AiLabel` for text search merge; enrich routes by `externalSource` (grapeminds or Wikidata).
 
 > **On-device label + voice (cost cut):** label photos run **ML Kit OCR** (Play Services,
 > preloaded via `mlkit.vision.DEPENDENCIES=ocr`) then a local parser
@@ -134,7 +134,7 @@ The app bundles simplified macro-region polygons (`france-macro-regions.geojson`
 > bottle detail screen (Description, Grape varieties, Flavour-profile bars, pairing prose, maturity notes).
 > No barcode and no price field; region insights are available on the client but not yet wired in the UI.
 
-> Real priority: `OpenFoodFacts → grapeminds → WineMag → AiLabel` (AiLabel itself is OCR → parse → Gemma → optional Gemini).
+> Real priority: `OpenFoodFacts → grapeminds → Wikidata → WineMag → AiLabel` (AiLabel itself is OCR → parse → Gemma → optional Gemini).
 
 ### Label / voice cost KPIs (relative)
 

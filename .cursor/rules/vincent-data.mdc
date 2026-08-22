@@ -20,11 +20,11 @@ Providers implement `WineDataProvider`. Order set in `ProductLookup.android.kt` 
 
 1. Open Food Facts (`BARCODE_SCAN`) — no key
 2. grapeminds (`TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH`, `LIST_*`) — `GRAPEMINDS_API_KEY`; typed client `GrapeMindsClient.kt`
-3. WineMag archive (`TEXT_SEARCH` only) — `WineMagClient.kt` → Worker `/v1/catalog/search` (D1); **no ENRICH**
-4. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
-5. Wikipedia (`LIST_REGIONS`) — HTML scrape
+3. Wikidata (`TEXT_SEARCH`, `ENRICH`, `LIST_REGIONS`) — SPARQL via `WikidataClient` / `WikidataSparql`; no key
+4. WineMag archive (`TEXT_SEARCH` only) — `WineMagClient.kt` → Worker `/v1/catalog/search` (D1); **no ENRICH**
+5. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
 
-Routing: barcode → first non-null; text search → merge results. `WineDataSource.enrich()` fills rich fields from grapeminds only.
+Routing: barcode → first non-null; text search → merge results. `WineDataSource.enrich()` routes by `externalSource` (grapeminds rich detail, Wikidata structured facts).
 
 ## Reference data import
 

@@ -1,0 +1,41 @@
+{
+  "head": {
+    "vars": ["item", "itemLabel", "itemDescription"]
+  },
+  "results": {
+    "bindings": [
+      {
+        "item": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q202386"
+        },
+        "itemLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Bordeaux"
+        },
+        "itemDescription": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "région viticole"
+        }
+      },
+      {
+        "item": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q2024"
+        },
+        "itemLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Bourgogne"
+        },
+        "itemDescription": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "région viticole française"
+        }
+      }
+    ]
+  }
+}

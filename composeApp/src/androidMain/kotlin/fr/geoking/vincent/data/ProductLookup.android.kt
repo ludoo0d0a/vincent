@@ -258,33 +258,26 @@ private object GrapeMindsProvider : WineDataProvider {
 }
 
 /**
- * Wikipedia provider — fetches and parses French wine regions directly from Wikipedia.
+ * Wikidata SPARQL — text search (wineries / regions / appellations / wines), enrich,
+ * and France-only wine-region list. See [WikidataClient] / [WikidataSparql].
  */
-private object WikipediaProvider : WineDataProvider {
-    override val id = "wikipedia"
-    override val displayName = "Wikipedia"
-    override val capabilities = setOf(ProviderCapability.LIST_REGIONS)
+private object WikidataProvider : WineDataProvider {
+    override val id = WikidataSparql.PROVIDER_ID
+    override val displayName = WikidataSparql.DISPLAY_NAME
+    override val capabilities = setOf(
+        ProviderCapability.TEXT_SEARCH,
+        ProviderCapability.ENRICH,
+        ProviderCapability.LIST_REGIONS,
+    )
 
-    override suspend fun listRegions(): List<Region> = withContext(Dispatchers.IO) {
-        val language = Settings.currentLanguageTag
-        try {
-            val conn = (URL(WikipediaRegionsParser.url(language)).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10_000
-                readTimeout = 15_000
-                setRequestProperty("Accept", "text/html")
-                setRequestProperty("Accept-Language", language)
-                setRequestProperty("User-Agent", "Vincent/1.0 (Android wine cellar app)")
-            }
-            if (conn.responseCode !in 200..299) return@withContext emptyList()
-            val html = conn.inputStream.bufferedReader().use { it.readText() }
-            WikipediaRegionsParser.parse(html, language).map { name ->
-                Region(id = "wp-$name", name = name, country = "France")
-            }
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
+    override suspend fun search(query: String): List<ProductInfo> =
+        WikidataClient.search(query, Settings.currentLanguageTag)
+
+    override suspend fun enrich(externalId: String): WineEnrichment? =
+        WikidataClient.enrich(externalId, Settings.currentLanguageTag)
+
+    override suspend fun listRegions(): List<Region> =
+        WikidataClient.listFrenchWineRegions(Settings.currentLanguageTag)
 }
 
 /**
@@ -341,7 +334,7 @@ private object WineMagProvider : WineDataProvider {
 actual fun wineDataProviders(): List<WineDataProvider> = listOf(
     OpenFoodFactsProvider, // free barcode, no key — first
     GrapeMindsProvider,    // text search + AI label analysis (Enterprise) — grapeminds.eu
+    WikidataProvider,      // SPARQL: search + enrich + FR wine regions
     WineMagProvider,       // static 2017 archive via Worker D1 — secondary search
     AiLabelProvider,       // label photo recognition (AI)
-    WikipediaProvider,     // region scraping
 )

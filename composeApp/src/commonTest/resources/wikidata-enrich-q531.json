@@ -1,0 +1,63 @@
+{
+  "head": {
+    "vars": ["itemLabel", "itemDescription", "countryLabel", "regionLabel", "grapeLabel"]
+  },
+  "results": {
+    "bindings": [
+      {
+        "itemLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Château Margaux"
+        },
+        "itemDescription": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "domaine viticole à Margaux"
+        },
+        "countryLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "France"
+        },
+        "regionLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Margaux"
+        },
+        "grapeLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Cabernet sauvignon"
+        }
+      },
+      {
+        "itemLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Château Margaux"
+        },
+        "itemDescription": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "domaine viticole à Margaux"
+        },
+        "countryLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "France"
+        },
+        "regionLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Margaux"
+        },
+        "grapeLabel": {
+          "xml:lang": "fr",
+          "type": "literal",
+          "value": "Merlot"
+        }
+      }
+    ]
+  }
+}
