@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """Convert INAO parcellaire shapefile to per-appellation GeoJSON + map pack zip.
 
 Requires: ogr2ogr (GDAL), zip
 
 Source: https://www.data.gouv.fr/datasets/delimitation-parcellaire-des-aoc-viticoles-de-linao/
-Licence: Licence Ouverte 2.0 — attribution INAO / IGN required in app.
+Licence: Licence Ouverte 2.0 - attribution INAO / IGN required in app.
 
 Usage:
   python scripts/catalog/ingest-inao-geo.py --shp /path/to/parcellaire.shp
@@ -66,7 +67,7 @@ def zip_pack() -> None:
     with zipfile.ZipFile(ZIP_OUT, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(GEO_DIR.glob("*.geojson")):
             zf.write(path, arcname=path.name)
-    print(f"Packed ? {ZIP_OUT} ({ZIP_OUT.stat().st_size // 1024} KiB)")
+    print(f"Packed -> {ZIP_OUT} ({ZIP_OUT.stat().st_size // 1024} KiB)")
 
 
 def main() -> None:
@@ -78,7 +79,7 @@ def main() -> None:
         sys.exit(1)
 
     combined = OUT_DIR / "inao-parcellaire-all.geojson"
-    print("Converting shapefile…")
+    print("Converting shapefile...")
     run_ogr2ogr(args.shp, combined)
     n = split_by_id_app(combined)
     print(f"Split {n} appellations")

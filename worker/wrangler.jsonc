@@ -31,6 +31,6 @@
   ],
 
   // Optional: WineMag archive (D1) + appellations map pack (R2). Created via scripts/catalog/.
-  // "d1_databases": [{ "binding": "CATALOG_DB", "database_name": "vincent-catalog", "database_id": "<id>" }],
+  "d1_databases": [{ "binding": "CATALOG_DB", "database_name": "vincent-catalog", "database_id": "c5b2a017-ef54-421d-97e9-553f08f9f045" }],
   "r2_buckets": [{ "binding": "MAP_PACK", "bucket_name": "vincent-map-pack" }]
 }
