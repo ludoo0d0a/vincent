@@ -2,6 +2,10 @@ package fr.geoking.vincent.data
 
 import androidx.compose.runtime.Composable
 
+/** Opens a system file picker and returns the chosen JSON reference-data file text. */
+@Composable
+expect fun rememberJsonImport(onLoading: (Boolean) -> Unit = {}, onText: (String) -> Unit): () -> Unit
+
 /** Opens a system file picker and returns the chosen file's text content. */
 @Composable
 expect fun rememberCsvImport(onLoading: (Boolean) -> Unit = {}, onText: (String) -> Unit): () -> Unit

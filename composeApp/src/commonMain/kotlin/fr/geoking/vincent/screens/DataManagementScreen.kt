@@ -48,6 +48,8 @@ import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Producers
 import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.Regions
+import fr.geoking.vincent.data.Grapes
+import fr.geoking.vincent.data.Appellations
 import fr.geoking.vincent.data.Suppliers
 import fr.geoking.vincent.data.Tastings
 import fr.geoking.vincent.data.PlocImport
@@ -97,6 +99,8 @@ fun DataManagementScreen(
     onOpenProducers: () -> Unit,
     onOpenSuppliers: () -> Unit,
     onOpenRegions: () -> Unit,
+    onOpenGrapes: () -> Unit,
+    onOpenAppellations: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val labelSaver = rememberLabelImageSaver()
@@ -377,6 +381,16 @@ fun DataManagementScreen(
                     label = stringResource(Res.string.data_management_regions),
                     sublabel = pluralStringResource(Res.plurals.regions_management_subtitle, Regions.all.size, Regions.all.size),
                     onClick = onOpenRegions,
+                )
+                DataLink(
+                    label = stringResource(Res.string.data_management_grapes),
+                    sublabel = pluralStringResource(Res.plurals.grapes_management_subtitle, Grapes.all.size, Grapes.all.size),
+                    onClick = onOpenGrapes,
+                )
+                DataLink(
+                    label = stringResource(Res.string.data_management_appellations),
+                    sublabel = pluralStringResource(Res.plurals.appellations_management_subtitle, Appellations.all.size, Appellations.all.size),
+                    onClick = onOpenAppellations,
                 )
             }
 

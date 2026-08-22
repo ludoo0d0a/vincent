@@ -2,10 +2,12 @@ package fr.geoking.vincent.data
 
 import fr.geoking.vincent.getCurrentTimeMillis
 import fr.geoking.vincent.model.AddSource
+import fr.geoking.vincent.model.Appellation
 import fr.geoking.vincent.model.ArMode
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.BottlePhotoKind
 import fr.geoking.vincent.model.FlavorProfile
+import fr.geoking.vincent.model.Grape
 import fr.geoking.vincent.model.NormPoint
 import fr.geoking.vincent.model.Producer
 import fr.geoking.vincent.model.Rack
@@ -44,6 +46,8 @@ data class VincentManifestDto(
     val producers: List<ProducerDto> = emptyList(),
     val suppliers: List<SupplierDto> = emptyList(),
     val regions: List<RegionDto> = emptyList(),
+    val grapes: List<GrapeDto> = emptyList(),
+    val appellations: List<AppellationDto> = emptyList(),
 )
 
 @Serializable data class FlavorProfileDto(
@@ -175,6 +179,25 @@ data class VincentManifestDto(
     val description: String = "",
 )
 
+@Serializable data class GrapeDto(
+    val id: String,
+    val name: String,
+    val color: String = "",
+    val vivcNumber: Int = 0,
+    val country: String = "",
+    val aliases: List<String> = emptyList(),
+)
+
+@Serializable data class AppellationDto(
+    val id: String,
+    val name: String,
+    val sign: String = "",
+    val category: String = "",
+    val department: String = "",
+    val inaoId: Int = 0,
+    val geoAsset: String = "",
+)
+
 fun encodeVincentManifest(manifest: VincentManifestDto): String =
     backupJson.encodeToString(VincentManifestDto.serializer(), manifest)
 
@@ -190,6 +213,8 @@ fun buildManifestDto(includePhotos: Boolean): VincentManifestDto = VincentManife
     producers = Producers.all.map { it.toDto() },
     suppliers = Suppliers.all.map { it.toDto() },
     regions = Regions.all.map { it.toDto() },
+    grapes = Grapes.all.map { it.toDto() },
+    appellations = Appellations.all.map { it.toDto() },
 )
 
 private fun Bottle.toDto() = BottleDto(
@@ -277,6 +302,10 @@ private fun Supplier.toDto() = SupplierDto(id, name, type, website, email, phone
 
 private fun Region.toDto() = RegionDto(id, name, country, description)
 
+private fun Grape.toDto() = GrapeDto(id, name, color, vivcNumber, country, aliases)
+
+private fun Appellation.toDto() = AppellationDto(id, name, sign, category, department, inaoId, geoAsset)
+
 fun VincentManifestDto.toDomain(): VincentBackupData = VincentBackupData(
     bottles = bottles.map { it.toDomain() },
     racks = racks.map { it.toDomain() },
@@ -284,6 +313,8 @@ fun VincentManifestDto.toDomain(): VincentBackupData = VincentBackupData(
     producers = producers.map { it.toDomain() },
     suppliers = suppliers.map { it.toDomain() },
     regions = regions.map { it.toDomain() },
+    grapes = grapes.map { it.toDomain() },
+    appellations = appellations.map { it.toDomain() },
     includesPhotos = includesPhotos,
 )
 
@@ -294,6 +325,8 @@ data class VincentBackupData(
     val producers: List<Producer>,
     val suppliers: List<Supplier>,
     val regions: List<Region>,
+    val grapes: List<Grape>,
+    val appellations: List<Appellation>,
     val includesPhotos: Boolean,
 )
 
@@ -382,6 +415,10 @@ private fun ProducerDto.toDomain() = Producer(id, name, region, country, website
 private fun SupplierDto.toDomain() = Supplier(id, name, type, website, email, phone)
 
 private fun RegionDto.toDomain() = Region(id, name, country, description)
+
+private fun GrapeDto.toDomain() = Grape(id, name, color, vivcNumber, country, aliases)
+
+private fun AppellationDto.toDomain() = Appellation(id, name, sign, category, department, inaoId, geoAsset)
 
 private inline fun <reified T : Enum<T>> enumOr(default: T, raw: String): T =
     runCatching { enumValueOf<T>(raw) }.getOrDefault(default)

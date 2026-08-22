@@ -22,6 +22,7 @@ sceneview = "4.18.0"
 boofcv = "1.1.4"
 mediapipeTasksGenai = "0.10.27"
 securityCrypto = "1.1.0-alpha06"
+osmdroid = "6.1.20"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
@@ -63,6 +64,7 @@ boofcv-android = { module = "org.boofcv:boofcv-android", version.ref = "boofcv" 
 # On-device Gemma via MediaPipe LLM Inference (maintenance mode; LiteRT-LM later).
 google-mediapipe-tasks-genai = { module = "com.google.mediapipe:tasks-genai", version.ref = "mediapipeTasksGenai" }
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
+osmdroid-android = { module = "org.osmdroid:osmdroid-android", version.ref = "osmdroid" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

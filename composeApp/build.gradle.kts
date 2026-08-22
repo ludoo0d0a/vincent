@@ -91,6 +91,7 @@ kotlin {
             implementation(libs.boofcv.android)
             implementation(libs.google.mediapipe.tasks.genai)
             implementation(libs.androidx.security.crypto)
+            implementation(libs.osmdroid.android)
         }
     }
 }

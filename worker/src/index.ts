@@ -10,6 +10,8 @@
 
 export interface Env {
   AI_KV: KVNamespace;
+  CATALOG_DB?: D1Database;
+  MAP_PACK?: R2Bucket;
   GEMINI_API_KEY: string;
   GRAPEMINDS_API_KEY: string;
   GRAPEMINDS_API_URL: string;
@@ -44,10 +46,11 @@ export default {
     }
 
     const isGrapeminds = url.pathname.startsWith("/v1/grapeminds");
+    const isCatalog = url.pathname.startsWith("/v1/catalog");
 
     if (
       (request.method !== "POST" || (url.pathname !== "/v1/generate" && url.pathname !== "/v1/grapeminds")) &&
-      (request.method !== "GET" || !isGrapeminds)
+      (request.method !== "GET" || (!isGrapeminds && !isCatalog))
     ) {
       return json({ error: { message: "Not found", status: "NOT_FOUND" } }, 404);
     }
@@ -83,8 +86,11 @@ export default {
       }
     }
 
-    // 3. Handle Grapeminds GET before parsing standard payload.
+    // 3. Handle catalogue + Grapeminds GET before parsing standard payload.
     if (request.method === "GET") {
+      if (isCatalog) {
+        return handleCatalogGet(request, url, env);
+      }
       if (isGrapeminds) {
         return handleGrapemindsGet(request, url, env, quotaHeadersFor);
       }
@@ -219,6 +225,57 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 // ---- handlers --------------------------------------------------------------
+
+async function handleCatalogGet(request: Request, url: URL, env: Env): Promise<Response> {
+  const sub = url.pathname.slice("/v1/catalog".length);
+  if (sub === "/search" || sub === "/search/") {
+    return handleWineMagSearch(url, env);
+  }
+  if (sub === "/map-pack" || sub === "/map-pack/") {
+    return handleMapPack(env);
+  }
+  return json({ error: { message: "Not found", status: "NOT_FOUND" } }, 404);
+}
+
+async function handleWineMagSearch(url: URL, env: Env): Promise<Response> {
+  const db = env.CATALOG_DB;
+  if (!db) {
+    return json({ error: { message: "Catalog DB not configured", status: "FAILED_PRECONDITION" } }, 503);
+  }
+  const q = (url.searchParams.get("q") || "").trim();
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "20", 10) || 20, 50);
+  if (q.length < 2) {
+    return json({ data: [] });
+  }
+  const like = `%${q.replace(/[%_]/g, "")}%`;
+  const { results } = await db
+    .prepare(
+      `SELECT title, winery, region_1, province, country, variety, color, points, price, description
+       FROM winemag
+       WHERE title LIKE ?1 OR winery LIKE ?1 OR region_1 LIKE ?1 OR variety LIKE ?1
+       LIMIT ?2`,
+    )
+    .bind(like, limit)
+    .all();
+  return json({ data: results ?? [] });
+}
+
+async function handleMapPack(env: Env): Promise<Response> {
+  const bucket = env.MAP_PACK;
+  if (!bucket) {
+    return json({ error: { message: "Map pack not configured", status: "FAILED_PRECONDITION" } }, 503);
+  }
+  const obj = await bucket.get("appellations-map-fr.zip");
+  if (!obj) {
+    return json({ error: { message: "Map pack missing", status: "NOT_FOUND" } }, 404);
+  }
+  return new Response(obj.body, {
+    headers: {
+      "content-type": "application/zip",
+      "cache-control": "public, max-age=86400",
+    },
+  });
+}
 
 async function handleGrapemindsGet(request: Request, url: URL, env: Env, quotaHeadersFor: Function): Promise<Response> {
   // Extract the subpath after /v1/grapeminds

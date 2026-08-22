@@ -1,0 +1,49 @@
+name: Catalog ingest (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to ingest
+        required: true
+        type: choice
+        options:
+          - winemag-d1
+          - vivc-popular
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install VIVC tooling
+        if: inputs.target == 'vivc-popular'
+        run: pip install vivcpy
+
+      - name: Generate popular grapes JSON
+        if: inputs.target == 'vivc-popular'
+        run: python scripts/catalog/ingest-vivc.py --popular-only
+
+      - name: Upload popular grapes artifact
+        if: inputs.target == 'vivc-popular'
+        uses: actions/upload-artifact@v4
+        with:
+          name: grapes-popular
+          path: composeApp/src/commonMain/composeResources/files/grapes-popular.json
+
+      - name: WineMag D1 ingest
+        if: inputs.target == 'winemag-d1'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WINEMAG_CSV_PATH: ${{ secrets.WINEMAG_CSV_PATH }}
+        run: |
+          echo "Download winemag CSV to scripts/catalog/data/ and configure D1 in worker/wrangler.jsonc before running ingest-winemag.py"
+          pip install csv
+          test -f scripts/catalog/data/winemag-data-130k-v2.csv || exit 1
+          npm ci --prefix worker
+          python scripts/catalog/ingest-winemag.py

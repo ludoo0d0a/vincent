@@ -63,6 +63,9 @@ import fr.geoking.vincent.screens.RecentScreen
 import fr.geoking.vincent.screens.SettingsScreen
 import fr.geoking.vincent.screens.DataManagementScreen
 import fr.geoking.vincent.screens.RegionsManagementScreen
+import fr.geoking.vincent.screens.GrapesManagementScreen
+import fr.geoking.vincent.screens.AppellationsManagementScreen
+import fr.geoking.vincent.screens.OriginsMapScreen
 import fr.geoking.vincent.screens.TastingEditScreen
 import fr.geoking.vincent.screens.TastingsScreen
 import fr.geoking.vincent.screens.ProducersScreen
@@ -92,6 +95,9 @@ private sealed interface Dest {
     data object WinesManagement : Dest
     data object RacksManagement : Dest
     data object RegionsManagement : Dest
+    data object GrapesManagement : Dest
+    data object AppellationsManagement : Dest
+    data object OriginsMap : Dest
     data object Tastings : Dest
     data object Producers : Dest
     data object Suppliers : Dest
@@ -207,11 +213,19 @@ fun App() = VincentTheme {
                     onOpenProducers = { stack.add(Dest.Producers) },
                     onOpenSuppliers = { stack.add(Dest.Suppliers) },
                     onOpenRegions = { stack.add(Dest.RegionsManagement) },
+                    onOpenGrapes = { stack.add(Dest.GrapesManagement) },
+                    onOpenAppellations = { stack.add(Dest.AppellationsManagement) },
                 )
 
                 Dest.WinesManagement -> WinesManagementScreen(onBack = ::pop)
                 Dest.RacksManagement -> RacksManagementScreen(onBack = ::pop)
                 Dest.RegionsManagement -> RegionsManagementScreen(onBack = ::pop)
+                Dest.GrapesManagement -> GrapesManagementScreen(onBack = ::pop)
+                Dest.AppellationsManagement -> AppellationsManagementScreen(
+                    onBack = ::pop,
+                    onOpenOriginsMap = { stack.add(Dest.OriginsMap) },
+                )
+                Dest.OriginsMap -> OriginsMapScreen(onBack = ::pop)
 
                 Dest.Tastings -> TastingsScreen(onBack = ::pop)
                 Dest.Producers -> ProducersScreen(onBack = ::pop)

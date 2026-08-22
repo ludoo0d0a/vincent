@@ -329,9 +329,19 @@ private fun JSONObject.frontImageUrl(): String? {
     return null
 }
 
+private object WineMagProvider : WineDataProvider {
+    override val id = "winemag"
+    override val displayName = "WineMag archive"
+    override val capabilities = setOf(ProviderCapability.TEXT_SEARCH)
+
+    override suspend fun search(query: String): List<ProductInfo> =
+        WineMagClient.search(query)
+}
+
 actual fun wineDataProviders(): List<WineDataProvider> = listOf(
     OpenFoodFactsProvider, // free barcode, no key — first
     GrapeMindsProvider,    // text search + AI label analysis (Enterprise) — grapeminds.eu
+    WineMagProvider,       // static 2017 archive via Worker D1 — secondary search
     AiLabelProvider,       // label photo recognition (AI)
     WikipediaProvider,     // region scraping
 )

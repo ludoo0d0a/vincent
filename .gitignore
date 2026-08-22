@@ -17,6 +17,10 @@ scripts/.keystore-credentials
 scripts/.play-service-account.json
 scripts/.adb-wireless
 
+# Reference catalogue ingest outputs (large; regenerate via scripts/catalog/)
+scripts/catalog/out/
+scripts/catalog/data/
+
 # Cloudflare Worker (AI proxy) — local build and local dev secrets
 .wrangler/
 worker/.dev.vars

@@ -537,6 +537,50 @@
     <string name="import_cellartracker">CellarTracker</string>
     <string name="import_ploc">PLOC</string>
     <string name="import_vincent">Vincent</string>
+
+    <string name="data_management_grapes">Grape varieties</string>
+    <plurals name="grapes_management_subtitle">
+        <item quantity="one">%1$d grape registered</item>
+        <item quantity="other">%1$d grapes registered</item>
+    </plurals>
+    <string name="grapes_management_title">Grape dictionary</string>
+    <string name="grapes_management_import_desc">Import the full VIVC dump (JSON). ~50 popular grapes are preloaded on first launch.</string>
+    <string name="grapes_management_import_vivc">Import VIVC (JSON)</string>
+    <plurals name="grapes_import_success">
+        <item quantity="one">%1$d grape imported</item>
+        <item quantity="other">%1$d grapes imported</item>
+    </plurals>
+
+    <string name="data_management_appellations">Appellations</string>
+    <plurals name="appellations_management_subtitle">
+        <item quantity="one">%1$d appellation registered</item>
+        <item quantity="other">%1$d appellations registered</item>
+    </plurals>
+    <string name="appellations_management_title">Appellations (INAO)</string>
+    <string name="appellations_management_import_desc">Import the INAO SIQO list (JSON) and download the France map pack (GeoJSON).</string>
+    <string name="appellations_management_import_siqo">Import SIQO (JSON)</string>
+    <string name="appellations_management_download_map">Download France map pack</string>
+    <plurals name="appellations_import_success">
+        <item quantity="one">%1$d appellation imported</item>
+        <item quantity="other">%1$d appellations imported</item>
+    </plurals>
+    <string name="appellations_map_download_success">Map pack downloaded (%1$d KB).</string>
+    <string name="appellations_map_download_error">Map pack download failed.</string>
+    <string name="appellations_attribution">Data: INAO (Licence Ouverte), IGN/Géoportail, OpenStreetMap (ODbL). Informative map only — not legally binding.</string>
+    <string name="reference_import_error">Invalid or unreadable JSON file.</string>
+
+    <string name="origins_map_title">Origins map</string>
+    <string name="origins_map_subtitle">%1$d appellations in reference</string>
+    <string name="origins_map_search">Search an appellation…</string>
+    <string name="origins_map_open">Open origins map</string>
+    <string name="origins_map_pack_missing">Map pack not downloaded — import from Appellations.</string>
+    <string name="origins_map_select_appellation">Select an appellation to show its boundary.</string>
+
+    <string name="catalog_source_archive_2017">Archive 2017</string>
+
+    <string name="settings_data_licenses_title">Data sources &amp; licenses</string>
+    <string name="settings_data_licenses_body">VIVC (Röckel et al., vivc.de) · INAO SIQO (Licence Ouverte 2.0) · OpenStreetMap (ODbL) · WineMag Kaggle 2017 archive (informational, no enrichment).</string>
+
     <string name="export_wines_button">Export wines to CSV</string>
     <string name="export_racks_button">Export racks to CSV</string>
     <string name="export_tastings_button">Export tastings to CSV</string>

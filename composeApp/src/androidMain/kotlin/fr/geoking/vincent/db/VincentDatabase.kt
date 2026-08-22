@@ -11,12 +11,31 @@ import androidx.room.RoomDatabase
         ProducerEntity::class,
         SupplierEntity::class,
         RegionEntity::class,
+        GrapeEntity::class,
+        AppellationEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class VincentDatabase : RoomDatabase() {
     companion object {
+        val MIGRATION_14_15 = object : androidx.room.migration.Migration(14, 15) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `grapes` (" +
+                        "`id` TEXT NOT NULL, `name` TEXT NOT NULL, `color` TEXT NOT NULL, " +
+                        "`vivcNumber` INTEGER NOT NULL, `country` TEXT NOT NULL, " +
+                        "`aliases` TEXT NOT NULL, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `appellations` (" +
+                        "`id` TEXT NOT NULL, `name` TEXT NOT NULL, `sign` TEXT NOT NULL, " +
+                        "`category` TEXT NOT NULL, `department` TEXT NOT NULL, " +
+                        "`inaoId` INTEGER NOT NULL, `geoAsset` TEXT NOT NULL, PRIMARY KEY(`id`))",
+                )
+            }
+        }
+
         val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE bottles ADD COLUMN alcoholLevel REAL NOT NULL DEFAULT 0.0")
@@ -49,4 +68,6 @@ abstract class VincentDatabase : RoomDatabase() {
     abstract fun producerDao(): ProducerDao
     abstract fun supplierDao(): SupplierDao
     abstract fun regionDao(): RegionDao
+    abstract fun grapeDao(): GrapeDao
+    abstract fun appellationDao(): AppellationDao
 }

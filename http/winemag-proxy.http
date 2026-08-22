@@ -1,0 +1,34 @@
+### WineMag archive search — Worker + D1
+#
+# Requires CATALOG_DB bound on the Worker and data loaded via scripts/catalog/ingest-winemag.py
+# Same auth as grapeminds proxy: Firebase ID token + App Check.
+#
+# Environment: grapeminds — http-client.env.json (reuse proxy base URL + tokens)
+
+### Search catalogue archive
+GET {{baseUrl}}/v1/catalog/search?q=margaux&limit=10
+X-Firebase-AppCheck: {{appCheckToken}}
+Authorization: Bearer {{firebaseIdToken}}
+Accept: application/json
+
+> {%
+    client.test("200 or 503 if D1 not configured", function () {
+        client.assert([200, 503].includes(response.status), "unexpected status " + response.status);
+    });
+    if (response.status === 200) {
+        client.test("data array", function () {
+            client.assert(Array.isArray(response.body.data), "missing data array");
+        });
+    }
+%}
+
+### Download France appellations map pack (R2)
+GET {{baseUrl}}/v1/catalog/map-pack
+X-Firebase-AppCheck: {{appCheckToken}}
+Authorization: Bearer {{firebaseIdToken}}
+
+> {%
+    client.test("200 or 503/404 when pack not deployed", function () {
+        client.assert([200, 404, 503].includes(response.status), "status " + response.status);
+    });
+%}

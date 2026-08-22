@@ -11,6 +11,7 @@ alwaysApply: false
 - **`Cellar.kt`** — in-memory SSOT (Compose snapshot state); all UI reads/writes here.
 - **`CellarRepository`** (common) → **`RoomCellarRepository`** (android) over `VincentDatabase`.
 - Entities/DAOs in `androidMain/.../db/` (`BottleEntity`, `BottleDao`, migrations in `VincentDatabase.kt`).
+- Reference tables: **`GrapeEntity`**, **`AppellationEntity`** (v15) + SSOT **`Grapes.kt`**, **`Appellations.kt`**.
 - Enums stored by name — no TypeConverter.
 
 ## Wine lookup (`ProductLookup.kt`)
@@ -19,9 +20,18 @@ Providers implement `WineDataProvider`. Order set in `ProductLookup.android.kt` 
 
 1. Open Food Facts (`BARCODE_SCAN`) — no key
 2. grapeminds (`TEXT_SEARCH`, `LABEL_SCAN`, `ENRICH`, `LIST_*`) — `GRAPEMINDS_API_KEY`; typed client `GrapeMindsClient.kt`
-3. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
+3. WineMag archive (`TEXT_SEARCH` only) — `WineMagClient.kt` → Worker `/v1/catalog/search` (D1); **no ENRICH**
+4. AI Label / Gemini (`LABEL_SCAN`) — `AI_PROXY_URL` (prod) or `GEMINI_API_KEY` (debug)
+5. Wikipedia (`LIST_REGIONS`) — HTML scrape
 
-Routing: barcode → first non-null; text search → merge results. `WineDataSource.enrich()` fills rich fields from grapeminds.
+Routing: barcode → first non-null; text search → merge results. `WineDataSource.enrich()` fills rich fields from grapeminds only.
+
+## Reference data import
+
+- **`ReferenceDataImport.kt`** — parse VIVC / INAO JSON
+- **`GrapeSeed.kt`** — load bundled `composeResources/files/grapes-popular.json` on bootstrap
+- **`MapPackDownload.android.kt`** — optional France GeoJSON zip from Worker
+- Ingest scripts: `scripts/catalog/ingest-{vivc,inao-siqo,inao-geo,winemag}.py`
 
 ## AI (`ai/`)
 
@@ -36,9 +46,9 @@ Routing: barcode → first non-null; text search → merge results. `WineDataSou
 ## Other data modules
 
 - **Auth** — `Auth.kt` + `GoogleSignIn.android.kt`, Firebase Auth
-- **CloudSync** — Firestore `users/{uid}/…`, last-write-wins
+- **CloudSync** — Firestore `users/{uid}/…`, last-write-wins (producers/suppliers; not grapes/appellations)
 - **CsvFormat** — import/export (Vincent / Vivino / PLOC tolerant mapping)
-- **FileTransfer** — Storage Access Framework (expect/actual)
+- **FileTransfer** — Storage Access Framework (expect/actual) + `rememberJsonImport`
 
 ## Adding a provider
 

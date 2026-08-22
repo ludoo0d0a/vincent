@@ -220,6 +220,27 @@ data class Region(
     val description: String = "",
 )
 
+/** Grape variety from VIVC or user import. */
+data class Grape(
+    val id: String,
+    val name: String,
+    val color: String = "",
+    val vivcNumber: Int = 0,
+    val country: String = "",
+    val aliases: List<String> = emptyList(),
+)
+
+/** French AOC/AOP/IGP appellation from INAO SIQO (+ optional map asset). */
+data class Appellation(
+    val id: String,
+    val name: String,
+    val sign: String = "",
+    val category: String = "",
+    val department: String = "",
+    val inaoId: Int = 0,
+    val geoAsset: String = "",
+)
+
 data class Supplier(
     val id: String,
     val name: String,

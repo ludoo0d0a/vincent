@@ -564,6 +564,49 @@
     <string name="import_ploc">PLOC</string>
     <string name="import_vincent">Vincent</string>
 
+    <string name="data_management_grapes">Cépages</string>
+    <plurals name="grapes_management_subtitle">
+        <item quantity="one">%1$d cépage enregistré</item>
+        <item quantity="other">%1$d cépages enregistrés</item>
+    </plurals>
+    <string name="grapes_management_title">Référentiel cépages</string>
+    <string name="grapes_management_import_desc">Importez le dump VIVC complet (JSON). Les ~50 cépages populaires sont préchargés au premier lancement.</string>
+    <string name="grapes_management_import_vivc">Importer VIVC (JSON)</string>
+    <plurals name="grapes_import_success">
+        <item quantity="one">%1$d cépage importé</item>
+        <item quantity="other">%1$d cépages importés</item>
+    </plurals>
+
+    <string name="data_management_appellations">Appellations</string>
+    <plurals name="appellations_management_subtitle">
+        <item quantity="one">%1$d appellation enregistrée</item>
+        <item quantity="other">%1$d appellations enregistrées</item>
+    </plurals>
+    <string name="appellations_management_title">Appellations (INAO)</string>
+    <string name="appellations_management_import_desc">Importez la liste SIQO INAO (JSON) et téléchargez le pack cartographique France (GeoJSON).</string>
+    <string name="appellations_management_import_siqo">Importer SIQO (JSON)</string>
+    <string name="appellations_management_download_map">Télécharger le pack carto France</string>
+    <plurals name="appellations_import_success">
+        <item quantity="one">%1$d appellation importée</item>
+        <item quantity="other">%1$d appellations importées</item>
+    </plurals>
+    <string name="appellations_map_download_success">Pack carto téléchargé (%1$d Ko).</string>
+    <string name="appellations_map_download_error">Échec du téléchargement du pack carto.</string>
+    <string name="appellations_attribution">Données : INAO (Licence Ouverte), IGN/Géoportail, OpenStreetMap (ODbL). Carte informative — sans valeur juridique.</string>
+    <string name="reference_import_error">Fichier JSON invalide ou illisible.</string>
+
+    <string name="origins_map_title">Carte des origines</string>
+    <string name="origins_map_subtitle">%1$d appellations en référentiel</string>
+    <string name="origins_map_search">Rechercher une appellation…</string>
+    <string name="origins_map_open">Ouvrir la carte des origines</string>
+    <string name="origins_map_pack_missing">Pack carto non téléchargé — importez depuis Appellations.</string>
+    <string name="origins_map_select_appellation">Sélectionnez une appellation pour afficher son contour.</string>
+
+    <string name="catalog_source_archive_2017">Archive 2017</string>
+
+    <string name="settings_data_licenses_title">Sources &amp; licences</string>
+    <string name="settings_data_licenses_body">VIVC (Röckel et al., vivc.de) · INAO SIQO (Licence Ouverte 2.0) · OpenStreetMap (ODbL) · WineMag archive Kaggle 2017 (usage informatif, sans enrichissement).</string>
+
     <string name="export_wines_button">Exporter les vins en CSV</string>
     <string name="export_racks_button">Exporter les casiers en CSV</string>
     <string name="export_tastings_button">Exporter les dégustations en CSV</string>

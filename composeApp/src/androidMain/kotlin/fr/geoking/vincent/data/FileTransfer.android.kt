@@ -80,6 +80,28 @@ private fun decodeCsvText(bytes: ByteArray): String? = try {
 }
 
 @Composable
+actual fun rememberJsonImport(onLoading: (Boolean) -> Unit, onText: (String) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                onLoading(true)
+                try {
+                    val text = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.decodeToString()
+                    }
+                    if (text != null) onText(text)
+                } finally {
+                    onLoading(false)
+                }
+            }
+        }
+    }
+    return { launcher.launch("application/json") }
+}
+
+@Composable
 actual fun rememberCsvExport(
     filename: String,
     content: () -> String,

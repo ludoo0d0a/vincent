@@ -17,6 +17,8 @@ data class VincentImportResult(
     val producers: Int,
     val suppliers: Int,
     val regions: Int,
+    val grapes: Int,
+    val appellations: Int,
     val photosRestored: Int,
 )
 
@@ -100,6 +102,8 @@ object VincentBackup {
         Producers.import(data.producers)
         Suppliers.import(data.suppliers)
         Regions.import(data.regions)
+        Grapes.import(data.grapes)
+        Appellations.import(data.appellations)
 
         VincentImportResult(
             bottles = bottles.size,
@@ -108,6 +112,8 @@ object VincentBackup {
             producers = data.producers.size,
             suppliers = data.suppliers.size,
             regions = data.regions.size,
+            grapes = data.grapes.size,
+            appellations = data.appellations.size,
             photosRestored = photosRestored,
         )
     }
@@ -120,6 +126,8 @@ object VincentBackup {
         Producers.clearAll()
         Suppliers.clearAll()
         Regions.clearAll()
+        Grapes.clearAll()
+        Appellations.clearAll()
     }
 
     private suspend fun embedPhoto(

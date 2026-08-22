@@ -285,6 +285,16 @@ fun SettingsScreen(
                 SettingsLink(stringResource(Res.string.settings_internal_logs_view), onOpenLogcat)
             }
 
+            Spacer(Modifier.height(16.dp))
+            SectionHeader(stringResource(Res.string.settings_data_licenses_title))
+            Text(
+                stringResource(Res.string.settings_data_licenses_body),
+                fontSize = 11.5.sp,
+                color = VincentColors.Muted,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+
             Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
                 Text(getAppVersion(), fontSize = 11.sp, color = VincentColors.Faint, fontWeight = FontWeight.W600)
             }

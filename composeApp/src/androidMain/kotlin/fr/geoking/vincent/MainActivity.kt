@@ -147,13 +147,15 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             VincentDatabase::class.java,
             "vincent.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, VincentDatabase.MIGRATION_9_10, MIGRATION_10_11, VincentDatabase.MIGRATION_11_12, VincentDatabase.MIGRATION_12_13, VincentDatabase.MIGRATION_13_14).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, VincentDatabase.MIGRATION_9_10, MIGRATION_10_11, VincentDatabase.MIGRATION_11_12, VincentDatabase.MIGRATION_12_13, VincentDatabase.MIGRATION_13_14, VincentDatabase.MIGRATION_14_15).build()
         val repository = RoomCellarRepository(db.bottleDao())
         val rackRepo = RoomRackRepository(db.rackDao())
         val tastingRepo = RoomTastingRepository(db.tastingDao())
         val producerRepo = RoomProducerRepository(db.producerDao())
         val supplierRepo = RoomSupplierRepository(db.supplierDao())
         val regionRepo = RoomRegionRepository(db.regionDao())
+        val grapeRepo = RoomGrapeRepository(db.grapeDao())
+        val appellationRepo = RoomAppellationRepository(db.appellationDao())
 
         Settings.init(applicationContext)
         fr.geoking.vincent.ai.GemmaModel.init(applicationContext)
@@ -174,6 +176,8 @@ class MainActivity : ComponentActivity() {
             Producers.bootstrap(producerRepo)
             Suppliers.bootstrap(supplierRepo)
             Regions.bootstrap(regionRepo)
+            Grapes.bootstrap(grapeRepo) { loadBundledPopularGrapes() }
+            Appellations.bootstrap(appellationRepo)
             if (shouldSeed) {
                 Settings.setDemoDataSeeded(true)
             }

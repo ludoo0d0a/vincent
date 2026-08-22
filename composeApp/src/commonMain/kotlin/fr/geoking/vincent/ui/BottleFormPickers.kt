@@ -46,6 +46,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geoking.vincent.data.Grapes
+import fr.geoking.vincent.data.PopularGrapeNames
 import fr.geoking.vincent.getCurrentYear
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
@@ -85,10 +87,8 @@ val AllAlcoholLevels: List<Double> = buildList {
     }
 }
 
-val PopularGrapes = listOf(
-    "Cabernet Sauvignon", "Merlot", "Pinot Noir", "Syrah", "Grenache", "Chardonnay",
-    "Sauvignon Blanc", "Chenin", "Riesling", "Gamay", "Viognier",
-)
+/** @deprecated use [PopularGrapeNames] — kept for call sites in this file. */
+val PopularGrapes = PopularGrapeNames
 
 @Composable
 fun CollapsibleSection(
@@ -475,12 +475,16 @@ fun GrapeChipEditor(
     onChange: (List<String>) -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
+    val quickSuggestions = remember(draft, Grapes.all.size) {
+        if (draft.trim().length >= 2) Grapes.suggestionNames(draft, 8)
+        else PopularGrapes.filter { it !in grapes }.take(6)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PopularGrapes.filter { it !in grapes }.take(6).forEach { g ->
+            quickSuggestions.filter { it !in grapes }.take(6).forEach { g ->
                 Chip(text = g, selected = false, onClick = { onChange(grapes + g) })
             }
         }

@@ -1062,6 +1062,14 @@ private fun resolveGrapemindsDrinkYear(raw: Int, vintageYear: Int?): Int {
     return vintageYear?.plus(raw) ?: 0
 }
 
+private fun productColor(category: String): WineColor? = when (category.lowercase()) {
+    "white" -> WineColor.WHITE
+    "rose", "rosé" -> WineColor.ROSE
+    "sparkling" -> WineColor.SPARKLING
+    "red" -> WineColor.RED
+    else -> null
+}
+
 private fun categoryFromRegionName(region: String): WineCategory {
     val v = region.lowercase()
     return when {
@@ -1091,6 +1099,8 @@ internal data class WineSuggestion(
     val externalSource: String? = null,
     val grape: String? = null,
     val region: String? = null,
+    /** WineMag / static catalogue row — no enrich, show archive badge. */
+    val archive2017: Boolean = false,
 )
 
 /** Suggestions for the add form: local cellar bottles first, then the wine catalogue. */
@@ -1115,6 +1125,7 @@ internal suspend fun searchWineSuggestions(query: String): List<WineSuggestion> 
         WineSuggestion(
             domain = p.brand.ifBlank { p.name },
             appellation = (if (p.brand.isNotBlank()) p.name else regionName).ifBlank { p.name },
+            color = productColor(p.category),
             category = regionName.takeIf { it.isNotBlank() }?.let { categoryFromRegionName(it) },
             vintage = p.vintage.orEmpty(),
             source = p.source,
@@ -1122,6 +1133,7 @@ internal suspend fun searchWineSuggestions(query: String): List<WineSuggestion> 
             externalSource = p.externalSource,
             grape = p.grape,
             region = p.region,
+            archive2017 = p.source?.contains("WineMag", ignoreCase = true) == true,
         )
     }
     return (local + catalog)
@@ -1201,9 +1213,12 @@ internal fun AutocompleteField(
                         }
                         if (!s.source.isNullOrBlank()) {
                             Text(
-                                s.source,
-                                fontSize = 9.5.sp, fontWeight = FontWeight.W700, color = VincentColors.Accent,
+                                if (s.archive2017) stringResource(Res.string.catalog_source_archive_2017) else s.source,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.W700,
+                                color = VincentColors.Accent,
                                 maxLines = 1,
+                                modifier = Modifier.padding(start = 6.dp),
                             )
                         }
                     }
