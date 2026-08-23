@@ -72,6 +72,7 @@ import fr.geoking.vincent.model.effectiveDrinkTo
 import fr.geoking.vincent.model.hasDrinkWindow
 import fr.geoking.vincent.model.photo
 import fr.geoking.vincent.model.thumbnailUri
+import fr.geoking.vincent.model.wineCategoryFromText
 import fr.geoking.vincent.ai.rememberPhotoCapture
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.AlcoholQuickPicker
@@ -591,17 +592,7 @@ private fun SugarChipRow(selected: SugarLevel, onSelect: (SugarLevel) -> Unit) {
     }
 }
 
-private fun categoryFromRegion(region: String): WineCategory {
-    val v = region.lowercase()
-    return when {
-        "bourgogne" in v || "burgundy" in v -> WineCategory.BOURGOGNE
-        "rhône" in v || "rhone" in v -> WineCategory.RHONE
-        "provence" in v -> WineCategory.PROVENCE
-        "loire" in v -> WineCategory.LOIRE
-        "champagne" in v -> WineCategory.CHAMPAGNE
-        else -> WineCategory.BORDEAUX
-    }
-}
+private fun categoryFromRegion(region: String): WineCategory = wineCategoryFromText(region)
 
 private fun resolveGrapemindsDrinkYear(raw: Int, vintageYear: Int?): Int {
     if (raw <= 0) return 0

@@ -3,8 +3,8 @@ package fr.geoking.vincent.data
 import fr.geoking.vincent.model.AddSource
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.Tasting
-import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.wineCategoryFromText
 
 /** Minimal wine identity extracted from a PLOC caves / dégustations export. */
 data class PlocWineRef(
@@ -195,7 +195,7 @@ private fun PlocWineRef.toBottle(quantity: Int): Bottle {
         domain = name,
         appellation = name,
         color = color ?: WineColor.RED,
-        category = guessPlocCategory(name),
+        category = wineCategoryFromText(name),
         vintage = v,
         price = 0,
         quantity = quantity,
@@ -208,18 +208,6 @@ private fun PlocWineRef.toBottle(quantity: Int): Bottle {
         source = AddSource.MANUAL,
         addedLabel = "import PLOC",
     )
-}
-
-private fun guessPlocCategory(text: String): WineCategory {
-    val v = text.lowercase()
-    return when {
-        "bourgogne" in v || "burgundy" in v || "chablis" in v -> WineCategory.BOURGOGNE
-        "rhône" in v || "rhone" in v || "gigondas" in v -> WineCategory.RHONE
-        "provence" in v || "bandol" in v -> WineCategory.PROVENCE
-        "loire" in v || "sancerre" in v || "anjou" in v -> WineCategory.LOIRE
-        "champagne" in v || "brut" in v -> WineCategory.CHAMPAGNE
-        else -> WineCategory.BORDEAUX
-    }
 }
 
 internal fun plocSlug(s: String): String =

@@ -22,27 +22,32 @@ object CsvFormat {
 
     // Header aliases (lower-cased) used to locate a value across app formats.
     private val ALIASES = mapOf(
-        "domain" to listOf("domain", "domaine", "winery", "nom du vin", "producer", "producteur", "nom", "name"),
-        "appellation" to listOf("appellation", "wine name", "wine", "cuvée", "cuvee", "vin", "nom du vin"),
-        "color" to listOf("color", "colour", "couleur", "wine type", "type"),
+        "domain" to listOf("domain", "domaine", "winery", "producer", "producteur", "nom du vin", "nom", "name"),
+        "appellation" to listOf("appellation", "wine name", "wine", "cuvée", "cuvee", "vin"),
+        "color" to listOf("color", "colour", "couleur", "wine type"),
         "vintage" to listOf("vintage", "millésime", "millesime", "année", "annee", "year"),
-        "price" to listOf("price", "prix", "prix d'achat", "purchase price", "price paid"),
+        "price" to listOf(
+            "price", "prix", "prix d'achat", "purchase price", "price paid",
+            "estimation", "prix unitaire", "prix de vente",
+        ),
         "quantity" to listOf("stock (en cave)", "stock en cave", "quantity", "quantité", "quantite", "qty", "stock", "bottles", "nombre"),
         "rating" to listOf("rating", "note", "your rating", "score", "ma note"),
         "cellarSpot" to listOf("cellarspot", "casier", "emplacement", "location", "bin", "rangement"),
-        "provenance" to listOf("provenance", "region", "région", "country", "pays", "origine"),
-        "merchant" to listOf("merchant", "caviste", "magasin", "store", "vendor", "acheté chez"),
-        "purchaseDate" to listOf("purchasedate", "purchase date", "date", "date d'achat", "scan date"),
+        "provenance" to listOf("provenance", "region", "région", "origine"),
+        "country" to listOf("country", "pays"),
+        "merchant" to listOf("merchant", "caviste", "magasin", "store", "vendor", "acheté chez", "fournisseur"),
+        "purchaseDate" to listOf("purchasedate", "purchase date", "date d'achat", "scan date"),
         "occasion" to listOf("occasion", "usage"),
         "alcoholLevel" to listOf("alcohollevel", "alcohol", "alcool", "degré", "degre", "degré d'alcool"),
         "sugarLevel" to listOf("sugarlevel", "sugar", "sucre", "taux de sucre"),
-        "id" to listOf("id", "idvin", "idcontact"),
+        "id" to listOf("id", "idvin"),
         "category" to listOf("category", "catégorie", "categorie"),
         "favorite" to listOf("favorite", "favori", "favourite"),
-        "pairings" to listOf("pairings", "accords", "accords mets-vin"),
+        "pairings" to listOf("pairings", "accords", "accords mets-vin", "plats"),
         "grapes" to listOf("grapes", "cépages", "cepages"),
-        "drinkFrom" to listOf("drinkfrom", "apogée début", "drink from", "begin consume"),
-        "drinkTo" to listOf("drinkto", "apogée fin", "drink to", "à boire avant", "end consume"),
+        "drinkFrom" to listOf("drinkfrom", "apogée début", "apogee debut", "drink from", "begin consume"),
+        "drinkTo" to listOf("drinkto", "apogée fin", "apogee fin", "drink to", "à boire avant", "end consume"),
+        "apogee" to listOf("apogée", "apogee"),
         "drinkNow" to listOf("drinknow"),
         "agingPotential" to listOf("agingpotential", "potentiel de garde", "aging potential"),
         "tastingNotes" to listOf("tastingnotes", "notes", "tasting notes", "commentaire", "commentaires"),
@@ -54,16 +59,14 @@ object CsvFormat {
         "wineName" to listOf("winename", "vin", "bouteille", "nom du vin", "nom"),
         "date" to listOf("date", "date dégustation", "tasting date"),
         "notes" to listOf("notes", "commentaire", "commentaires", "tasting notes"),
-        "rating" to listOf("rating", "note", "your rating", "score", "ma note"),
         "place" to listOf("place", "lieu", "location"),
 
         // Producers / Suppliers
         "name" to listOf("name", "nom", "raison sociale"),
         "region" to listOf("region", "région", "ville"),
-        "country" to listOf("country", "pays"),
         "website" to listOf("website", "site web", "url"),
         "email" to listOf("email", "e-mail", "courriel"),
-        "phone" to listOf("phone", "téléphone", "portable", "tel"),
+        "phone" to listOf("phone", "téléphone", "portable", "tel", "fax"),
         "type" to listOf("type"),
 
         // Racks
@@ -210,8 +213,9 @@ object CsvFormat {
                     val idx = r * maxCol + c
                     if (!wineName.isNullOrBlank()) {
                         val vintage = row.field("vintage", index)
-                        val plocId = row.field("id", index)
+                        val plocId = row.field("id", index)?.takeIf { it.isNotBlank() }
                         val bottle = wineLookup?.invoke(plocId, wineName, vintage)
+                        val bottleId = bottle?.id ?: plocId
                         refs += PlocWineRef(wineName, vintage, plocId, bottle?.color)
                         rackCells[idx] = RackCell(
                             row = rowLabel(r),
@@ -220,6 +224,7 @@ object CsvFormat {
                             category = bottle?.category,
                             vintage = vintage ?: bottle?.vintage,
                             price = bottle?.price?.takeIf { it > 0 },
+                            bottleId = bottleId,
                         )
                     }
                 }
@@ -284,6 +289,9 @@ object CsvFormat {
     }
 
     private fun List<String>.toBottle(index: Map<String, Int>): Bottle? {
+        val isPloc = "idvin" in index || ("nom du vin" in index && "couleur" in index)
+        if (isPloc) return toPlocBottle(index)
+
         val domain = field("domain", index) ?: field("appellation", index) ?: return null
         val appellation = field("appellation", index) ?: field("provenance", index) ?: ""
         val color = parseColor(field("color", index))
@@ -291,7 +299,7 @@ object CsvFormat {
         val vintage = field("vintage", index) ?: "NM"
         val id = field("id", index) ?: slug("$domain-$vintage")
         val category = field("category", index)?.let { runCatching { WineCategory.valueOf(it) }.getOrNull() }
-            ?: guessCategory(provenance + " " + appellation)
+            ?: wineCategoryFromText(provenance + " " + appellation)
 
         return Bottle(
             id = id,
@@ -300,7 +308,7 @@ object CsvFormat {
             color = color,
             category = category,
             vintage = vintage,
-            price = field("price", index).toIntOr(0),
+            price = field("price", index).toPriceOr(0),
             quantity = field("quantity", index).toIntOr(1),
             rating = field("rating", index).toDoubleOr(0.0).let { if (it > 5) it / 20.0 else it },
             cellarSpot = field("cellarSpot", index) ?: "—",
@@ -322,6 +330,77 @@ object CsvFormat {
             addedLabel = field("addedLabel", index) ?: "importé",
             addedAt = field("addedAt", index)?.toLongOrNull() ?: 0L,
         )
+    }
+
+    /** PLOC Vins.csv — exact headers to avoid alias clashes (Nom du vin vs Producteur vs Appellation). */
+    private fun List<String>.toPlocBottle(index: Map<String, Int>): Bottle? {
+        val wineName = plocColumn("nom du vin", index)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val producer = plocColumn("producteur", index)?.trim()?.takeIf { it.isNotEmpty() }
+        val appellationCol = plocColumn("appellation", index)?.trim()?.takeIf { it.isNotEmpty() }
+        val cuvee = plocColumn("cuvée", index)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: plocColumn("cuvee", index)?.trim()?.takeIf { it.isNotEmpty() }
+        val region = plocColumn("région", index)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: plocColumn("region", index)?.trim()?.takeIf { it.isNotEmpty() }
+        val country = plocColumn("pays", index)?.trim()?.takeIf { it.isNotEmpty() }
+        val colorRaw = plocColumn("couleur", index)
+        val color = parseColor(colorRaw)
+        val vintage = plocColumn("millésime", index)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: plocColumn("millesime", index)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "NM"
+        val id = plocColumn("idvin", index)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: slug("$wineName-$vintage")
+
+        // Nom du vin is the display identity; Appellation / Cuvée fill the secondary line.
+        val domain = wineName
+        val appellation = appellationCol ?: cuvee ?: producer.orEmpty()
+        val provenance = listOfNotNull(region, country).joinToString(", ").ifBlank { region ?: country ?: "" }
+        val category = wineCategoryFromText("$provenance $appellation $wineName $producer")
+        val (drinkFrom, drinkTo) = parseApogee(plocColumn("apogée", index) ?: plocColumn("apogee", index))
+
+        return Bottle(
+            id = id,
+            domain = domain,
+            appellation = appellation.ifEmpty { provenance.ifEmpty { wineName } },
+            color = color,
+            category = category,
+            vintage = vintage,
+            price = field("price", index).toPriceOr(0),
+            quantity = field("quantity", index).toIntOr(0),
+            rating = field("rating", index).toDoubleOr(0.0).let { if (it > 5) it / 20.0 else it },
+            cellarSpot = "—",
+            provenance = provenance.ifEmpty { "—" },
+            merchant = "—",
+            purchaseDate = "—",
+            occasion = "—",
+            alcoholLevel = field("alcoholLevel", index).toDoubleOr(0.0),
+            sugarLevel = when {
+                colorRaw?.lowercase()?.let { "liquor" in it || "moel" in it || "doux" in it } == true ->
+                    SugarLevel.MOELLEUX
+                else -> parseSugar(field("sugarLevel", index))
+            },
+            favorite = false,
+            pairings = emptyList(),
+            grapes = field("grapes", index)?.split(";", ",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
+            drinkFrom = drinkFrom,
+            drinkTo = drinkTo,
+            drinkNow = 0.5f,
+            agingPotential = 0,
+            tastingNotes = field("tastingNotes", index) ?: "",
+            source = AddSource.MANUAL,
+            addedLabel = "import PLOC",
+            addedAt = 0L,
+        )
+    }
+
+    /** PLOC "Apogée" is often `2019/2022` or a single year. */
+    private fun parseApogee(raw: String?): Pair<Int, Int> {
+        if (raw.isNullOrBlank()) return 0 to 0
+        val years = Regex("""\d{4}""").findAll(raw).map { it.value.toInt() }.toList()
+        return when (years.size) {
+            0 -> 0 to 0
+            1 -> years[0] to years[0]
+            else -> years[0] to years[1]
+        }
     }
 
     private fun List<String>.toRack(index: Map<String, Int>): Rack? {
@@ -412,23 +491,17 @@ object CsvFormat {
         }
     }
 
-    private fun guessCategory(text: String): WineCategory {
-        val v = text.lowercase()
-        return when {
-            "bourgogne" in v || "burgundy" in v || "chablis" in v -> WineCategory.BOURGOGNE
-            "rhône" in v || "rhone" in v -> WineCategory.RHONE
-            "provence" in v || "bandol" in v -> WineCategory.PROVENCE
-            "loire" in v || "sancerre" in v -> WineCategory.LOIRE
-            "champagne" in v || "reims" in v -> WineCategory.CHAMPAGNE
-            else -> WineCategory.BORDEAUX
-        }
-    }
-
     private fun slug(s: String): String =
         s.lowercase().map { if (it.isLetterOrDigit()) it else '-' }.joinToString("").trim('-')
 
     private fun String?.toIntOr(d: Int): Int =
         this?.filter { it.isDigit() }?.toIntOrNull() ?: d
+
+    /** Euro amounts may use a comma decimal (`7,6`); keep the integer part only. */
+    private fun String?.toPriceOr(d: Int): Int {
+        val n = this?.replace(',', '.')?.filter { it.isDigit() || it == '.' }?.toDoubleOrNull() ?: return d
+        return n.toInt()
+    }
 
     private fun String?.toDoubleOr(d: Double): Double =
         this?.replace(',', '.')?.filter { it.isDigit() || it == '.' }?.toDoubleOrNull() ?: d

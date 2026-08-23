@@ -12,6 +12,7 @@ import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.SugarLevel
 import fr.geoking.vincent.model.WineCategory
 import fr.geoking.vincent.model.WineColor
+import fr.geoking.vincent.model.wineCategoryFromText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -551,17 +552,7 @@ object WineAiEngine : WineRecognizer, PriceEstimator, PriceSearcher, FoodPairer 
         }
     }
 
-    private fun categoryOf(text: String): WineCategory {
-        val v = text.lowercase()
-        return when {
-            "bourgogne" in v || "burgundy" in v || "chablis" in v -> WineCategory.BOURGOGNE
-            "rhône" in v || "rhone" in v -> WineCategory.RHONE
-            "provence" in v || "bandol" in v -> WineCategory.PROVENCE
-            "loire" in v || "sancerre" in v -> WineCategory.LOIRE
-            "champagne" in v || "reims" in v -> WineCategory.CHAMPAGNE
-            else -> WineCategory.BORDEAUX
-        }
-    }
+    private fun categoryOf(text: String): WineCategory = wineCategoryFromText(text)
 }
 
 actual fun wineRecognizer(): WineRecognizer = WineAiEngine

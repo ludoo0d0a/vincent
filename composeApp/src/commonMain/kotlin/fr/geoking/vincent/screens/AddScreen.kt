@@ -92,6 +92,7 @@ import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.model.cellIndexFromSpot
 import fr.geoking.vincent.model.cellSpotLabel
 import fr.geoking.vincent.model.rowLabel
+import fr.geoking.vincent.model.wineCategoryFromText
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.BottlePhotosRow
@@ -602,7 +603,7 @@ fun AddScreen(onClose: () -> Unit, initialPlacement: RackPlacement? = null, edit
                             val placed = r.copy(
                                 cells = r.cells.mapIndexed { idx, c ->
                                     when {
-                                        idx == ci -> RackCell(rowLabel(ci / r.cols), true, b.color, b.category, b.vintage, b.price, selected = true)
+                                        idx == ci -> RackCell(rowLabel(ci / r.cols), true, b.color, b.category, b.vintage, b.price, selected = true, bottleId = b.id)
                                         c.selected -> c.copy(selected = false)
                                         else -> c
                                     }
@@ -1070,17 +1071,7 @@ private fun productColor(category: String): WineColor? = when (category.lowercas
     else -> null
 }
 
-private fun categoryFromRegionName(region: String): WineCategory {
-    val v = region.lowercase()
-    return when {
-        "bourgogne" in v || "burgundy" in v -> WineCategory.BOURGOGNE
-        "rhône" in v || "rhone" in v -> WineCategory.RHONE
-        "provence" in v -> WineCategory.PROVENCE
-        "loire" in v -> WineCategory.LOIRE
-        "champagne" in v -> WineCategory.CHAMPAGNE
-        else -> WineCategory.BORDEAUX
-    }
-}
+private fun categoryFromRegionName(region: String): WineCategory = wineCategoryFromText(region)
 
 /** A wine candidate surfaced by [AutocompleteField], from the cellar or the wine catalogue. */
 internal data class WineSuggestion(

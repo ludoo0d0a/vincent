@@ -124,6 +124,7 @@ data class VincentManifestDto(
     val vintage: String? = null,
     val price: Int? = null,
     val selected: Boolean = false,
+    val bottleId: String? = null,
 )
 
 @Serializable data class RackDto(
@@ -281,6 +282,7 @@ private fun RackCell.toDto() = RackCellDto(
     vintage = vintage,
     price = price,
     selected = selected,
+    bottleId = bottleId,
 )
 
 private fun RackArCalibration.toDto() = RackArCalibrationDto(
@@ -394,6 +396,7 @@ private fun RackCellDto.toDomain() = RackCell(
     vintage = vintage,
     price = price,
     selected = selected,
+    bottleId = bottleId,
 )
 
 private fun RackArCalibrationDto.toDomain() = RackArCalibration(

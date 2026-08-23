@@ -62,6 +62,7 @@ private fun String.toRackCell(): RackCell {
         category = fields.getOrNull(3)?.takeIf { it.isNotEmpty() }?.let { WineCategory.valueOf(it) },
         vintage = fields.getOrNull(4)?.takeIf { it.isNotEmpty() },
         price = fields.getOrNull(5)?.toIntOrNull(),
+        bottleId = fields.getOrNull(6)?.takeIf { it.isNotEmpty() },
     )
 }
 
@@ -72,6 +73,7 @@ private fun RackCell.toData(): String = listOf(
     category?.name ?: "",
     vintage ?: "",
     price?.toString() ?: "",
+    bottleId ?: "",
 ).joinToString(FIELD_SEP)
 
 private fun String.toArCalibration(): RackArCalibration {

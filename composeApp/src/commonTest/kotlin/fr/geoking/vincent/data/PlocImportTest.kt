@@ -21,10 +21,15 @@ class PlocImportTest {
         assertEquals(1, result.bottles.size)
         val b = result.bottles[0]
         assertEquals("Albert Besombes Bourgueil L'Attire-Bouchon", b.domain)
+        assertEquals("Bourgueil", b.appellation)
+        assertEquals("Vallée de la Loire, France", b.provenance)
+        assertEquals(WineCategory.LOIRE, b.category)
         assertEquals(2023, b.vintage.toInt())
         assertEquals(WineColor.RED, b.color)
         assertEquals(12.5, b.alcoholLevel)
         assertTrue("Cabernet Franc" in b.grapes)
+        assertEquals("559588af-510a-41b8-b432-cb034b5b45bd", b.id)
+        assertEquals(4, b.price) // Estimation
     }
 
     @Test
@@ -274,6 +279,31 @@ class PlocImportTest {
         val sommeliere = caves.racks.first { it.name == "La Sommelière" }
         val roséCell = sommeliere.cells.first { it.vintage == "2011" && it.occupied }
         assertEquals(WineColor.ROSE, roséCell.color)
+        assertEquals("058680d3-42b3-4dc6-8359-ecfd4d43b8c4", roséCell.bottleId)
+        val match = roséCell.matchingBottle(Cellar.bottles)
+        assertTrue(match != null, "rack cell should resolve to imported bottle via bottleId")
+        assertEquals("058680d3-42b3-4dc6-8359-ecfd4d43b8c4", match!!.id)
+        assertEquals("Le Rosé de Mouton Cadet", match.domain)
+        assertEquals("Bordeaux", match.appellation)
+    }
+
+    @Test
+    fun testPlocBottleMappingsFromFixture() {
+        val result = CsvFormat.parse(readPlocFixture("Vins.csv"))
+        assertEquals("PLOC", result.source)
+        assertTrue(result.bottles.size >= 300)
+
+        val loire = result.bottles.first { it.id == "559588af-510a-41b8-b432-cb034b5b45bd" }
+        assertEquals("Albert Besombes Bourgueil L'Attire-Bouchon", loire.domain)
+        assertEquals("Bourgueil", loire.appellation)
+        assertEquals(WineCategory.LOIRE, loire.category)
+        assertTrue(loire.provenance.contains("Loire"))
+
+        val alsace = result.bottles.first {
+            it.provenance.contains("Alsace", ignoreCase = true) && it.grapes.any { g -> "Pinot" in g }
+        }
+        assertTrue(alsace.domain.isNotBlank())
+        assertTrue(alsace.provenance.contains("Alsace"))
     }
 
     @Test

@@ -159,14 +159,19 @@ fun Bottle.agingStatus(currentYear: Int): AgingStatus? {
 }
 
 /**
- * Best-effort link between a physical rack cell and a real bottle, matching on
- * wine colour + price + last two vintage digits (same heuristic as the cellar
- * peek card). Returns the first bottle from [pool] that fits, or null.
+ * Link a rack cell to a cellar bottle: prefer [RackCell.bottleId] (PLOC IdVin),
+ * then colour + vintage (+ price when both sides have one).
  */
 fun RackCell.matchingBottle(pool: List<Bottle>): Bottle? {
     if (!occupied) return null
-    return pool.firstOrNull {
-        it.color == color && it.price == price && it.vintage.takeLast(2) == vintage?.takeLast(2)
+    bottleId?.takeIf { it.isNotBlank() }?.let { id ->
+        pool.firstOrNull { it.id == id }?.let { return it }
+    }
+    val v2 = vintage?.takeLast(2) ?: return null
+    return pool.firstOrNull { b ->
+        (color == null || b.color == color) &&
+            b.vintage.takeLast(2) == v2 &&
+            (price == null || b.price == price)
     }
 }
 
@@ -179,7 +184,36 @@ data class RackCell(
     val vintage: String? = null,
     val price: Int? = null,
     val selected: Boolean = false,
+    /** Stable bottle id when known (e.g. PLOC IdVin) — preferred by [matchingBottle]. */
+    val bottleId: String? = null,
 )
+
+/**
+ * Map free-text region / appellation / wine name to a [WineCategory] rack bucket.
+ * Unknown regions fall back to [WineCategory.BORDEAUX].
+ */
+fun wineCategoryFromText(text: String): WineCategory {
+    val v = text.lowercase()
+    return when {
+        "champagne" in v || "reims" in v || "épernay" in v || "epernay" in v -> WineCategory.CHAMPAGNE
+        "bourgogne" in v || "burgundy" in v || "chablis" in v || "beaujolais" in v ||
+            "mâcon" in v || "macon" in v || "nuits" in v || "beaune" in v ||
+            "pouilly-fuissé" in v || "pouilly-fuisse" in v -> WineCategory.BOURGOGNE
+        "rhône" in v || "rhone" in v || "gigondas" in v || "châteauneuf" in v ||
+            "chateauneuf" in v || "hermitage" in v || "crozes" in v ||
+            "rôtie" in v || "rotie" in v || "ardèche" in v || "ardeche" in v ||
+            "vacqueyras" in v || "rasteau" in v || "condrieu" in v -> WineCategory.RHONE
+        "provence" in v || "bandol" in v || "cassis" in v || "palette" in v -> WineCategory.PROVENCE
+        "loire" in v || "sancerre" in v || "anjou" in v || "bourgueil" in v ||
+            "chinon" in v || "muscadet" in v || "vouvray" in v || "saumur" in v ||
+            "pouilly" in v || "menetou" in v || "quincy" in v -> WineCategory.LOIRE
+        "bordeaux" in v || "médoc" in v || "medoc" in v || "émilion" in v ||
+            "emilion" in v || "pomerol" in v || "graves" in v || "sauternes" in v ||
+            "pauillac" in v || "margaux" in v || "saint-julien" in v ||
+            "st-julien" in v || "entre-deux-mers" in v -> WineCategory.BORDEAUX
+        else -> WineCategory.BORDEAUX
+    }
+}
 
 /** What the rack overlay shows on each occupied cell. */
 enum class RackMode(val label: StringResource) {
