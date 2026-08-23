@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -273,7 +274,8 @@ fun CellarScreen(
         }
 
         // Selected-bottle detail, pinned to the bottom. Dismissable so the whole
-        // rack can be seen at a glance.
+        // rack can be seen at a glance. Must consume pointer events — background
+        // alone does not hit-test, so taps would otherwise reach the rack below.
         val sel = selectedIdx
         if (sel != null) {
             Box(
@@ -281,6 +283,11 @@ fun CellarScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(VincentColors.Bg)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    )
                     .onGloballyPositioned { peekHeightPx = it.size.height }
                     .padding(horizontal = 16.dp, vertical = 11.dp),
             ) {
@@ -700,13 +707,14 @@ private fun PeekCard(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(18.dp))
                 .background(Brush.linearGradient(listOf(Color(0xFFF6EAEA), Color(0xFFEFD9DC))))
+                .clickable { onOpenBottle(match) }
                 .padding(12.dp),
         ) {
             Column {
                 Row(verticalAlignment = Alignment.Top) {
                     BottleThumb(match, Modifier.size(width = 46.dp, height = 92.dp).clip(RoundedCornerShape(10.dp)))
                     Spacer(Modifier.width(13.dp))
-                    Column(Modifier.weight(1f).clickable { onOpenBottle(match) }) {
+                    Column(Modifier.weight(1f)) {
                         ColorTag(match.color, label = "${stringResource(match.color.label)} · ${stringResource(match.category.label)}")
                         Spacer(Modifier.height(6.dp))
                         Text(title, fontSize = 16.sp, fontWeight = FontWeight.W800, color = VincentColors.Fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
