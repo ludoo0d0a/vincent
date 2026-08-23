@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +43,9 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
+import vincent.composeapp.generated.resources.Res
+import vincent.composeapp.generated.resources.cellar_action_cancel
+import vincent.composeapp.generated.resources.cellar_edit_delete
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
 import fr.geoking.vincent.model.thumbnailUri
@@ -315,3 +320,31 @@ fun DrinkPeakBar(
 
 private val ScreenPad = PaddingValues(horizontal = 16.dp)
 fun screenPadding(): PaddingValues = ScreenPad
+
+/** Destructive-action confirmation — use before any irreversible delete. */
+@Composable
+fun ConfirmDeleteDialog(
+    title: String,
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    confirmLabel: String = stringResource(Res.string.cellar_edit_delete),
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Text(message, fontSize = 13.sp, color = VincentColors.Fg)
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(confirmLabel, color = VincentColors.Red)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.cellar_action_cancel))
+            }
+        },
+    )
+}

@@ -139,6 +139,8 @@
     <string name="detail_tasting_save">Save</string>
     <string name="detail_tasting_title">Tasting</string>
     <string name="detail_tasting_delete">Delete tasting</string>
+    <string name="detail_tasting_delete_confirm_title">Delete this tasting?</string>
+    <string name="detail_tasting_delete_confirm_message">The tasting will be permanently deleted.</string>
     <string name="detail_tasting_open">View tastings</string>
     <string name="detail_price_auto">Auto</string>
     <string name="detail_price_searching">Searching prices…</string>
@@ -215,6 +217,8 @@
     <string name="cellar_edit_capacity_x">Capacity: %1$d squares × 4 = %2$d bottles</string>
     <string name="cellar_edit_duplicate">Duplicate</string>
     <string name="cellar_edit_delete">Delete</string>
+    <string name="cellar_edit_delete_confirm_title">Delete this rack?</string>
+    <string name="cellar_edit_delete_confirm_message">The rack and its layout will be permanently deleted.</string>
     <string name="cellar_edit_cancel">Cancel</string>
     <string name="cellar_edit_save">Save</string>
 
@@ -445,6 +449,8 @@
     <string name="settings_gemma_downloading">Downloading… %1$d%%</string>
     <string name="settings_gemma_download">Download model</string>
     <string name="settings_gemma_delete">Delete model</string>
+    <string name="settings_gemma_delete_confirm_title">Delete the Gemma model?</string>
+    <string name="settings_gemma_delete_confirm_message">The on-device model (~550 MB) will be erased. You can download it again later.</string>
     <string name="settings_gemma_error">Error: %1$s</string>
     <string name="settings_hf_token">Hugging Face token (optional)</string>
     <string name="settings_hf_token_hint">Required if the Gemma repo is gated</string>
@@ -479,6 +485,8 @@
 
     <string name="log_empty">No logs</string>
     <string name="log_no_result">No result</string>
+    <string name="debug_clear_logs_confirm_title">Clear logs?</string>
+    <string name="debug_clear_logs_confirm_message">All displayed internal logs will be deleted.</string>
 
     <string name="data_management_title">Data management</string>
     <string name="data_management_subtitle">Manage imports, exports and reference data</string>

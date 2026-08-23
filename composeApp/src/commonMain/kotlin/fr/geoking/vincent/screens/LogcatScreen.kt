@@ -42,8 +42,11 @@ import androidx.compose.ui.unit.sp
 import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.debug.LogLevel
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.ConfirmDeleteDialog
 import org.jetbrains.compose.resources.stringResource
 import vincent.composeapp.generated.resources.Res
+import vincent.composeapp.generated.resources.debug_clear_logs_confirm_message
+import vincent.composeapp.generated.resources.debug_clear_logs_confirm_title
 import vincent.composeapp.generated.resources.debug_internal_logs
 import vincent.composeapp.generated.resources.log_empty
 import vincent.composeapp.generated.resources.log_no_result
@@ -51,6 +54,19 @@ import vincent.composeapp.generated.resources.log_no_result
 @Composable
 fun LogcatScreen(onBack: () -> Unit) {
     var query by remember { mutableStateOf("") }
+    var showClearConfirm by remember { mutableStateOf(false) }
+
+    if (showClearConfirm) {
+        ConfirmDeleteDialog(
+            title = stringResource(Res.string.debug_clear_logs_confirm_title),
+            message = stringResource(Res.string.debug_clear_logs_confirm_message),
+            onConfirm = {
+                showClearConfirm = false
+                InternalLog.clear()
+            },
+            onDismiss = { showClearConfirm = false },
+        )
+    }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).imePadding()) {
         // Toolbar
@@ -82,7 +98,7 @@ fun LogcatScreen(onBack: () -> Unit) {
             Box(
                 Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
                     .background(VincentColors.Surface2)
-                    .clickable { InternalLog.clear() },
+                    .clickable { showClearConfirm = true },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

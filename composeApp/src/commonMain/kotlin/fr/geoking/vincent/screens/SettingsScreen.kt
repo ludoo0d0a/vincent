@@ -55,6 +55,7 @@ import fr.geoking.vincent.data.Updater
 import fr.geoking.vincent.debug.InternalLog
 import fr.geoking.vincent.getAppVersion
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.ConfirmDeleteDialog
 import fr.geoking.vincent.ui.SectionHeader
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -69,10 +70,24 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
+    var showGemmaDeleteConfirm by remember { mutableStateOf(false) }
     var geminiDraft by remember { mutableStateOf(Settings.geminiApiKey) }
     var hfDraft by remember { mutableStateOf(Settings.huggingFaceToken) }
     var showGeminiKey by remember { mutableStateOf(false) }
     val gemmaState = GemmaModel.state
+
+    if (showGemmaDeleteConfirm) {
+        ConfirmDeleteDialog(
+            title = stringResource(Res.string.settings_gemma_delete_confirm_title),
+            message = stringResource(Res.string.settings_gemma_delete_confirm_message),
+            onConfirm = {
+                showGemmaDeleteConfirm = false
+                GemmaModel.delete()
+            },
+            onDismiss = { showGemmaDeleteConfirm = false },
+            confirmLabel = stringResource(Res.string.settings_gemma_delete),
+        )
+    }
 
     if (showConfirmDialog) {
         AlertDialog(
@@ -207,7 +222,7 @@ fun SettingsScreen(
                         }
                         is GemmaModelState.Ready -> {
                             SettingsActionChip(stringResource(Res.string.settings_gemma_delete), danger = true) {
-                                GemmaModel.delete()
+                                showGemmaDeleteConfirm = true
                             }
                         }
                     }

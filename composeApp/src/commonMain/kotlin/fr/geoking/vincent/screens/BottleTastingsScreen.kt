@@ -22,7 +22,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +36,7 @@ import fr.geoking.vincent.data.Cellar
 import fr.geoking.vincent.data.Tastings
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.ConfirmDeleteDialog
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.Stars
 import fr.geoking.vincent.ui.VCard
@@ -51,12 +55,25 @@ fun BottleTastingsScreen(
     val bottleTastings = remember(live.id, Tastings.all.toList()) {
         Tastings.all.filter { it.bottleId == live.id }.sortedByDescending { it.date }
     }
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
 
     fun deleteTasting(id: String) {
         Tastings.delete(id)
         val remaining = Tastings.all.filter { it.bottleId == live.id }
         val avg = if (remaining.isEmpty()) 0.0 else remaining.map { it.rating }.average()
         Cellar.updateBottle((Cellar.bottle(live.id) ?: live).copy(rating = avg))
+    }
+
+    pendingDeleteId?.let { id ->
+        ConfirmDeleteDialog(
+            title = stringResource(Res.string.detail_tasting_delete_confirm_title),
+            message = stringResource(Res.string.detail_tasting_delete_confirm_message),
+            onConfirm = {
+                pendingDeleteId = null
+                deleteTasting(id)
+            },
+            onDismiss = { pendingDeleteId = null },
+        )
     }
 
     Column(Modifier.fillMaxSize().background(VincentColors.Bg)) {
@@ -104,7 +121,7 @@ fun BottleTastingsScreen(
                                     Icons.Outlined.DeleteOutline,
                                     contentDescription = stringResource(Res.string.detail_tasting_delete),
                                     tint = VincentColors.Muted,
-                                    modifier = Modifier.size(20.dp).clickable { deleteTasting(tasting.id) },
+                                    modifier = Modifier.size(20.dp).clickable { pendingDeleteId = tasting.id },
                                 )
                             }
                             if (tasting.notes.isNotEmpty()) {

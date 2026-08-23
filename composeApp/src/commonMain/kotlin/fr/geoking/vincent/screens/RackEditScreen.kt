@@ -47,6 +47,7 @@ import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.model.RackFormat
 import fr.geoking.vincent.theme.MonoNumber
 import fr.geoking.vincent.theme.VincentColors
+import fr.geoking.vincent.ui.ConfirmDeleteDialog
 
 @Composable
 fun RackEditScreen(
@@ -66,6 +67,22 @@ fun RackEditScreen(
     var staggerOffset by remember { mutableStateOf(rack.staggerOffset) }
     var format by remember { mutableStateOf(rack.format) }
     val canDelete = Racks.all.size > 1
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        ConfirmDeleteDialog(
+            title = stringResource(Res.string.cellar_edit_delete_confirm_title),
+            message = stringResource(Res.string.cellar_edit_delete_confirm_message),
+            onConfirm = {
+                showDeleteConfirm = false
+                Racks.remove(rackIndex)
+                val nextIdx = rackIndex.coerceAtMost(Racks.all.lastIndex)
+                onSwitchedToRack(nextIdx)
+                onBack()
+            },
+            onDismiss = { showDeleteConfirm = false },
+        )
+    }
 
     Column(
         Modifier
@@ -218,12 +235,7 @@ fun RackEditScreen(
                     Text(stringResource(Res.string.cellar_edit_duplicate))
                 }
                 OutlinedButton(
-                    onClick = {
-                        Racks.remove(rackIndex)
-                        val nextIdx = rackIndex.coerceAtMost(Racks.all.lastIndex)
-                        onSwitchedToRack(nextIdx)
-                        onBack()
-                    },
+                    onClick = { showDeleteConfirm = true },
                     enabled = canDelete,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = VincentColors.Red),
