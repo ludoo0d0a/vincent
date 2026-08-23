@@ -98,7 +98,7 @@ private suspend fun downloadMapPack(context: Context): MapPackResult {
         throw MapPackException(MapPackFailure.AuthRequired)
     }
 
-    val url = "$base/v1/catalog/map-pack"
+    val url = "$base/v1/catalog/map-pack?variant=mobile"
     val conn = (URL(url).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"
         connectTimeout = CONNECT_TIMEOUT_MS

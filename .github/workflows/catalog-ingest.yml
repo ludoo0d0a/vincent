@@ -78,8 +78,18 @@ jobs:
       - name: Build appellations map pack
         if: inputs.target == 'inao-geo'
         run: |
-          test -f scripts/catalog/data/parcellaire.shp || { echo "Missing scripts/catalog/data/parcellaire.shp - download INAO shapefile first"; exit 1; }
-          python scripts/catalog/ingest-inao-geo.py --shp scripts/catalog/data/parcellaire.shp
+          set -euo pipefail
+          SHP=""
+          if [ -f scripts/catalog/data/parcellaire.shp ]; then
+            SHP=scripts/catalog/data/parcellaire.shp
+          else
+            SHP=$(ls scripts/catalog/data/inao-shp/*.shp 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$SHP" ] || [ ! -f "$SHP" ]; then
+            echo "Missing INAO shapefile (scripts/catalog/data/parcellaire.shp or scripts/catalog/data/inao-shp/*.shp)" >&2
+            exit 1
+          fi
+          python scripts/catalog/ingest-inao-geo.py --shp "$SHP"
 
       - name: Upload map pack to R2
         if: inputs.target == 'inao-geo'
@@ -90,3 +100,5 @@ jobs:
           npm ci --prefix worker
           npx --prefix worker wrangler r2 object put vincent-map-pack/appellations-map-fr.zip \
             --file scripts/catalog/out/appellations-map-fr.zip
+          npx --prefix worker wrangler r2 object put vincent-map-pack/appellations-map-fr-mobile.zip \
+            --file scripts/catalog/out/appellations-map-fr-mobile.zip

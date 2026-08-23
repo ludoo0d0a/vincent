@@ -582,7 +582,7 @@
     </plurals>
     <string name="appellations_map_download_success">Map pack downloaded (%1$d KB).</string>
     <string name="appellations_map_download_error">Map pack download failed.</string>
-    <string name="appellations_map_download_hint">The pack is several hundred MB: Wi‑Fi recommended, Google account required. Allow a few minutes.</string>
+    <string name="appellations_map_download_hint">Mobile pack (~10 MB): Wi‑Fi recommended, Google account required.</string>
     <string name="appellations_map_error_not_configured">AI proxy not configured (AI_PROXY_URL).</string>
     <string name="appellations_map_error_auth">Google sign-in required to download the map pack.</string>
     <string name="appellations_map_error_not_found">Map pack not found on the server.</string>

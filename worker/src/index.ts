@@ -232,7 +232,7 @@ async function handleCatalogGet(request: Request, url: URL, env: Env): Promise<R
     return handleWineMagSearch(url, env);
   }
   if (sub === "/map-pack" || sub === "/map-pack/") {
-    return handleMapPack(env);
+    return handleMapPack(url, env);
   }
   return json({ error: { message: "Not found", status: "NOT_FOUND" } }, 404);
 }
@@ -260,19 +260,27 @@ async function handleWineMagSearch(url: URL, env: Env): Promise<Response> {
   return json({ data: results ?? [] });
 }
 
-async function handleMapPack(env: Env): Promise<Response> {
+async function handleMapPack(url: URL, env: Env): Promise<Response> {
   const bucket = env.MAP_PACK;
   if (!bucket) {
     return json({ error: { message: "Map pack not configured", status: "FAILED_PRECONDITION" } }, 503);
   }
-  const obj = await bucket.get("appellations-map-fr.zip");
+  // Default: mobile (dissolved + ~200 m simplify, ~10 MiB).
+  // Full parcellaire detail: ?variant=full
+  const variant = (url.searchParams.get("variant") || "mobile").trim().toLowerCase();
+  const key =
+    variant === "full"
+      ? "appellations-map-fr.zip"
+      : "appellations-map-fr-mobile.zip";
+  const obj = await bucket.get(key);
   if (!obj) {
-    return json({ error: { message: "Map pack missing", status: "NOT_FOUND" } }, 404);
+    return json({ error: { message: `Map pack missing (${key})`, status: "NOT_FOUND" } }, 404);
   }
   return new Response(obj.body, {
     headers: {
       "content-type": "application/zip",
       "cache-control": "public, max-age=86400",
+      "x-vincent-map-pack": variant === "full" ? "full" : "mobile",
     },
   });
 }

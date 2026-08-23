@@ -94,18 +94,31 @@ Not `WineDataProvider` catalogue sources — imported JSON via **Gestion des don
 |--------|------------|--------|---------|
 | **VIVC** | `grapes` | bundled `grapes-popular.json` + full JSON file | `scripts/catalog/ingest-vivc.py` |
 | **INAO SIQO** | `appellations` | JSON file | `scripts/catalog/ingest-inao-siqo.py` |
-| **INAO parcellaire** | map pack on device | Worker `GET /v1/catalog/map-pack` → R2 zip | `scripts/catalog/ingest-inao-geo.py` |
+| **INAO parcellaire** | map packs on device | Worker `GET /v1/catalog/map-pack` (mobile default; `?variant=full`) → R2 | `scripts/catalog/ingest-inao-geo.py` |
 
 Attribution: VIVC (Röckel et al.), INAO (Licence Ouverte 2.0), OSM (ODbL), Wikidata (CC0 facts; Commons images via P18, badge « Wikidata »). Origins map: `OriginsMapScreen` (osmdroid + GeoJSON overlay).
 
 ### INAO map pack (R2)
 
-The optional France appellations GeoJSON zip is served by the Worker at `GET /v1/catalog/map-pack` from R2 bucket `vincent-map-pack` (key `appellations-map-fr.zip`). One-time setup:
+Two packs are built and uploaded to R2 bucket `vincent-map-pack`:
+
+| Key | Role | Approx. size |
+|-----|------|----------------|
+| `appellations-map-fr-mobile.zip` | **Default** app download (dissolved + ~200 m simplify) | ~10 MiB |
+| `appellations-map-fr.zip` | Full parcellaire detail | ~270 MiB |
+
+Worker: `GET /v1/catalog/map-pack` → mobile; `?variant=full` → full.
+
+One-time setup:
 
 1. Create the R2 bucket: `wrangler r2 bucket create vincent-map-pack` (binding is in `worker/wrangler.jsonc`).
-2. Download the [INAO parcellaire shapefile](https://www.data.gouv.fr/datasets/delimitation-parcellaire-des-aoc-viticoles-de-linao/) into `scripts/catalog/data/parcellaire.shp` (+ sidecar files).
-3. Build locally: `python scripts/catalog/ingest-inao-geo.py --shp scripts/catalog/data/parcellaire.shp`
-4. Upload: `wrangler r2 object put vincent-map-pack/appellations-map-fr.zip --file scripts/catalog/out/appellations-map-fr.zip`
+2. Download the [INAO parcellaire shapefile](https://www.data.gouv.fr/datasets/delimitation-parcellaire-des-aoc-viticoles-de-linao/) into `scripts/catalog/data/` (or `scripts/catalog/data/inao-shp/`).
+3. Build locally: `python scripts/catalog/ingest-inao-geo.py --shp scripts/catalog/data/inao-shp/*.shp`
+4. Upload both:
+   ```bash
+   wrangler r2 object put vincent-map-pack/appellations-map-fr.zip --file scripts/catalog/out/appellations-map-fr.zip
+   wrangler r2 object put vincent-map-pack/appellations-map-fr-mobile.zip --file scripts/catalog/out/appellations-map-fr-mobile.zip
+   ```
 
 Or run the GitHub Action **Catalog ingest → inao-geo** (requires shapefile committed or supplied as a CI artifact, plus `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets).
 
