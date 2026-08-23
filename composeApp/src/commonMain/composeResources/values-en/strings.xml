@@ -574,6 +574,14 @@
     </plurals>
     <string name="appellations_map_download_success">Map pack downloaded (%1$d KB).</string>
     <string name="appellations_map_download_error">Map pack download failed.</string>
+    <string name="appellations_map_download_hint">The pack is several hundred MB: Wi‑Fi recommended, Google account required. Allow a few minutes.</string>
+    <string name="appellations_map_error_not_configured">AI proxy not configured (AI_PROXY_URL).</string>
+    <string name="appellations_map_error_auth">Google sign-in required to download the map pack.</string>
+    <string name="appellations_map_error_not_found">Map pack not found on the server.</string>
+    <string name="appellations_map_error_empty">Downloaded file contains no geometry.</string>
+    <string name="appellations_map_error_storage">Not enough space or write error on device.</string>
+    <string name="appellations_map_error_network">Network failure — check connection and retry.</string>
+    <string name="appellations_map_error_http">Download failed (HTTP %1$d).</string>
     <string name="appellations_attribution">Data: INAO (Licence Ouverte), IGN/Géoportail, OpenStreetMap (ODbL). Informative map only — not legally binding.</string>
     <string name="reference_import_error">Invalid or unreadable JSON file.</string>
 
@@ -584,7 +592,8 @@
     <string name="origins_map_tab_reference">Reference</string>
     <string name="origins_map_search">Search an appellation…</string>
     <string name="origins_map_open">Open origins map</string>
-    <string name="origins_map_pack_missing">Map pack not downloaded — import from Appellations.</string>
+    <string name="origins_map_open_settings">Open settings (Appellations)</string>
+    <string name="origins_map_pack_missing">Map pack not downloaded — get it from Appellations.</string>
     <string name="origins_map_pack_hint">Macro-region map active. Download the map pack for appellation detail.</string>
     <string name="origins_map_select_appellation">Select an appellation to show its boundary.</string>
     <string name="origins_map_no_geometry">No map geometry for this appellation.</string>

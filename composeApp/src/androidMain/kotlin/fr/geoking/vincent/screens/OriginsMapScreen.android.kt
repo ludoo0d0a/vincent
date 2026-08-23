@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,10 +16,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -34,7 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,10 +47,10 @@ import fr.geoking.vincent.data.Appellations
 import fr.geoking.vincent.data.CellarOrigins
 import fr.geoking.vincent.data.OriginAggregate
 import fr.geoking.vincent.data.OriginKind
+import fr.geoking.vincent.data.isMapPackInstalled
 import fr.geoking.vincent.data.loadBundledMacroRegionsGeoJson
 import fr.geoking.vincent.data.loadBundledOriginCentroids
 import fr.geoking.vincent.data.readAppellationGeoJson
-import fr.geoking.vincent.data.isMapPackInstalled
 import fr.geoking.vincent.model.Appellation
 import fr.geoking.vincent.model.Bottle
 import fr.geoking.vincent.model.WineColor
@@ -72,6 +77,7 @@ actual fun OriginsMapScreen(
     initialTab: OriginsMapTab,
     highlightOriginKey: String?,
     onOpenBottle: (Bottle) -> Unit,
+    onOpenMapPackSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     var tab by remember { mutableStateOf(initialTab) }
@@ -123,8 +129,12 @@ actual fun OriginsMapScreen(
                 context = context,
                 highlightOriginKey = highlightOriginKey,
                 onOpenBottle = onOpenBottle,
+                onOpenMapPackSettings = onOpenMapPackSettings,
             )
-            OriginsMapTab.Reference -> ReferenceOriginsTab(context = context)
+            OriginsMapTab.Reference -> ReferenceOriginsTab(
+                context = context,
+                onOpenMapPackSettings = onOpenMapPackSettings,
+            )
         }
     }
 }
@@ -145,12 +155,13 @@ private fun CellarOriginsTab(
     context: Context,
     highlightOriginKey: String?,
     onOpenBottle: (Bottle) -> Unit,
+    onOpenMapPackSettings: () -> Unit,
 ) {
     var colorFilter by remember { mutableStateOf<WineColor?>(null) }
     var selectedOriginKey by remember { mutableStateOf(highlightOriginKey) }
     var sheetBottles by remember { mutableStateOf<List<Bottle>?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val mapPackReady = remember { isMapPackInstalled(context) }
+    val mapPackReady = isMapPackInstalled(context)
     val bottleCount = fr.geoking.vincent.data.Cellar.bottles.size
     val aggregates = remember(bottleCount, colorFilter) { CellarOrigins.aggregate(colorFilter) }
     var macroGeoJson by remember { mutableStateOf<String?>(null) }
@@ -180,34 +191,41 @@ private fun CellarOriginsTab(
         if (highlightOriginKey != null) selectedOriginKey = highlightOriginKey
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        if (!mapPackReady) {
-            Text(
-                stringResource(Res.string.origins_map_pack_hint),
-                fontSize = 11.sp,
-                color = VincentColors.Muted,
-                modifier = Modifier.padding(vertical = 6.dp),
-            )
-        }
+    val unmapped = remember(aggregates) {
+        aggregates.filter { it.origin.kind == OriginKind.Unmapped && it.origin.latLon == null }
+    }
 
-        Row(
+    Column(Modifier.fillMaxSize()) {
+        // Fixed chrome above the map (hint + colour filters).
+        Column(
             Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .background(VincentColors.Bg)
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         ) {
-            ColorFilterChip(
-                label = stringResource(Res.string.origins_map_filter_all),
-                selected = colorFilter == null,
-                onClick = { colorFilter = null },
-            )
-            WineColor.entries.forEach { color ->
+            if (!mapPackReady) {
+                MapPackHintBanner(onOpenSettings = onOpenMapPackSettings)
+                Spacer(Modifier.height(8.dp))
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 ColorFilterChip(
-                    label = stringResource(color.label),
-                    selected = colorFilter == color,
-                    onClick = { colorFilter = if (colorFilter == color) null else color },
+                    label = stringResource(Res.string.origins_map_filter_all),
+                    selected = colorFilter == null,
+                    onClick = { colorFilter = null },
                 )
+                WineColor.entries.forEach { color ->
+                    ColorFilterChip(
+                        label = stringResource(color.label),
+                        selected = colorFilter == color,
+                        onClick = { colorFilter = if (colorFilter == color) null else color },
+                    )
+                }
             }
         }
 
@@ -215,7 +233,7 @@ private fun CellarOriginsTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(bottom = 8.dp),
+                .padding(horizontal = 16.dp),
             factory = { ctx ->
                 Configuration.getInstance().userAgentValue = ctx.packageName
                 MapView(ctx).apply {
@@ -302,23 +320,36 @@ private fun CellarOriginsTab(
             },
         )
 
-        val unmapped = aggregates.filter { it.origin.kind == OriginKind.Unmapped && it.origin.latLon == null }
+        // Fixed footer: unlocated origins only (scrollable, capped height).
         if (unmapped.isNotEmpty()) {
-            Text(
-                stringResource(Res.string.origins_map_unmapped),
-                fontSize = 11.sp,
-                color = VincentColors.Muted,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-            unmapped.take(3).forEach { agg ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(VincentColors.Surface)
+                    .border(1.dp, VincentColors.Border)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .heightIn(max = 132.dp),
+            ) {
                 Text(
-                    "${agg.origin.label} (${agg.bottleCount})",
-                    fontSize = 12.sp,
-                    color = VincentColors.Fg,
-                    modifier = Modifier
-                        .clickable { sheetBottles = agg.bottles }
-                        .padding(vertical = 4.dp),
+                    stringResource(Res.string.origins_map_unmapped),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.W700,
+                    color = VincentColors.Muted,
+                    modifier = Modifier.padding(bottom = 4.dp),
                 )
+                LazyColumn {
+                    items(unmapped, key = { it.origin.key }) { agg ->
+                        Text(
+                            "${agg.origin.label} (${agg.bottleCount})",
+                            fontSize = 12.sp,
+                            color = VincentColors.Fg,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { sheetBottles = agg.bottles }
+                                .padding(vertical = 6.dp),
+                        )
+                    }
+                }
             }
         }
     }
@@ -345,39 +376,49 @@ private fun CellarOriginsTab(
 }
 
 @Composable
-private fun ReferenceOriginsTab(context: Context) {
+private fun ReferenceOriginsTab(
+    context: Context,
+    onOpenMapPackSettings: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<Appellation?>(null) }
     val filtered = remember(query, Appellations.all.size) {
         Appellations.search(query, limit = 200)
     }
     var geoPoints by remember { mutableStateOf<List<GeoPoint>?>(null) }
+    val mapPackReady = isMapPackInstalled(context)
 
-    LaunchedEffect(selected) {
+    LaunchedEffect(selected, mapPackReady) {
         geoPoints = null
         val app = selected ?: return@LaunchedEffect
-        if (app.geoAsset.isBlank()) return@LaunchedEffect
+        if (!mapPackReady || app.geoAsset.isBlank()) return@LaunchedEffect
         geoPoints = withContext(Dispatchers.IO) {
             readAppellationGeoJson(context, app.geoAsset)?.let { GeoJsonParser.parsePoints(it) }
         }
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        // Fixed chrome above the map.
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
             placeholder = { Text(stringResource(Res.string.origins_map_search)) },
             singleLine = true,
         )
+
+        if (!mapPackReady) {
+            Spacer(Modifier.height(8.dp))
+            MapPackHintBanner(onOpenSettings = onOpenMapPackSettings)
+        }
 
         selected?.let { app ->
             Spacer(Modifier.height(8.dp))
             Text(
                 buildString {
                     append(app.name)
-                    if (app.sign.isNotBlank()) append("  ${app.sign}")
-                    if (app.department.isNotBlank()) append("  ${app.department}")
+                    if (app.sign.isNotBlank()) append(" · ${app.sign}")
+                    if (app.department.isNotBlank()) append(" · ${app.department}")
                 },
                 fontSize = 13.sp,
                 color = VincentColors.Fg,
@@ -386,7 +427,12 @@ private fun ReferenceOriginsTab(context: Context) {
         }
 
         Spacer(Modifier.height(8.dp))
-        ReferenceMapPanel(context = context, points = geoPoints, mapPackReady = isMapPackInstalled(context))
+        ReferenceMapPanel(
+            context = context,
+            points = geoPoints,
+            mapPackReady = mapPackReady,
+            hasSelection = selected != null,
+        )
 
         Spacer(Modifier.height(8.dp))
         LazyColumn(Modifier.weight(1f)) {
@@ -398,7 +444,9 @@ private fun ReferenceOriginsTab(context: Context) {
                         .padding(vertical = 10.dp, horizontal = 4.dp),
                 ) {
                     Text(app.name, fontSize = 14.sp, color = VincentColors.Fg)
-                    val meta = listOf(app.sign, app.category, app.department).filter { it.isNotBlank() }.joinToString("  ")
+                    val meta = listOf(app.sign, app.category, app.department)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · ")
                     if (meta.isNotEmpty()) {
                         Text(meta, fontSize = 11.sp, color = VincentColors.Muted)
                     }
@@ -410,7 +458,38 @@ private fun ReferenceOriginsTab(context: Context) {
             stringResource(Res.string.appellations_attribution),
             fontSize = 10.sp,
             color = VincentColors.Muted,
-            modifier = Modifier.padding(vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(VincentColors.Bg)
+                .padding(vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun MapPackHintBanner(onOpenSettings: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(VincentColors.AccentSoft)
+            .padding(12.dp),
+    ) {
+        Text(
+            stringResource(Res.string.origins_map_pack_hint),
+            fontSize = 12.sp,
+            color = VincentColors.AccentDeep,
+            lineHeight = 16.sp,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(Res.string.origins_map_open_settings),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.W700,
+            color = VincentColors.Accent,
+            modifier = Modifier
+                .clickable(onClick = onOpenSettings)
+                .padding(vertical = 2.dp),
         )
     }
 }
@@ -420,28 +499,39 @@ private fun ReferenceMapPanel(
     context: Context,
     points: List<GeoPoint>?,
     mapPackReady: Boolean,
+    hasSelection: Boolean,
 ) {
+    val panelModifier = Modifier
+        .fillMaxWidth()
+        .height(220.dp)
+        .clip(RoundedCornerShape(12.dp))
+        .background(VincentColors.Surface2)
+
     when {
-        !mapPackReady -> Text(
-            stringResource(Res.string.origins_map_pack_missing),
-            fontSize = 11.sp,
-            color = VincentColors.Muted,
-            modifier = Modifier.fillMaxWidth().height(160.dp),
-        )
-        points == null -> Text(
-            stringResource(Res.string.origins_map_select_appellation),
-            fontSize = 11.sp,
-            color = VincentColors.Muted,
-            modifier = Modifier.fillMaxWidth().height(160.dp),
-        )
-        points.isEmpty() -> Text(
-            stringResource(Res.string.origins_map_no_geometry),
-            fontSize = 11.sp,
-            color = VincentColors.Muted,
-            modifier = Modifier.fillMaxWidth().height(160.dp),
-        )
+        !mapPackReady -> Box(panelModifier.padding(16.dp), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(Res.string.origins_map_pack_missing),
+                fontSize = 12.sp,
+                color = VincentColors.Muted,
+                lineHeight = 16.sp,
+            )
+        }
+        !hasSelection || points == null -> Box(panelModifier.padding(16.dp), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(Res.string.origins_map_select_appellation),
+                fontSize = 12.sp,
+                color = VincentColors.Muted,
+            )
+        }
+        points.isEmpty() -> Box(panelModifier.padding(16.dp), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(Res.string.origins_map_no_geometry),
+                fontSize = 12.sp,
+                color = VincentColors.Red,
+            )
+        }
         else -> AndroidView(
-            modifier = Modifier.fillMaxWidth().height(220.dp),
+            modifier = panelModifier,
             factory = { ctx ->
                 Configuration.getInstance().userAgentValue = ctx.packageName
                 MapView(ctx).apply {
@@ -480,7 +570,7 @@ private fun ColorFilterChip(label: String, selected: Boolean, onClick: () -> Uni
         fontSize = 12.sp,
         color = fg,
         modifier = Modifier
-            .background(bg, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+            .background(bg, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
@@ -512,7 +602,5 @@ private fun countMarkerDrawable(context: Context, count: Int, highlighted: Boole
         intrinsicHeight = size
         paint.color = if (highlighted) 0xFF6B1515.toInt() else 0xFFA04040.toInt()
         paint.style = Paint.Style.FILL
-    }.also {
-        // Marker title shows the count; osmdroid draws icon only.
     }
 }

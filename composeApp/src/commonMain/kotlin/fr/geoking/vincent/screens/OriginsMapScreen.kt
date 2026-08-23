@@ -9,4 +9,5 @@ expect fun OriginsMapScreen(
     initialTab: OriginsMapTab = OriginsMapTab.Cellar,
     highlightOriginKey: String? = null,
     onOpenBottle: (Bottle) -> Unit = {},
+    onOpenMapPackSettings: () -> Unit = {},
 )

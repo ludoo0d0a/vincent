@@ -600,6 +600,14 @@
     </plurals>
     <string name="appellations_map_download_success">Pack carto téléchargé (%1$d Ko).</string>
     <string name="appellations_map_download_error">Échec du téléchargement du pack carto.</string>
+    <string name="appellations_map_download_hint">Le pack fait plusieurs centaines de Mo : Wi‑Fi recommandé, compte Google requis. Comptez quelques minutes.</string>
+    <string name="appellations_map_error_not_configured">Proxy AI non configuré (AI_PROXY_URL).</string>
+    <string name="appellations_map_error_auth">Connexion Google requise pour télécharger le pack carto.</string>
+    <string name="appellations_map_error_not_found">Pack carto introuvable sur le serveur.</string>
+    <string name="appellations_map_error_empty">Le fichier téléchargé ne contient aucune géométrie.</string>
+    <string name="appellations_map_error_storage">Espace insuffisant ou erreur d’écriture sur l’appareil.</string>
+    <string name="appellations_map_error_network">Échec réseau — vérifiez la connexion et réessayez.</string>
+    <string name="appellations_map_error_http">Échec du téléchargement (HTTP %1$d).</string>
     <string name="appellations_attribution">Données : INAO (Licence Ouverte), IGN/Géoportail, OpenStreetMap (ODbL). Carte informative — sans valeur juridique.</string>
     <string name="reference_import_error">Fichier JSON invalide ou illisible.</string>
 
@@ -610,7 +618,8 @@
     <string name="origins_map_tab_reference">Référentiel</string>
     <string name="origins_map_search">Rechercher une appellation…</string>
     <string name="origins_map_open">Ouvrir la carte des origines</string>
-    <string name="origins_map_pack_missing">Pack carto non téléchargé — importez depuis Appellations.</string>
+    <string name="origins_map_open_settings">Ouvrir les réglages (Appellations)</string>
+    <string name="origins_map_pack_missing">Pack carto non téléchargé — téléchargez-le depuis Appellations.</string>
     <string name="origins_map_pack_hint">Carte macro-régions active. Téléchargez le pack carto pour le détail par appellation.</string>
     <string name="origins_map_select_appellation">Sélectionnez une appellation pour afficher son contour.</string>
     <string name="origins_map_no_geometry">Pas de géométrie cartographique pour cette appellation.</string>

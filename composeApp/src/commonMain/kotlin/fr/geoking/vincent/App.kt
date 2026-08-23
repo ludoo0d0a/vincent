@@ -239,6 +239,7 @@ fun App() = VincentTheme {
                     initialTab = top.initialTab,
                     highlightOriginKey = top.highlightOriginKey,
                     onOpenBottle = { stack.add(Dest.Detail(it)) },
+                    onOpenMapPackSettings = { stack.add(Dest.AppellationsManagement) },
                 )
 
                 Dest.Tastings -> TastingsScreen(onBack = ::pop)

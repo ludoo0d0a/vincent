@@ -186,15 +186,21 @@ fun ExternalProviderButtons(
 }
 
 @Composable
-fun ImportStatusBanner(message: String, modifier: Modifier = Modifier) {
+fun ImportStatusBanner(
+    message: String,
+    modifier: Modifier = Modifier,
+    error: Boolean = false,
+) {
+    val bg = if (error) VincentColors.Red.copy(alpha = 0.12f) else VincentColors.AccentSoft
+    val fg = if (error) VincentColors.Red else VincentColors.AccentDeep
     Box(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(VincentColors.AccentSoft)
+            .background(bg)
             .padding(13.dp),
     ) {
-        Text(message, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = VincentColors.AccentDeep)
+        Text(message, fontSize = 12.5.sp, fontWeight = FontWeight.W600, color = fg)
     }
 }
 
