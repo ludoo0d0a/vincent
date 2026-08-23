@@ -12,6 +12,8 @@ object Appellations {
 
     private var repo: AppellationRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Bumped on [clearAll] so in-flight [persist] upserts cannot recreate wiped rows. */
+    private var generation = 0
 
     /** Local directory name under app files dir for downloaded GeoJSON map pack. */
     const val MAP_PACK_DIR = "appellations-map-fr"
@@ -49,12 +51,17 @@ object Appellations {
     }
 
     suspend fun clearAll() {
-        repo?.deleteAll()
+        generation++
         all.clear()
+        repo?.deleteAll()
     }
 
     private fun persist(a: Appellation) {
         val repository = repo ?: return
-        scope.launch { repository.upsert(a) }
+        val gen = generation
+        scope.launch {
+            if (gen != generation) return@launch
+            repository.upsert(a)
+        }
     }
 }

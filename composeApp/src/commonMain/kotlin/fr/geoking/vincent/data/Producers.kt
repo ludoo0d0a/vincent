@@ -12,6 +12,8 @@ object Producers {
 
     private var repo: ProducerRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Bumped on [clearAll] so in-flight [persist] upserts cannot recreate wiped rows. */
+    private var generation = 0
 
     suspend fun bootstrap(repository: ProducerRepository) {
         repo = repository
@@ -34,13 +36,16 @@ object Producers {
     }
 
     suspend fun clearAll() {
-        repo?.deleteAll()
+        generation++
         all.clear()
+        repo?.deleteAll()
     }
 
     private fun persist(p: Producer) {
         val repo = repo ?: return
+        val gen = generation
         scope.launch {
+            if (gen != generation) return@launch
             repo.upsert(p)
             cloudSyncPushProducer(p)
         }

@@ -83,6 +83,7 @@ private sealed interface BackupUiStatus {
     data object ExportSuccess : BackupUiStatus
     data object ExportCanceled : BackupUiStatus
     data object ResetSuccess : BackupUiStatus
+    data object DemoImportSuccess : BackupUiStatus
 }
 
 private sealed interface PlocImportStatus {
@@ -112,6 +113,7 @@ fun DataManagementScreen(
     var pendingImport by remember { mutableStateOf<VincentParsedBackup?>(null) }
     var importMode by remember { mutableStateOf(VincentImportMode.MERGE) }
     var showResetDialog by remember { mutableStateOf(false) }
+    var showDemoDialog by remember { mutableStateOf(false) }
 
     val exportSummary = stringResource(
         Res.string.vincent_backup_export_summary,
@@ -239,6 +241,46 @@ fun DataManagementScreen(
         )
     }
 
+    if (showDemoDialog) {
+        AlertDialog(
+            onDismissRequest = { showDemoDialog = false },
+            title = { Text(stringResource(Res.string.settings_insert_demo_data_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(Res.string.settings_insert_demo_data_confirm_message),
+                    fontSize = 13.sp,
+                    color = VincentColors.Fg,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDemoDialog = false
+                        busy = true
+                        status = null
+                        scope.launch {
+                            runCatching {
+                                Cellar.seedDemoData()
+                                Racks.seedDemoData()
+                                fr.geoking.vincent.data.Settings.setDemoDataSeeded(true)
+                            }
+                                .onSuccess { status = BackupUiStatus.DemoImportSuccess }
+                                .onFailure { status = BackupUiStatus.ImportError }
+                            busy = false
+                        }
+                    },
+                ) {
+                    Text(stringResource(Res.string.data_management_demo_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDemoDialog = false }) {
+                    Text(stringResource(Res.string.cellar_action_cancel))
+                }
+            },
+        )
+    }
+
     Column(Modifier.fillMaxSize().background(VincentColors.Bg).verticalScroll(rememberScrollState())) {
         DataScreenHeader(
             title = stringResource(Res.string.data_management_title),
@@ -313,6 +355,7 @@ fun DataManagementScreen(
                         BackupUiStatus.ExportSuccess -> stringResource(Res.string.vincent_backup_export_success)
                         BackupUiStatus.ExportCanceled -> stringResource(Res.string.vincent_backup_export_canceled)
                         BackupUiStatus.ResetSuccess -> stringResource(Res.string.data_management_reset_success)
+                        BackupUiStatus.DemoImportSuccess -> stringResource(Res.string.settings_insert_demo_data_success_message)
                     },
                 )
             }
@@ -398,6 +441,29 @@ fun DataManagementScreen(
             SectionHeader(stringResource(Res.string.data_management_section_maintenance))
             VCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
+                    Text(
+                        stringResource(Res.string.data_management_demo_desc),
+                        fontSize = 11.5.sp,
+                        color = VincentColors.Muted,
+                        lineHeight = 16.sp,
+                    )
+                    Button(
+                        onClick = { showDemoDialog = true },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VincentColors.Accent, contentColor = Color.White),
+                    ) {
+                        Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            stringResource(Res.string.data_management_demo_button),
+                            fontWeight = FontWeight.W700,
+                            fontSize = 12.5.sp,
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
                     Text(
                         stringResource(Res.string.data_management_reset_desc),
                         fontSize = 11.5.sp,

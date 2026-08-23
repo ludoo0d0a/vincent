@@ -160,6 +160,7 @@ Resolved by the `secret()` function in `composeApp/build.gradle.kts`, in order:
 | `AI_PROXY_URL` | Cloudflare Worker (grapeminds catalogue proxy) | blank |
 | `WEB_CLIENT_ID` | Google Sign-in / Firebase | — |
 | `AR_ENABLED` | AR feature flag | `true` |
+| `CLOUD_SYNC` | Firestore cloud sync feature flag | `false` |
 
 Keys present in `local.properties` but **not read by the app code** (used by CI/deploy or to integrate):
 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `NETLIFY_TOKEN`.
@@ -235,7 +236,9 @@ Keys present in `local.properties` but **not read by the app code** (used by CI/
   `users/{uid}/…` via `data/CloudSync.kt` + `data/CloudSync.android.kt`.
   Bottle photos and rack AR reference images stay **on-device only**; merge is
   last-write-wins per document (`updatedAt`). Guest mode stays local-only.
-  Flag: `FeatureFlags.CLOUD_SYNC` (account screen: backup status + “Sync now”).
+  Flag: `CLOUD_SYNC` env / `local.properties` → `BuildConfig.CLOUD_SYNC` →
+  `FeatureFlags.CLOUD_SYNC` (default **off**; account screen: backup status + “Sync now”).
+  Repo Actions variable: `CLOUD_SYNC` (set via `gh variable set CLOUD_SYNC`).
   **Firestore setup** (once per project):
   1. Enable **Firestore** (Native mode) in the [Firebase console](https://console.firebase.google.com/project/vincent-499318/firestore).
   2. From the repo root (`firebase.json` + `.firebaserc` → project `vincent-499318`):

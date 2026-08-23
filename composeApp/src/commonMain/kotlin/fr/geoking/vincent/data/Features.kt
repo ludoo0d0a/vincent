@@ -7,4 +7,7 @@ package fr.geoking.vincent.data
 expect object Features {
     /** Master switch for the ARCore "AR cellar" feature (entry point + screen). */
     val arEnabled: Boolean
+
+    /** Master switch for Firestore cloud sync when signed in with Google. */
+    val cloudSync: Boolean
 }

@@ -12,6 +12,8 @@ object Tastings {
 
     private var repo: TastingRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Bumped on [clearAll] so in-flight [persist] upserts cannot recreate wiped rows. */
+    private var generation = 0
 
     suspend fun bootstrap(repository: TastingRepository) {
         repo = repository
@@ -45,13 +47,16 @@ object Tastings {
     }
 
     suspend fun clearAll() {
-        repo?.deleteAll()
+        generation++
         all.clear()
+        repo?.deleteAll()
     }
 
     private fun persist(t: Tasting) {
         val repo = repo ?: return
+        val gen = generation
         scope.launch {
+            if (gen != generation) return@launch
             repo.upsert(t)
             cloudSyncPushTasting(t)
         }

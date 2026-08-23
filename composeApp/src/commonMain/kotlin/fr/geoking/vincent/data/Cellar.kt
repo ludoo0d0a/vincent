@@ -39,6 +39,8 @@ object Cellar {
 
     private var repo: CellarRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Bumped on [clearAll] so in-flight [persist] upserts cannot recreate wiped rows. */
+    private var generation = 0
 
     /**
      * Wire a persistent store. On first launch (empty DB) the seed is persisted;
@@ -182,15 +184,18 @@ object Cellar {
     }
 
     suspend fun clearAll() {
-        repo?.deleteAll()
+        generation++
         bottles.clear()
         recent.clear()
         addedThisMonth = 0
+        repo?.deleteAll()
     }
 
     private fun persist(b: Bottle) {
         val r = repo ?: return
+        val gen = generation
         scope.launch {
+            if (gen != generation) return@launch
             r.upsert(b)
             cloudSyncPushBottle(b)
         }

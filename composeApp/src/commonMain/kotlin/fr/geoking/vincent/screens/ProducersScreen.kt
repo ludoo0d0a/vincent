@@ -23,6 +23,7 @@ import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.DataImportCard
+import fr.geoking.vincent.ui.DataPreviewList
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.ExternalProviderButtons
 import fr.geoking.vincent.ui.ImportStatusBanner
@@ -102,6 +103,16 @@ fun ProducersScreen(onBack: () -> Unit) {
                 }
                 null -> Unit
             }
+
+            Spacer(Modifier.height(8.dp))
+            DataPreviewList(
+                items = Producers.all,
+                label = { it.name },
+                secondary = {
+                    listOf(it.region, it.country).filter { s -> s.isNotBlank() }.joinToString(" · ")
+                        .ifBlank { null }
+                },
+            )
 
             Spacer(Modifier.height(24.dp))
         }

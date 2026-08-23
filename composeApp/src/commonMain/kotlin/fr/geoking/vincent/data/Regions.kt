@@ -12,6 +12,8 @@ object Regions {
 
     private var repo: RegionRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Bumped on [clearAll] so in-flight [persist] upserts cannot recreate wiped rows. */
+    private var generation = 0
 
     suspend fun bootstrap(repository: RegionRepository) {
         repo = repository
@@ -34,13 +36,16 @@ object Regions {
     }
 
     suspend fun clearAll() {
-        repo?.deleteAll()
+        generation++
         all.clear()
+        repo?.deleteAll()
     }
 
     private fun persist(r: Region) {
         val repo = repo ?: return
+        val gen = generation
         scope.launch {
+            if (gen != generation) return@launch
             repo.upsert(r)
             // cloudSyncPushRegion(r) // TODO: implement if needed
         }

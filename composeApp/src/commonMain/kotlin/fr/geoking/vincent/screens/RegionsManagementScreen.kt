@@ -21,6 +21,7 @@ import fr.geoking.vincent.data.Regions
 import fr.geoking.vincent.data.WineDataSource
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.DataImportCard
+import fr.geoking.vincent.ui.DataPreviewList
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.ExternalProviderButtons
 import fr.geoking.vincent.ui.ImportStatusBanner
@@ -84,6 +85,13 @@ fun RegionsManagementScreen(onBack: () -> Unit) {
                     },
                 )
             }
+
+            Spacer(Modifier.height(8.dp))
+            DataPreviewList(
+                items = Regions.all,
+                label = { it.name },
+                secondary = { it.country.takeIf { c -> c.isNotBlank() } },
+            )
 
             Spacer(Modifier.height(24.dp))
         }

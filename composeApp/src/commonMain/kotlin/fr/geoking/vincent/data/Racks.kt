@@ -19,6 +19,8 @@ object Racks {
 
     private var repo: RackRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Bumped on [clearAll] so in-flight [persist] upserts cannot recreate wiped rows. */
+    private var generation = 0
 
     /** Wire a persistent store. If empty, the seed is persisted. */
     suspend fun bootstrap(repository: RackRepository, shouldSeed: Boolean = false) {
@@ -93,12 +95,9 @@ object Racks {
     }
 
     suspend fun clearAll() {
-        val r = repo
-        if (r != null) {
-            all.toList().forEach { cloudSyncDeleteRack(it.id) }
-            r.deleteAll()
-        }
+        generation++
         all.clear()
+        repo?.deleteAll()
     }
 
     /** Insert a copy of the rack at [index] right after it (name suffixed "copie"). */
@@ -170,7 +169,9 @@ object Racks {
 
     private fun persist(r: Rack) {
         val repo = repo ?: return
+        val gen = generation
         scope.launch {
+            if (gen != generation) return@launch
             repo.upsert(r)
             cloudSyncPushRack(r)
         }

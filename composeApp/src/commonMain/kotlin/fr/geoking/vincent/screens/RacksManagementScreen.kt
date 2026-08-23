@@ -21,6 +21,7 @@ import fr.geoking.vincent.data.Racks
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.DataImportCard
+import fr.geoking.vincent.ui.DataPreviewList
 import fr.geoking.vincent.ui.RedImportButton
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.ImportStatusBanner
@@ -76,6 +77,13 @@ fun RacksManagementScreen(onBack: () -> Unit) {
                 }
                 null -> Unit
             }
+
+            Spacer(Modifier.height(8.dp))
+            DataPreviewList(
+                items = Racks.all,
+                label = { it.name },
+                secondary = { "${it.cols}×${it.rows} · ${it.occupiedCount}/${it.capacity}" },
+            )
 
             Spacer(Modifier.height(24.dp))
         }

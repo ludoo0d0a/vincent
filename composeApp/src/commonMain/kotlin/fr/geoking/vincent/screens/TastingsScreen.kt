@@ -21,6 +21,7 @@ import fr.geoking.vincent.data.Tastings
 import fr.geoking.vincent.data.rememberCsvImport
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.DataImportCard
+import fr.geoking.vincent.ui.DataPreviewList
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.ImportStatusBanner
 import fr.geoking.vincent.ui.RedImportButton
@@ -75,6 +76,19 @@ fun TastingsScreen(onBack: () -> Unit) {
                 }
                 null -> Unit
             }
+
+            Spacer(Modifier.height(8.dp))
+            DataPreviewList(
+                items = Tastings.all,
+                label = { it.wineName },
+                secondary = {
+                    buildString {
+                        append(it.date)
+                        if (it.place.isNotBlank()) append(" · ").append(it.place)
+                        if (it.rating > 0) append(" · ").append(it.rating)
+                    }
+                },
+            )
 
             Spacer(Modifier.height(24.dp))
         }

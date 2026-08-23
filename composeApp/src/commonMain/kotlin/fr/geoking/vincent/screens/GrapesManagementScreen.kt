@@ -20,6 +20,7 @@ import fr.geoking.vincent.data.ReferenceDataImport
 import fr.geoking.vincent.data.rememberJsonImport
 import fr.geoking.vincent.theme.VincentColors
 import fr.geoking.vincent.ui.DataImportCard
+import fr.geoking.vincent.ui.DataPreviewList
 import fr.geoking.vincent.ui.DataScreenHeader
 import fr.geoking.vincent.ui.ImportStatusBanner
 import fr.geoking.vincent.ui.RedImportButton
@@ -84,6 +85,16 @@ fun GrapesManagementScreen(onBack: () -> Unit) {
                     },
                 )
             }
+
+            Spacer(Modifier.height(8.dp))
+            DataPreviewList(
+                items = Grapes.all,
+                label = { it.name },
+                secondary = {
+                    listOf(it.color, it.country).filter { s -> s.isNotBlank() }.joinToString(" · ")
+                        .ifBlank { null }
+                },
+            )
 
             Spacer(Modifier.height(24.dp))
         }

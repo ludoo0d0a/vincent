@@ -176,7 +176,9 @@ class MainActivity : ComponentActivity() {
             Producers.bootstrap(producerRepo)
             Suppliers.bootstrap(supplierRepo)
             Regions.bootstrap(regionRepo)
-            Grapes.bootstrap(grapeRepo) { loadBundledPopularGrapes() }
+            Grapes.bootstrap(grapeRepo) {
+                if (Settings.demoDataSeeded) emptyList() else loadBundledPopularGrapes()
+            }
             Appellations.bootstrap(appellationRepo)
             loadBundledOriginCentroids()
             if (shouldSeed) {

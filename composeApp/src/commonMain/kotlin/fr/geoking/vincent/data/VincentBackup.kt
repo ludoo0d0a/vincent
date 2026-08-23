@@ -119,7 +119,7 @@ object VincentBackup {
     }
 
     suspend fun clearAll() {
-        cloudSyncClearAll()
+        // Local wipe first so a cloud failure cannot abort the reset.
         Cellar.clearAll()
         Racks.clearAll()
         Tastings.clearAll()
@@ -128,6 +128,7 @@ object VincentBackup {
         Regions.clearAll()
         Grapes.clearAll()
         Appellations.clearAll()
+        runCatching { cloudSyncClearAll() }
     }
 
     private suspend fun embedPhoto(

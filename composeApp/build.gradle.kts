@@ -119,6 +119,9 @@ android {
         // Feature flag for the ARCore "AR cellar" screen. Optional AR_ENABLED in
         // local.properties / CI env (true|false) flips it; defaults to enabled.
         buildConfigField("Boolean", "AR_ENABLED", secret("AR_ENABLED").ifBlank { "true" })
+        // Cloud Firestore sync (bottles/racks/…). Optional CLOUD_SYNC in
+        // local.properties / CI env (true|false); defaults to disabled.
+        buildConfigField("Boolean", "CLOUD_SYNC", secret("CLOUD_SYNC").ifBlank { "false" })
         // Wine data provider credentials/source. "xxx" placeholders mean "not
         // configured": the matching providers stay inert until a real value is set
         // via local.properties / gradle properties / CI env.

@@ -12,6 +12,8 @@ object Grapes {
 
     private var repo: GrapeRepository? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Bumped on [clearAll] so in-flight [persist] upserts cannot recreate wiped rows. */
+    private var generation = 0
 
     suspend fun bootstrap(repository: GrapeRepository, seedIfEmpty: suspend () -> List<Grape> = { emptyList() }) {
         repo = repository
@@ -61,19 +63,24 @@ object Grapes {
     }
 
     suspend fun clearAll() {
-        repo?.deleteAll()
+        generation++
         all.clear()
+        repo?.deleteAll()
     }
 
     private fun persist(g: Grape) {
         val repository = repo ?: return
-        scope.launch { repository.upsert(g) }
+        val gen = generation
+        scope.launch {
+            if (gen != generation) return@launch
+            repository.upsert(g)
+        }
     }
 }
 
-/** Fallback when Room is empty ó mirrors [PopularGrapes] in BottleFormPickers. */
+/** Fallback when Room is empty ù mirrors [PopularGrapes] in BottleFormPickers. */
 val PopularGrapeNames = listOf(
     "Cabernet Sauvignon", "Merlot", "Pinot Noir", "Syrah", "Grenache", "Chardonnay",
     "Sauvignon Blanc", "Chenin", "Riesling", "Gamay", "Viognier", "Carignan",
-    "MourvËdre", "Cinsault", "Semillon", "Muscat", "Malbec", "Tempranillo",
+    "Mourvùdre", "Cinsault", "Semillon", "Muscat", "Malbec", "Tempranillo",
 )
