@@ -43,3 +43,9 @@ http/http-client.private.env.json
 
 # Local symlink to shared tools (link-scripts.sh; CI checks out the repo here)
 /geoking-tools
+
+# Logs and Python bytecode
+*.log
+*.pyc
+__pycache__/
+
