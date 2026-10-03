@@ -20,13 +20,33 @@ concurrency:
   group: play-release
   cancel-in-progress: true
 
+# Project-scoped secrets → env. Kept here, not in geoking-ci.
+env:
+  KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 || secrets.SIGNING_KEY }}
+  KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.KEY_STORE_PASSWORD }}
+  KEY_ALIAS: ${{ secrets.KEY_ALIAS || secrets.ALIAS }}
+  KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+  PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON || secrets.SERVICE_ACCOUNT_JSON }}
+  GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+  WEB_CLIENT_ID: ${{ secrets.WEB_CLIENT_ID }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  AI_PROXY_URL: ${{ secrets.AI_PROXY_URL }}
+  AR_ENABLED: ${{ secrets.AR_ENABLED }}
+  CLOUD_SYNC: ${{ secrets.CLOUD_SYNC }}
+  GRAPEMINDS_API_KEY: ${{ secrets.GRAPEMINDS_API_KEY }}
+  GEMMA_MODEL_URL: ${{ secrets.GEMMA_MODEL_URL }}
+
 jobs:
   release:
-    uses: ludoo0d0a/geoking-ci/.github/workflows/release-play.yml@main
-    with:
-      package_name: fr.geoking.vincent
-      is_workflow_dispatch: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
-      workflow_dispatch_track: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.track || '' }}
-      workflow_dispatch_skip_review: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.changesNotSentForReview && 'true' || 'false' }}
-      version_name_override: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Release to Play
+        uses: ludoo0d0a/geoking-ci/actions/gk-release-play@main
+        with:
+          package_name: fr.geoking.vincent
+          is_workflow_dispatch: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
+          workflow_dispatch_track: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.track || '' }}
+          workflow_dispatch_skip_review: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.changesNotSentForReview == 'true' && 'true' || 'false' }}
+          version_name_override: ${{ github.ref_type == 'tag' && github.ref_name || '' }}

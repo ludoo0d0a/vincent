@@ -40,3 +40,6 @@ docs/
 # IntelliJ HTTP Client private env — holds the grapeminds API key + Firebase tokens
 http/http-client.private.env.json
 **/http-client.private.env.json
+
+# Local symlink to shared tools (link-scripts.sh; CI checks out the repo here)
+/geoking-tools
