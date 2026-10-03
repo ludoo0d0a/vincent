@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- ARCore is optional: the app still installs on non-AR devices; the feature
          flag + runtime ArCoreApk check hide/disable the AR screen there. -->

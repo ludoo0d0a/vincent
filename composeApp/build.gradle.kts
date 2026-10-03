@@ -79,7 +79,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.play.services)
             implementation(libs.google.code.scanner)
             implementation(libs.google.mlkit.text.recognition)
-            implementation(libs.google.app.update.ktx)
+            implementation("fr.geoking.tools:in-app-update")
             implementation(libs.coil.compose)
             // ARCore (Google Play Services for AR) + SceneView (Filament + Compose)
             // for the offline AR cellar screen. Android target only.

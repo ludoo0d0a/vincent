@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_available_title">Mise à jour disponible</string>
+    <string name="update_available_message">Une nouvelle version de Vincent est disponible. Téléchargement en arrière-plan — l\'application redémarrera ensuite.</string>
+</resources>

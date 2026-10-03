@@ -239,10 +239,10 @@ Keys present in `local.properties` but **not read by the app code** (used by CI/
 - **Manual entry (wired).** A real form in the Add screen (`screens/AddScreen.kt`) for
   domaine/appellation/colour/category/vintage/price/quantity/rack — the reliable path when
   AI/lookup miss. The confirm button stays disabled until there is a real bottle.
-- **In-app updates (wired).** `MainActivity` uses **Play In-App Updates** (flexible):
-  on startup it checks Play, shows the update popup, downloads in the background, and
-  **auto-completes (restarts) as soon as the download finishes**. Only active for
-  Play-installed builds; a no-op in debug/sideload.
+- **In-app updates (wired).** Shared `fr.geoking.tools:in-app-update` (geoking-tools):
+  flexible Play update at startup (dialog + notification), background download, then
+  **auto-complete (restart)**. Settings → **Check for updates**. Tap the notification
+  to start without a second confirm. Play-installed builds only; soft no-op in debug/sideload.
 - **Still to wire**: photo sync to cloud storage.
 - **Cloud sync (phase 1, wired).** Signed-in Google users sync cellar **metadata**
   (bottles, racks, tastings, producers, suppliers) to **Firestore** under

@@ -42,7 +42,7 @@ patterns instead of copying verbatim.
 | `testing-setup` | **Partial** | Unit tests only; no Compose UI / instrumented tests yet |
 | `android-cli` | **Active** | adb, logcat (`LogcatScreen`), Play in-app updates |
 | `r8-analyzer` | **Future** | `isMinifyEnabled = false` in release — enable minify first |
-| `agp-9-upgrade` | **Not yet** | AGP **8.13.2** (`gradle/libs.versions.toml`) |
+| `agp-9-upgrade` | **Partial** | AGP **9.4.0** with `android.builtInKotlin=false` / `newDsl=false` (monolithic `composeApp`); full split still TODO |
 | `navigation-3` | **Not applicable** | Custom stack; large migration — only if explicitly requested |
 | `migrate-xml-views-to-jetpack-compose` | **N/A** | Already 100 % Compose |
 | `play-billing-library-version-upgrade` | **N/A** | No Play Billing dependency |
@@ -105,14 +105,14 @@ None known. When adding a new screen with `TextField` / `OutlinedTextField` / `B
 
 | Item | Value / file |
 |------|----------------|
-| AGP | 8.13.2 |
+| AGP | 9.4.0 (Gradle 9.6; KMP opt-out flags in `gradle.properties`) |
 | Kotlin | 2.3.21 · KSP 2.3.9 |
-| SDK | min 24 · compile/target **36** |
+| SDK | min **26** · compile **37** · target **36** |
 | JDK | 21 (`jvmToolchain(21)`) |
 | Minify | **off** (`release.isMinifyEnabled = false`) |
 | Signing | `secret("KEYSTORE_*")` — CI via `.github/workflows/` |
 | Version | `playstore/version.properties` |
-| Play updates | `MainActivity` — flexible in-app updates (`app-update-ktx`) |
+| Play updates | `MainActivity` + Settings via `fr.geoking.tools:in-app-update` |
 
 Before enabling R8/minify, run `r8-analyzer.mdc` and add keep rules for Room, Firebase, BoofCV, SceneView, ARCore.
 

@@ -35,7 +35,7 @@ Package: `fr.geoking.vincent`. Full docs: `README.md`.
 
 ## Stack
 
-Kotlin 2.3 · Compose MP 1.11 · Material 3 · Room (KSP) · JDK 21 · min SDK 24.
+Kotlin 2.3 · Compose MP 1.11 · Material 3 · Room (KSP) · JDK 21 · AGP 9.4 · min SDK 26.
 
 ## Android skills
 

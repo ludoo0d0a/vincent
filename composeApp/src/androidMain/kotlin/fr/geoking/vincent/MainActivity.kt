@@ -1,31 +1,54 @@
 package fr.geoking.vincent
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.google.android.play.core.appupdate.AppUpdateManager
-import com.google.android.play.core.appupdate.AppUpdateManagerFactory
-import com.google.android.play.core.appupdate.AppUpdateOptions
-import com.google.android.play.core.install.InstallStateUpdatedListener
-import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
-import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.firebase.appcheck.AppCheckProviderFactory
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
-import fr.geoking.vincent.data.*
-import fr.geoking.vincent.db.*
+import fr.geoking.tools.inappupdate.UpdateNotificationSpec
+import fr.geoking.vincent.data.Appellations
+import fr.geoking.vincent.data.Cellar
+import fr.geoking.vincent.data.CloudSyncRepos
+import fr.geoking.vincent.data.Grapes
+import fr.geoking.vincent.data.Producers
+import fr.geoking.vincent.data.Racks
+import fr.geoking.vincent.data.Regions
+import fr.geoking.vincent.data.Settings
+import fr.geoking.vincent.data.Suppliers
+import fr.geoking.vincent.data.Tastings
+import fr.geoking.vincent.data.UpdateState
+import fr.geoking.vincent.data.Updater
+import fr.geoking.vincent.data.bootstrapAuth
+import fr.geoking.vincent.data.cloudSyncOnReady
+import fr.geoking.vincent.data.initCloudSync
+import fr.geoking.vincent.data.loadBundledOriginCentroids
+import fr.geoking.vincent.data.loadBundledPopularGrapes
+import fr.geoking.vincent.db.RoomAppellationRepository
+import fr.geoking.vincent.db.RoomCellarRepository
+import fr.geoking.vincent.db.RoomGrapeRepository
+import fr.geoking.vincent.db.RoomProducerRepository
+import fr.geoking.vincent.db.RoomRackRepository
+import fr.geoking.vincent.db.RoomRegionRepository
+import fr.geoking.vincent.db.RoomSupplierRepository
+import fr.geoking.vincent.db.RoomTastingRepository
+import fr.geoking.vincent.db.VincentDatabase
+import fr.geoking.tools.inappupdate.CheckFeedback
+import fr.geoking.vincent.ui.UpdateAvailableDialog
+import fr.geoking.vincent.ui.UpdateCheckFeedbackDialog
+import fr.geoking.vincent.update.InAppUpdateHelper
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.getString
-import vincent.composeapp.generated.resources.*
 
 private val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -98,39 +121,23 @@ private val MIGRATION_3_4 = object : Migration(3, 4) {
 
 class MainActivity : ComponentActivity() {
 
-    private val appUpdateManager: AppUpdateManager by lazy { AppUpdateManagerFactory.create(applicationContext) }
-
-    // Flexible update: show a non-blocking download banner while it downloads, then
-    // auto-complete it (restarts the app) as soon as the download finishes.
-    private val installListener = InstallStateUpdatedListener { state ->
-        when (state.installStatus()) {
-            InstallStatus.PENDING -> UpdateState.onDownloading(null)
-
-            InstallStatus.DOWNLOADING -> {
-                val total = state.totalBytesToDownload()
-                val fraction = if (total > 0) state.bytesDownloaded().toFloat() / total else null
-                UpdateState.onDownloading(fraction)
-            }
-
-            InstallStatus.DOWNLOADED -> {
-                // Keep the banner up; the app restarts almost immediately.
-                UpdateState.onDownloading(1f)
-                MainScope().launch {
-                    Toast.makeText(this@MainActivity, getString(Res.string.update_downloaded), Toast.LENGTH_SHORT).show()
-                    appUpdateManager.completeUpdate()
-                }
-            }
-
-            InstallStatus.FAILED, InstallStatus.CANCELED -> UpdateState.onIdle()
-
-            else -> {}
-        }
+    private val inAppUpdateHelper by lazy {
+        InAppUpdateHelper(
+            context = applicationContext,
+            notificationSpec = UpdateNotificationSpec(
+                channelId = "vincent_updates",
+                channelName = getString(R.string.update_available_title),
+                smallIcon = R.drawable.ic_notification,
+                title = getString(R.string.update_available_title),
+                message = getString(R.string.update_available_message),
+                launchActivityClass = MainActivity::class.java,
+            ),
+        )
     }
 
-    // Launches Google's update confirmation dialog; the result needs no handling
-    // (cancel = nothing; the install listener drives the rest).
-    private val updateLauncher =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { }
+    private val updateResultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { /* cancel / failure: no-op */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Force dark status/nav icons (light bar appearance) over our light background,
@@ -202,55 +209,75 @@ class MainActivity : ComponentActivity() {
 
         bootstrapAuth()
 
-        appUpdateManager.registerListener(installListener)
-        Updater.triggerUpdate = { manual -> checkForUpdate(manual) }
-        checkForUpdate(manual = false)
+        inAppUpdateHelper.consumeLaunchIntent(intent)
+        Updater.triggerUpdate = { manual -> inAppUpdateHelper.checkForUpdate(manual) }
+        inAppUpdateHelper.checkForUpdate()
 
         setContent {
+            val updateAvailable by inAppUpdateHelper.updateAvailable.collectAsState()
+            val autoStartUpdate by inAppUpdateHelper.autoStartUpdate.collectAsState()
+            val installStatus by inAppUpdateHelper.installStatus.collectAsState()
+            val checkFeedback by inAppUpdateHelper.checkFeedback.collectAsState()
+
+            LaunchedEffect(updateAvailable, autoStartUpdate) {
+                if (autoStartUpdate && updateAvailable != null) {
+                    inAppUpdateHelper.maybeAutoStartUpdate(updateResultLauncher)
+                }
+            }
+
+            // Drive the commonMain download banner from the shared helper status.
+            LaunchedEffect(installStatus) {
+                val inProgress = installStatus == InstallStatus.PENDING ||
+                    installStatus == InstallStatus.DOWNLOADING ||
+                    installStatus == InstallStatus.INSTALLING ||
+                    installStatus == InstallStatus.DOWNLOADED
+                if (inProgress) UpdateState.onDownloading(null) else UpdateState.onIdle()
+            }
+
             App()
+
+            val dialogUpdate = updateAvailable?.takeUnless { autoStartUpdate }
+            dialogUpdate?.let { info ->
+                UpdateAvailableDialog(
+                    onCancel = { inAppUpdateHelper.dismissUpdate() },
+                    onUpdate = { inAppUpdateHelper.startUpdate(info, updateResultLauncher) },
+                )
+            }
+
+            when (val feedback = checkFeedback) {
+                is CheckFeedback.UpToDate -> {
+                    UpdateCheckFeedbackDialog(
+                        isError = false,
+                        onDismiss = { inAppUpdateHelper.resetCheckFeedback() },
+                    )
+                }
+                is CheckFeedback.Error -> {
+                    UpdateCheckFeedbackDialog(
+                        isError = true,
+                        errorMessage = feedback.message,
+                        onDismiss = { inAppUpdateHelper.resetCheckFeedback() },
+                    )
+                }
+                CheckFeedback.None -> Unit
+            }
         }
     }
 
-    /** On startup: if Play has an update, show the (flexible) update popup. */
-    private fun checkForUpdate(manual: Boolean) {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
-                info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    updateLauncher,
-                    AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
-                )
-            } else if (manual) {
-                MainScope().launch {
-                    val msg = if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE) {
-                        getString(Res.string.update_ineligible)
-                    } else {
-                        getString(Res.string.update_up_to_date)
-                    }
-                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
-                }
-            }
-        }.addOnFailureListener {
-            if (manual) {
-                MainScope().launch {
-                    Toast.makeText(this@MainActivity, getString(Res.string.update_error), Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        inAppUpdateHelper.consumeLaunchIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        // If a flexible update finished downloading while the app was backgrounded, finish it.
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.installStatus() == InstallStatus.DOWNLOADED) appUpdateManager.completeUpdate()
+        if (inAppUpdateHelper.installStatus.value == InstallStatus.DOWNLOADED) {
+            inAppUpdateHelper.completeUpdate()
         }
     }
 
     override fun onDestroy() {
-        appUpdateManager.unregisterListener(installListener)
+        inAppUpdateHelper.unregister()
         Updater.triggerUpdate = null
         super.onDestroy()
     }

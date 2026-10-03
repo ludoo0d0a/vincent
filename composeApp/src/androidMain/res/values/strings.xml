@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Used outside Compose (notification channel / content). -->
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_message">A new version of Vincent is available. Download it in the background — the app will restart when ready.</string>
+</resources>
