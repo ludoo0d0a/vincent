@@ -28,6 +28,12 @@ fun secret(key: String): String {
     return ""
 }
 
+fun secretFlag(key: String): Boolean =
+    when (secret(key).trim().lowercase()) {
+        "true", "1", "yes" -> true
+        else -> false
+    }
+
 // On CI, the google-services.json is provided via an environment variable or local.properties.
 // This block writes it to the expected location before the Google Services plugin runs.
 secret("GOOGLE_SERVICES_JSON").takeIf { it.isNotBlank() }?.let { json ->
@@ -128,6 +134,9 @@ android {
         buildConfigField("String", "GRAPEMINDS_API_KEY", "\"${secret("GRAPEMINDS_API_KEY").ifBlank { "xxx" }}\"")
         // Optional CDN / mirror for the on-device Gemma .task file. Blank → Hugging Face default.
         buildConfigField("String", "GEMMA_MODEL_URL", "\"${secret("GEMMA_MODEL_URL")}\"")
+        // Developer UI: on for debug builds; off for release / Play Store by default.
+        // Debug can still opt via local.properties DEBUG_DEV (redundant with BuildConfig.DEBUG).
+        buildConfigField("boolean", "DEBUG_DEV", "false")
     }
 
     buildFeatures {
@@ -162,10 +171,15 @@ android {
 
         getByName("debug") {
             buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+            // local.properties / CI: DEBUG_DEV=true (optional; BuildConfig.DEBUG already gates UI).
+            buildConfigField("boolean", "DEBUG_DEV", secretFlag("DEBUG_DEV").toString())
         }
         getByName("release") {
             isMinifyEnabled = false
             buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+            // Play Store AABs must not ship developer UI. Do not read DEBUG_DEV from
+            // local.properties here — a local DEBUG_DEV=true would otherwise bake into release.
+            buildConfigField("boolean", "DEBUG_DEV", "false")
             if (keystorePath.isNotBlank()) {
                 signingConfig = signingConfigs.getByName("release")
             }

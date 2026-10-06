@@ -35,6 +35,7 @@ env:
   CLOUD_SYNC: ${{ secrets.CLOUD_SYNC }}
   GRAPEMINDS_API_KEY: ${{ secrets.GRAPEMINDS_API_KEY }}
   GEMMA_MODEL_URL: ${{ secrets.GEMMA_MODEL_URL }}
+  # DEBUG_DEV intentionally unset: release / Play Store builds keep developer UI off.
 
 jobs:
   release:
